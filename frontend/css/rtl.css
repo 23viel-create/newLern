@@ -1,5 +1,4 @@
-/* תמיכת RTL — המסמך כולו מוגדר dir="rtl" ב-HTML.
-   קובץ זה מטפל בתיקוני מרווח ומיקום ספציפיים ל-RTL. */
+/* RTL corrections — all pages have dir="rtl" in HTML */
 
 .navbar            { flex-direction: row-reverse; }
 .navbar__links     { flex-direction: row-reverse; }
@@ -8,12 +7,31 @@
 .modal__actions    { flex-direction: row-reverse; }
 .tree-toolbar      { flex-direction: row-reverse; }
 .tree-toolbar__actions  { flex-direction: row-reverse; }
-.tree-toolbar__controls { flex-direction: row-reverse; margin-inline-start: auto; }
+.tree-toolbar__controls { flex-direction: row-reverse; }
 
-/* הכפתורים בשורת עץ מיושרים לסוף (שמאל) */
 .tree-node__actions { margin-inline-start: auto; }
 
-/* פתיחת עץ — החץ מסתובב לאחר הרחבה */
-.tree-node--folder.tree-node--expanded > .tree-node__row .tree-node__toggle {
-  transform: rotate(90deg);
+/* Editor header — back button on right, actions on left */
+.editor-header { flex-direction: row-reverse; }
+.editor-nav    { flex-direction: row-reverse; }
+.editor-header-actions { flex-direction: row-reverse; }
+
+/* 3-column layout: audio panel on right, AI panel on left */
+.editor-body { flex-direction: row-reverse; }
+
+/* Audio panel border */
+.editor-panel--audio {
+  border-inline-start: none;
+  border-inline-end: 1px solid var(--color-border);
 }
+.editor-panel--ai { border-inline-start: 1px solid var(--color-border); border-inline-end: none; }
+
+/* Formatting toolbar RTL */
+.editor-toolbar { flex-direction: row-reverse; }
+
+/* Modal actions */
+.modal__actions { flex-direction: row-reverse; }
+.audio-actions  { flex-direction: row-reverse; }
+
+/* Bulk import */
+.form-row { flex-direction: row-reverse; }

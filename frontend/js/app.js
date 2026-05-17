@@ -1,6 +1,7 @@
 // נקודת כניסה ראשית של האפליקציה
 document.addEventListener('DOMContentLoaded', () => {
   WindowManager.initOfflineDetection();
+  EditorManager.init();
   loadKeyCount();
 
   // ניווט בין תצוגות
@@ -8,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const view = link.dataset.view;
+      document.body.classList.remove('editor-open');
       WindowManager.showView(view);
       if (view === 'summaries') SummariesManager.init();
     });
@@ -29,14 +31,12 @@ async function loadTodayTasks() {
       return;
     }
     container.innerHTML = tasks
-      .map(
-        (t) => `
+      .map((t) => `
         <div class="card">
           <h3>${escHtml(t.title || t.id)}</h3>
           <p class="hint">מועד: ${escHtml(t.dueDate)}</p>
           <button class="btn btn--primary" onclick="markDone('${escHtml(t.id)}')">סיימתי ✓</button>
-        </div>`,
-      )
+        </div>`)
       .join('');
   } catch {
     container.innerHTML = '<p class="placeholder-text">לא ניתן לטעון משימות</p>';
@@ -52,23 +52,14 @@ async function markDone(taskId) {
   }
 }
 
-// ─── סטטוס AI ─────────────────────────────────────────────────────────────────
-
 async function loadKeyCount() {
-  try {
-    await Api.health();
-    // TODO: /api/ai/status — יוחזר בשלב AI
-  } catch {
-    // השרת אינו זמין
-  }
+  try { await Api.health(); } catch {}
 }
 
 // ─── עזר גלובלי ───────────────────────────────────────────────────────────────
 
 function escHtml(str) {
   return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }

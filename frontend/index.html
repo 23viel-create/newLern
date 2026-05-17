@@ -39,18 +39,15 @@
     <section id="view-summaries" class="view hidden">
       <div class="page-header">
         <h1>בחירת תכנים</h1>
-
-        <!-- סרגל כלים -->
         <div class="tree-toolbar">
           <div class="tree-toolbar__actions">
             <button class="btn btn--secondary" data-action="new-folder" data-path="">
-              <span>📁</span> תיקייה חדשה
+              📁 תיקייה חדשה
             </button>
             <button class="btn btn--primary" data-action="new-summary" data-path="">
-              <span>📄</span> סיכום חדש
+              📄 סיכום חדש
             </button>
           </div>
-
           <div class="tree-toolbar__controls">
             <div class="sort-group">
               <label for="treeSort">מיין לפי:</label>
@@ -67,10 +64,104 @@
           </div>
         </div>
       </div>
-
-      <!-- עץ הסיכומים -->
       <div id="summariesTree" class="tree-container">
         <p class="placeholder-text">טוען סיכומים...</p>
+      </div>
+    </section>
+
+    <!-- ── עורך סיכום (full-bleed, overrides container) ── -->
+    <section id="view-editor" class="view hidden editor-view">
+
+      <!-- כותרת עם ניווט -->
+      <div class="editor-header">
+        <button id="editorBackBtn" class="btn btn--secondary btn--sm">← חזרה</button>
+        <div class="editor-nav">
+          <button id="editorPrevBtn" class="btn btn--ghost btn--sm" title="סיכום קודם (Alt+←)">❮ הקודם</button>
+          <h2 id="editorTitle" class="editor-title">—</h2>
+          <button id="editorNextBtn" class="btn btn--ghost btn--sm" title="סיכום הבא (Alt+→)">הבא ❯</button>
+        </div>
+        <div class="editor-header-actions">
+          <span id="editorSaveStatus" class="save-status save-status--saved">נשמר ✓</span>
+          <button id="bulkImportBtn" class="btn btn--secondary btn--sm">📥 ייבוא בתפזורת</button>
+        </div>
+      </div>
+
+      <!-- גוף 3 עמודות -->
+      <div class="editor-body">
+
+        <!-- עמודה ימין: הקלטות שמע -->
+        <aside class="editor-panel editor-panel--audio" id="audioPanel">
+          <div class="panel-header">
+            <h3>הקלטות שמע</h3>
+          </div>
+          <div class="audio-actions">
+            <button id="recordBtn" class="btn btn--primary btn--sm">🎤 הקלט</button>
+            <label class="btn btn--secondary btn--sm" for="audioUploadInput" style="cursor:pointer">📤 העלה</label>
+            <input type="file" id="audioUploadInput" accept="audio/*" hidden />
+          </div>
+          <div id="recordingStatus" class="recording-status hidden">
+            <span class="rec-dot"></span>
+            <span id="recordingTime">00:00</span>
+            <button id="stopRecordBtn" class="btn btn--danger btn--xs">⏹ עצור</button>
+          </div>
+          <ul id="audioList" class="audio-list">
+            <li class="audio-empty placeholder-text">אין הקלטות</li>
+          </ul>
+        </aside>
+
+        <!-- עמודה אמצע: עורך -->
+        <div class="editor-main">
+          <div class="editor-toolbar" id="editorToolbar">
+            <button class="fmt-btn" data-cmd="bold"               title="מודגש (Ctrl+B)"><b>ב</b></button>
+            <button class="fmt-btn" data-cmd="italic"             title="נטוי (Ctrl+I)"><i>נ</i></button>
+            <button class="fmt-btn" data-cmd="underline"          title="קו תחתון (Ctrl+U)"><u>ק</u></button>
+            <span class="toolbar-sep"></span>
+            <select id="editorFontFamily" class="select-field select-field--sm" title="גופן">
+              <option value="Arial, sans-serif">Arial</option>
+              <option value="'David', serif">David</option>
+              <option value="'Times New Roman', serif">Times</option>
+              <option value="'Courier New', monospace">Courier</option>
+            </select>
+            <select id="editorFontSize" class="select-field select-field--sm" title="גודל גופן">
+              <option value="12px">12</option>
+              <option value="14px">14</option>
+              <option value="16px" selected>16</option>
+              <option value="18px">18</option>
+              <option value="20px">20</option>
+              <option value="24px">24</option>
+              <option value="32px">32</option>
+            </select>
+            <span class="toolbar-sep"></span>
+            <button class="fmt-btn" data-cmd="insertUnorderedList" title="רשימה">•≡</button>
+            <button class="fmt-btn" data-cmd="insertOrderedList"   title="רשימה ממוספרת">1≡</button>
+            <span class="toolbar-sep"></span>
+            <button class="fmt-btn" data-cmd="justifyRight"  title="יישור לימין">⬛R</button>
+            <button class="fmt-btn" data-cmd="justifyCenter" title="מרכוז">⬛C</button>
+            <button class="fmt-btn" data-cmd="justifyLeft"   title="יישור לשמאל">⬛L</button>
+            <span class="toolbar-sep"></span>
+            <button class="fmt-btn" data-cmd="removeFormat" title="נקה עיצוב">✕</button>
+          </div>
+
+          <div id="editorContent"
+               class="editor-content"
+               contenteditable="true"
+               dir="rtl"
+               spellcheck="true"
+               data-placeholder="התחל לכתוב את הסיכום כאן..."></div>
+        </div>
+
+        <!-- עמודה שמאל: מסייע AI (placeholder) -->
+        <aside class="editor-panel editor-panel--ai">
+          <div class="panel-header">
+            <h3>מסייע AI</h3>
+          </div>
+          <div class="ai-placeholder">
+            <div class="ai-placeholder__icon">🤖</div>
+            <p>מסייע ה-AI יהיה זמין בשלב 6 של הפיתוח.</p>
+            <p class="hint">יצירת שאלות, סיכום אוטומטי וניתוח תוכן.</p>
+          </div>
+        </aside>
+
       </div>
     </section>
 
@@ -103,7 +194,6 @@
       <h2 id="confirmModalTitle">אישור מחיקה</h2>
       <p id="modalMessage">האם אתה בטוח שברצונך למחוק פריט זה? לא ניתן לשחזר את הפעולה.</p>
       <div class="modal__actions">
-        <!-- "ביטול" מקבל focus כדי למנוע מחיקה בטעות על ידי Enter -->
         <button id="modalCancelBtn"  class="btn btn--secondary" autofocus>ביטול</button>
         <button id="modalConfirmBtn" class="btn btn--danger">כן, מחק</button>
       </div>
@@ -126,9 +216,59 @@
     </div>
   </div>
 
+  <!-- ══════════════════ מודל ייבוא בתפזורת ══════════════════ -->
+  <div id="bulkImportModal" class="modal hidden"
+       role="dialog" aria-modal="true" aria-labelledby="bulkImportTitle">
+    <div class="modal__overlay"></div>
+    <div class="modal__box modal__box--wide">
+      <h2 id="bulkImportTitle">📥 ייבוא תוכן בתפזורת</h2>
+
+      <div class="form-group">
+        <label class="form-label" for="bulkParentSelect">תיקיית יעד</label>
+        <select id="bulkParentSelect" class="select-field input-field--full"></select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group form-group--half">
+          <label class="form-label" for="bulkBaseName">שם בסיס לסיכומים</label>
+          <input type="text" id="bulkBaseName" class="input-field input-field--full"
+                 placeholder="לדוגמה: פרק" value="סיכום" maxlength="80" />
+        </div>
+        <div class="form-group form-group--half">
+          <label class="form-label" for="bulkDelimiter">מפריד (delimiter)</label>
+          <input type="text" id="bulkDelimiter" class="input-field input-field--full"
+                 value="---" maxlength="50" />
+          <p class="hint">הטקסט יפוצל בכל הופעת המפריד</p>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">קובץ טקסט (אופציונלי)</label>
+        <input type="file" id="bulkFileInput" class="input-field" accept=".txt,.md" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="bulkContent">תוכן לייבוא</label>
+        <textarea id="bulkContent" class="input-field input-field--full editor-textarea"
+                  rows="10" placeholder="הדבק תוכן כאן, או העלה קובץ..."></textarea>
+      </div>
+
+      <div id="bulkPreview" class="bulk-preview hidden">
+        <strong id="bulkPreviewCount"></strong>
+      </div>
+
+      <div class="modal__actions">
+        <button id="bulkCancelBtn"  class="btn btn--secondary">ביטול</button>
+        <button id="bulkPreviewBtn" class="btn btn--ghost">תצוגה מקדימה</button>
+        <button id="bulkConfirmBtn" class="btn btn--primary">ייבא</button>
+      </div>
+    </div>
+  </div>
+
   <script src="js/api.js"></script>
   <script src="js/windowManager.js"></script>
   <script src="js/summariesManager.js"></script>
+  <script src="js/editorManager.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

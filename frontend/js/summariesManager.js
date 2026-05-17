@@ -160,13 +160,26 @@ const SummariesManager = (() => {
         <div class="tree-node__row" ${indent}>
           <span class="tree-node__spacer"></span>
           <span class="tree-node__icon" aria-hidden="true">📄</span>
-          <span class="tree-node__name">${title}</span>
+          <span class="tree-node__name tree-node__name--link"
+                data-action="open" data-path="${p}"
+                role="button" tabindex="0" title="פתח סיכום">${title}</span>
           <div class="tree-node__actions">
             <button class="btn btn--xs btn--ghost" data-action="rename" data-path="${p}" data-name="${rawName}">✏️</button>
             <button class="btn btn--xs btn--danger-ghost" data-action="delete" data-path="${p}" data-name="${rawName}" data-type="summary">🗑️</button>
           </div>
         </div>
       </li>`;
+  }
+
+  // ─── flatten (for editor navigation) ───────────────────────────────────────
+
+  function flattenSummaries(nodes) {
+    const out = [];
+    for (const n of nodes) {
+      if (n.type === 'summary')           out.push(n);
+      else if (n.children?.length)        out.push(...flattenSummaries(n.children));
+    }
+    return out;
   }
 
   // ─── אירועים ────────────────────────────────────────────────────────────────
@@ -239,6 +252,14 @@ const SummariesManager = (() => {
         } catch (err) {
           alert(`שגיאה: ${err.message}`);
         }
+        break;
+      }
+
+      case 'open': {
+        // flatten the sorted tree (not filtered) so nav works across all summaries
+        const flatList = flattenSummaries(sortTree(treeData));
+        const node     = flatList.find(n => n.path === nodePath);
+        if (node) EditorManager.open(node, flatList);
         break;
       }
 
