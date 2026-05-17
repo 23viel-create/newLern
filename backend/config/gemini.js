@@ -2,7 +2,6 @@ const fs = require('fs');
 const path = require('path');
 
 const AI_KEYS_FILE = path.join(__dirname, '../../data/ai_keys.json');
-const MAX_KEYS = 5;
 
 // In-memory quota tracking per key
 const keyStats = {};
@@ -19,9 +18,11 @@ function _loadSavedKeys() {
 
 function _loadEnvKeys() {
   const keys = [];
-  for (let i = 1; i <= MAX_KEYS; i++) {
+  // Support any number of GEMINI_API_KEY_N env vars
+  for (let i = 1; i <= 100; i++) {
     const k = process.env[`GEMINI_API_KEY_${i}`];
-    if (k && k.trim()) keys.push(k.trim());
+    if (!k || !k.trim()) break; // stop at first gap
+    keys.push(k.trim());
   }
   return keys;
 }
@@ -33,11 +34,11 @@ function getApiKeys() {
   for (const k of env) {
     if (!all.includes(k)) all.push(k);
   }
-  return all.slice(0, MAX_KEYS);
+  return all;
 }
 
 function saveApiKeys(keys) {
-  const valid = keys.filter(k => k && k.trim()).slice(0, MAX_KEYS);
+  const valid = keys.filter(k => k && k.trim());
   fs.mkdirSync(path.dirname(AI_KEYS_FILE), { recursive: true });
   fs.writeFileSync(AI_KEYS_FILE, JSON.stringify({ keys: valid }, null, 2));
 }
@@ -80,4 +81,4 @@ function getKeyStatus() {
   });
 }
 
-module.exports = { getApiKeys, saveApiKeys, getNextKey, recordUsage, recordError, getKeyStatus, MAX_KEYS };
+module.exports = { getApiKeys, saveApiKeys, getNextKey, recordUsage, recordError, getKeyStatus };

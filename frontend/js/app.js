@@ -8,15 +8,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ניווט בין תצוגות
   document.querySelectorAll('.nav-link').forEach((link) => {
-    link.addEventListener('click', (e) => {
+    link.addEventListener('click', async (e) => {
       e.preventDefault();
       const view = link.dataset.view;
+      // שמור תוכן עורך לפני מעבר
+      if (document.body.classList.contains('editor-open')) {
+        EditorManager.clear();
+      }
       document.body.classList.remove('editor-open');
       WindowManager.showView(view);
       if (view === 'summaries') SummariesManager.init();
       if (view === 'dashboard') { CalendarManager.init(); AiManager.setContext('calendar'); }
       if (view === 'settings')  { loadSrSettings(); AiManager.refreshBattery(); BackupManager.loadBackupList(); }
-      if (view === 'editor')    AiManager.setContext('editor');
+      if (view === 'help')      { /* static — no init needed */ }
     });
   });
 
@@ -53,6 +57,7 @@ function _bindSrSettings() {
   document.getElementById('saveSrSettingsBtn').addEventListener('click', async () => {
     const algorithm = algoSel.value;
     const heavyLoadThreshold = parseInt(document.getElementById('srHeavyLoad').value, 10) || 9;
+    const calendarDisplayPreference = document.getElementById('calDisplayPref')?.value || 'combined';
     let customSequence;
 
     if (algorithm === 'custom') {
@@ -65,10 +70,11 @@ function _bindSrSettings() {
     }
 
     try {
-      await Api.saveScheduleSettings({ algorithm, customSequence, heavyLoadThreshold });
+      await Api.saveScheduleSettings({ algorithm, customSequence, heavyLoadThreshold, calendarDisplayPreference });
       const msg = document.getElementById('srSettingsSavedMsg');
       msg.classList.remove('hidden');
       setTimeout(() => msg.classList.add('hidden'), 2500);
+      CalendarManager.setDisplayPref(calendarDisplayPreference);
       CalendarManager.loadCalendar(); // refresh color coding
     } catch (err) {
       alert(`שגיאה בשמירת הגדרות: ${err.message}`);
@@ -87,6 +93,11 @@ async function loadSrSettings() {
     // Show/hide custom sequence group
     document.getElementById('srCustomSeqGroup').style.display =
       s.algorithm === 'custom' ? '' : 'none';
+    // Calendar display preference
+    const calPrefEl = document.getElementById('calDisplayPref');
+    if (calPrefEl && s.calendarDisplayPreference) {
+      calPrefEl.value = s.calendarDisplayPreference;
+    }
   } catch { /* fail silently */ }
 }
 

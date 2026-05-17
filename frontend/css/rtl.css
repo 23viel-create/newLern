@@ -73,3 +73,7 @@
 .backup-item        { flex-direction: row-reverse; }
 .history-item__meta { flex-direction: row-reverse; }
 .diag-row           { flex-direction: row-reverse; }
+
+/* Help RTL */
+.help-list li::before { content: '→ '; }
+.api-key-input-wrap   { flex-direction: row-reverse; }

@@ -17,6 +17,7 @@
       <a href="#" data-view="summaries"  class="nav-link">בחירת תכנים</a>
       <a href="#" data-view="schedule"   class="nav-link">לוח זמנים</a>
       <a href="#" data-view="settings"   class="nav-link">הגדרות</a>
+      <a href="#" data-view="help"       class="nav-link">❓ עזרה</a>
     </nav>
     <div class="navbar__status">
       <span id="offlineIndicator" class="badge badge--offline hidden">אין חיבור לאינטרנט</span>
@@ -253,6 +254,16 @@
           <p class="hint">ימים עם מספר משימות גדול מהסף יסומנו בשחור בלוח השנה</p>
         </div>
 
+        <div class="form-group">
+          <label class="form-label" for="calDisplayPref">תצוגת לוח השנה:</label>
+          <select id="calDisplayPref" class="select-field">
+            <option value="combined">משולב — עברי ראשי + לועזי משני</option>
+            <option value="hebrew">עברי בלבד</option>
+            <option value="gregorian">לועזי בלבד</option>
+          </select>
+          <p class="hint">קובע אילו שמות חודשים יוצגו בכותרת לוח השנה</p>
+        </div>
+
         <div class="form-row-actions">
           <button id="saveSrSettingsBtn" class="btn btn--primary">שמור הגדרות</button>
           <span id="srSettingsSavedMsg" class="save-status save-status--saved hidden">נשמר ✓</span>
@@ -340,6 +351,100 @@
         <div id="diagnosticsResult" class="diagnostics-result hidden"></div>
       </div>
 
+    </section>
+
+    <!-- ── מסך עזרה ── -->
+    <section id="view-help" class="view hidden">
+      <div class="help-screen">
+        <h1 class="help-title">📖 מדריך למשתמש — מערכת למידה פעילה</h1>
+        <p class="help-intro">המערכת מיועדת ללמידה אישית עצמאית, שמירת סיכומים, בחינה עצמית וחזרה מרווחת. כל הנתונים שמורים <strong>מקומית בלבד</strong> במחשבך.</p>
+
+        <div class="help-section">
+          <h2>📊 לוח בקרה</h2>
+          <p>מסך הפתיחה מציג לוח שנה עברי-לועזי עם משימות החזרה שלך לכל יום.</p>
+          <ul class="help-list">
+            <li><strong>לחץ על יום</strong> — ראה את כל הסיכומים לחזרה באותו יום.</li>
+            <li><strong>כפתור "בוצע"</strong> — סמן חזרה כהושלמת; הצבע ישתנה ל<span class="help-color help-color--done">ירוק</span>.</li>
+            <li><strong>צבעי הלוח:</strong> <span class="help-color help-color--done">ירוק</span> = הושלם, <span class="help-color help-color--partial">כתום</span> = חלקי, <span class="help-color help-color--missed">אדום</span> = פוסח.</li>
+            <li><strong>עומס כבד</strong> (שחור) — יותר מ-9 פריטים ביום. ניתן לשנות את הסף בהגדרות.</li>
+            <li>שבתות וחגים חסומים — לא ניתן לקבוע חזרות בהם.</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>📁 בחירת תכנים</h2>
+          <p>כאן מנהלים את עץ הסיכומים — תיקיות וסיכומים בתוכן.</p>
+          <ul class="help-list">
+            <li><strong>📁 תיקייה חדשה</strong> — צור קטגוריה (למשל: "גמרא", "הלכה").</li>
+            <li><strong>📄 סיכום חדש</strong> — צור מסמך ריק לכתיבת סיכום.</li>
+            <li><strong>לחיצה על סיכום</strong> — פותח את העורך במסך מלא.</li>
+            <li><strong>📅 תזמן חזרה</strong> (מתפריט הפריט) — הוסף את הסיכום ללוח החזרות.</li>
+            <li><strong>מיון וחיפוש</strong> — חפש סיכומים לפי שם, מיין לפי תאריך.</li>
+            <li><strong>ייבוא בתפזורת</strong> (📥) — הכנס מספר סיכומים מקובץ טקסט אחד בעזרת מפריד.</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>✏️ עורך הסיכום</h2>
+          <p>מסך עריכה מלא עם שלוש עמודות: הקלטות שמע (ימין), עורך טקסט (מרכז), מסייע AI (שמאל).</p>
+          <ul class="help-list">
+            <li><strong>עיצוב טקסט</strong> — Ctrl+B (מודגש), Ctrl+I (נטוי), Ctrl+U (קו תחתון). בחר גופן וגודל מהסרגל.</li>
+            <li><strong>שמירה אוטומטית</strong> — השינויים נשמרים 1.5 שניות אחרי עצירת ההקלדה.</li>
+            <li><strong>🎤 הקלט</strong> — הקלט שמע ישירות לסיכום. <strong>📤 העלה</strong> — העלה קובץ שמע.</li>
+            <li><strong>❮ הקודם / הבא ❯</strong> — עבור בין סיכומים בסדר העץ ללא חזרה לרשימה.</li>
+            <li><strong>📝 שאלות</strong> — ערוך שאלות פתוחות ורב-ברירה לסיכום זה.</li>
+            <li><strong>🎯 בחן</strong> — התחל בחינה עצמית מיידית על הסיכום.</li>
+            <li><strong>📄 Word</strong> — ייצא את הסיכום לקובץ Word להדפסה לשבת.</li>
+            <li><strong>🕐 גרסאות</strong> — צפה וזשחזר עד 5 גרסאות קודמות של הסיכום.</li>
+            <li><strong>← חזרה</strong> — חזור לרשימת הסיכומים (השינויים נשמרים אוטומטית).</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>🤖 מסייע AI (עמודה שמאלית בעורך)</h2>
+          <p>דורש הגדרת מפתח Gemini API בהגדרות. בלי מפתח — כל שאר הפונקציות עובדות!</p>
+          <ul class="help-list">
+            <li><strong>📖 הסבר את הסיכום</strong> — קבל נקודות מפתח מהתוכן הנוכחי.</li>
+            <li><strong>🔍 מצא מקורות</strong> — הצע מקורות ומראי מקומות רלוונטיים.</li>
+            <li><strong>📝 הצע שאלות</strong> — קבל שאלות לבחינה עצמית שלא הוספת עדיין.</li>
+            <li><strong>שדה הצ'אט</strong> — שאל שאלה חופשית על הסיכום (Ctrl+Enter לשליחה).</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>🎯 בחינה עצמית</h2>
+          <p>מערכת הבחינה תומכת בשאלות פתוחות ובחירה מרובה.</p>
+          <ul class="help-list">
+            <li><strong>שאלות פתוחות</strong> — כתוב תשובה, לחץ "גלה תשובה", ודרג עצמך 1–5.</li>
+            <li><strong>שאלות רב-ברירה</strong> — בחר תשובה, קבל משוב מיידי עם הסבר.</li>
+            <li><strong>ציון מתחת 70%</strong> — הסיכום יתוזמן מחדש לחזרה בלוח המרווח.</li>
+            <li><strong>בחינת תיקייה</strong> — בחן מכל הסיכומים בתיקייה בשאיפה אחת.</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>⚙️ הגדרות</h2>
+          <ul class="help-list">
+            <li><strong>אלגוריתם חזרה מרווחת</strong> — "חזקות של 2" (1,2,4,8,16...) או רצף מותאם אישית.</li>
+            <li><strong>סף עומס כבד</strong> — כמות המשימות המקסימלית לפני שיום מסומן כ"כבד".</li>
+            <li><strong>תצוגת לוח שנה</strong> — בחר עברי, לועזי, או משולב.</li>
+            <li><strong>מפתחות Gemini API</strong> — הוסף כמה מפתחות שרוצה (חינמיים, ב-aistudio.google.com).</li>
+            <li><strong>צ'אט מאמרים</strong> — שוחח עם ספריית מאמרי למידה פעילה.</li>
+            <li><strong>גיבוי ותחזוקה</strong> — ייצא ZIP של כל הנתונים, ייבא מגיבוי, צפה בגרסאות.</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>💡 טיפים למשתמש מתקדם</h2>
+          <ul class="help-list">
+            <li>לחץ Alt+← / Alt+→ בעורך לניווט מהיר בין סיכומים.</li>
+            <li>גרסאות סיכום (🕐) שומרות אוטומטית בכל שמירה — עד 5 גרסאות אחורה.</li>
+            <li>ייצא ZIP לפני כל עדכון מערכת כגיבוי.</li>
+            <li>צור תוכנית לימוד מותאמת אישית דרך ה-AI בהגדרות → צ'אט מאמרים.</li>
+            <li>המערכת עובדת לגמרי offline — רק ה-AI דורש חיבור לאינטרנט.</li>
+          </ul>
+        </div>
+      </div>
     </section>
 
   </main>

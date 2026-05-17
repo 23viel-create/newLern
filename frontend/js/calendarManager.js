@@ -1,10 +1,17 @@
 // מנהל לוח השנה הדו-לשוני ולוח בקרה
 const CalendarManager = (() => {
 
-  const MONTH_NAMES_HE = [
+  const MONTH_NAMES_GREG = [
     '', 'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
     'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר',
   ];
+
+  const HEBREW_MONTH_NAMES = {
+    1:'ניסן', 2:'אייר', 3:'סיוון', 4:'תמוז', 5:'אב', 6:'אלול',
+    7:'תשרי', 8:'חשוון', 9:'כסלו', 10:'טבת', 11:'שבט', 12:'אדר', 13:'אדר ב׳',
+  };
+
+  let _calDisplayPref = 'combined'; // 'hebrew' | 'gregorian' | 'combined'
 
   // Sun–Sat headers (Hebrew week starts Sunday, RTL: Sun on right → Sat on left)
   const DOW_HEADERS = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
@@ -54,16 +61,40 @@ const CalendarManager = (() => {
 
   async function loadCalendar() {
     const ym = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
-    document.getElementById('calMonthLabel').textContent =
-      `${MONTH_NAMES_HE[currentMonth]} ${currentYear}`;
 
     try {
       calendarData = await Api.getCalendarData(ym);
+      _calDisplayPref = calendarData?.settings?.calendarDisplayPreference || 'combined';
+      _updateMonthLabel();
       _renderGrid(calendarData.days);
       _renderTaskPanel(selectedDate);
     } catch (err) {
       document.getElementById('calGrid').innerHTML =
         `<p class="placeholder-text error-text">שגיאה בטעינת לוח השנה: ${_esc(err.message)}</p>`;
+    }
+  }
+
+  function _updateMonthLabel() {
+    const label = document.getElementById('calMonthLabel');
+    if (!label) return;
+
+    // Get the Hebrew month of the 15th of the current Gregorian month (mid-month)
+    const midDay   = calendarData?.days?.find(d => d.hebrewDay === 15) || calendarData?.days?.[14];
+    const hebMonth = midDay ? HEBREW_MONTH_NAMES[midDay.hebrewMonth] : null;
+    const hebYear  = midDay ? midDay.hebrewYear  : null;
+
+    const gregLabel = `${MONTH_NAMES_GREG[currentMonth]} ${currentYear}`;
+    const hebLabel  = hebMonth ? `${hebMonth} ${hebYear}` : '';
+
+    if (_calDisplayPref === 'hebrew' && hebLabel) {
+      label.innerHTML = `<strong>${hebLabel}</strong>`;
+    } else if (_calDisplayPref === 'gregorian') {
+      label.innerHTML = gregLabel;
+    } else {
+      // combined — Hebrew primary, Gregorian secondary
+      label.innerHTML = hebLabel
+        ? `<strong>${hebLabel}</strong> <span class="cal-month-sub">(${gregLabel})</span>`
+        : gregLabel;
     }
   }
 
@@ -223,10 +254,15 @@ const CalendarManager = (() => {
   function _formatDateLabel(dateStr) {
     const [y, m, d] = dateStr.split('-').map(Number);
     const dow = new Date(y, m - 1, d).getDay();
-    return `יום ${DOW_NAMES_HE[dow]}, ${d} ב${MONTH_NAMES_HE[m]} ${y}`;
+    return `יום ${DOW_NAMES_HE[dow]}, ${d} ב${MONTH_NAMES_GREG[m]} ${y}`;
+  }
+
+  function setDisplayPref(pref) {
+    _calDisplayPref = pref;
+    _updateMonthLabel();
   }
 
   // ── Public ────────────────────────────────────────────────────────────────
 
-  return { init, loadCalendar };
+  return { init, loadCalendar, setDisplayPref };
 })();

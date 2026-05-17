@@ -306,6 +306,12 @@ const SummariesManager = (() => {
         try {
           await Api.deleteNode(nodePath);
           expanded.delete(nodePath);
+          // אם הסיכום הנמחק פתוח בעורך — נקה את העורך וחזור לעץ
+          const openNode = EditorManager.getCurrentNode();
+          if (openNode && (openNode.path === nodePath || openNode.path.startsWith(nodePath + '/'))) {
+            EditorManager.clear();
+            WindowManager.showView('summaries');
+          }
           await loadTree();
         } catch (err) {
           alert(`שגיאה: ${err.message}`);

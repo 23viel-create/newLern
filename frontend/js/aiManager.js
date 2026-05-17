@@ -189,36 +189,72 @@ const AiManager = (() => {
     if (last) last.remove();
   }
 
-  // ─── Key management ─────────────────────────────────────────────────────────
+  // ─── Key management — dynamic unlimited list ─────────────────────────────────
   async function _renderKeyFields() {
     const container = el.apiKeysList();
     if (!container) return;
 
-    let savedKeys = [];
+    let savedCount = 0;
     try {
       const res = await Api.aiGetKeys();
-      savedKeys = (res.keys || []).map(() => ''); // don't display actual keys
+      savedCount = (res.keys || []).length;
     } catch { /* first load */ }
 
-    // Always render 5 slots
     container.innerHTML = '';
-    for (let i = 0; i < 5; i++) {
-      const row = document.createElement('div');
-      row.className = 'form-group api-key-row';
-      row.innerHTML = `
-        <label class="form-label">מפתח ${i + 1}</label>
+    const slotCount = Math.max(savedCount, 1);
+    for (let i = 0; i < slotCount; i++) _addKeyRow(container, i);
+    _appendAddKeyButton(container);
+  }
+
+  function _addKeyRow(container, index) {
+    const row = document.createElement('div');
+    row.className = 'form-group api-key-row';
+    row.innerHTML = `
+      <label class="form-label">מפתח ${index + 1}</label>
+      <div class="api-key-input-wrap">
         <input type="password"
                class="input-field input-field--full api-key-input"
-               data-index="${i}"
                placeholder="AIza..."
-               autocomplete="off" />`;
-      container.appendChild(row);
-    }
+               autocomplete="off" />
+        <button type="button" class="btn btn--ghost btn--xs remove-key-btn" title="הסר מפתח">✕</button>
+      </div>`;
+    row.querySelector('.remove-key-btn').addEventListener('click', () => {
+      row.remove();
+      _renumberKeys();
+    });
+    // Insert before the "add" button if it exists
+    const addBtn = container.querySelector('.add-key-btn-wrap');
+    if (addBtn) container.insertBefore(row, addBtn);
+    else container.appendChild(row);
+  }
+
+  function _appendAddKeyButton(container) {
+    const wrap = document.createElement('div');
+    wrap.className = 'add-key-btn-wrap';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn--ghost btn--sm';
+    btn.textContent = '+ הוסף מפתח';
+    btn.addEventListener('click', () => {
+      const rows = container.querySelectorAll('.api-key-row');
+      _addKeyRow(container, rows.length);
+      _renumberKeys();
+    });
+    wrap.appendChild(btn);
+    container.appendChild(wrap);
+  }
+
+  function _renumberKeys() {
+    const container = el.apiKeysList();
+    if (!container) return;
+    container.querySelectorAll('.api-key-row label').forEach((lbl, i) => {
+      lbl.textContent = `מפתח ${i + 1}`;
+    });
   }
 
   async function _saveKeys() {
     const inputs = document.querySelectorAll('.api-key-input');
-    const keys = Array.from(inputs).map(inp => inp.value.trim());
+    const keys = Array.from(inputs).map(inp => inp.value.trim()).filter(Boolean);
     try {
       await Api.aiSaveKeys(keys);
       const msg = el.keysSavedMsg();

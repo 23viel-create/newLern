@@ -102,7 +102,9 @@ function createFolder(parentRelPath, rawName) {
   if (!fs.existsSync(parentPath)) throw new Error('תיקיית הורה לא נמצאה');
 
   const folderPath = path.join(parentPath, name);
-  if (fs.existsSync(folderPath)) throw new Error('תיקייה בשם זה כבר קיימת');
+  if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
+    throw new Error('תיקייה בשם זה כבר קיימת');
+  }
 
   ensureDir(folderPath);
   const now  = new Date().toISOString();
@@ -119,7 +121,9 @@ function createSummary(parentRelPath, rawName) {
   if (!fs.existsSync(parentPath)) throw new Error('תיקיית הורה לא נמצאה');
 
   const summaryPath = path.join(parentPath, name);
-  if (fs.existsSync(summaryPath)) throw new Error('סיכום בשם זה כבר קיים');
+  if (fs.existsSync(summaryPath) && fs.statSync(summaryPath).isDirectory()) {
+    throw new Error('סיכום בשם זה כבר קיים');
+  }
 
   ensureDir(summaryPath);
   const now  = new Date().toISOString();

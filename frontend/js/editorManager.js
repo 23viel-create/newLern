@@ -449,5 +449,20 @@ const EditorManager = (() => {
 
   // ─── ממשק ציבורי ─────────────────────────────────────────────────────────────
 
-  return { init, open, getCurrentNode: () => currentNode };
+  function clear() {
+    if (isDirty) _save();
+    currentNode = null;
+    prevNode = null;
+    nextNode = null;
+    isDirty = false;
+    const editor = document.getElementById('editorContent');
+    if (editor) editor.innerHTML = '';
+    document.getElementById('editorTitle').textContent = '—';
+    setSaveStatus('saved');
+    document.getElementById('audioList').innerHTML =
+      '<li class="audio-empty placeholder-text">אין הקלטות</li>';
+    document.body.classList.remove('editor-open');
+  }
+
+  return { init, open, clear, getCurrentNode: () => currentNode };
 })();
