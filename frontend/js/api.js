@@ -81,7 +81,30 @@ const Api = {
   getScheduleSettings:  ()          => apiFetch('/schedule/settings'),
   saveScheduleSettings: (settings)  => apiFetch('/schedule/settings', { method: 'PUT', body: settings }),
 
-  // ── חידונים ──────────────────────────────────────────────────────────────
+  // ── שאלות (CRUD ידני) ─────────────────────────────────────────────────────
+  getQuizQuestions: (nodePath) =>
+    apiFetch(`/quizzes/questions?path=${encodeURIComponent(nodePath)}`),
+
+  addOpenQuestion: (nodePath, question, answer) =>
+    apiFetch('/quizzes/questions/open', { method: 'POST', body: { nodePath, question, answer } }),
+  updateOpenQuestion: (nodePath, id, question, answer) =>
+    apiFetch(`/quizzes/questions/open/${encodeURIComponent(id)}`, { method: 'PUT', body: { nodePath, question, answer } }),
+  deleteOpenQuestion: (nodePath, id) =>
+    apiFetch('/quizzes/questions/open', { method: 'DELETE', body: { nodePath, id } }),
+
+  addMcQuestion: (nodePath, question, options, correct_option_index) =>
+    apiFetch('/quizzes/questions/mc', { method: 'POST', body: { nodePath, question, options, correct_option_index } }),
+  updateMcQuestion: (nodePath, id, question, options, correct_option_index) =>
+    apiFetch(`/quizzes/questions/mc/${encodeURIComponent(id)}`, { method: 'PUT', body: { nodePath, question, options, correct_option_index } }),
+  deleteMcQuestion: (nodePath, id) =>
+    apiFetch('/quizzes/questions/mc', { method: 'DELETE', body: { nodePath, id } }),
+
+  getQuizBundle:    (paths) =>
+    apiFetch('/quizzes/bundle', { method: 'POST', body: { paths } }),
+  submitQuizResult: (summaryPath, totalScore, questionResults) =>
+    apiFetch('/quizzes/submit', { method: 'POST', body: { summaryPath, totalScore, questionResults } }),
+
+  // ── חידונים AI ────────────────────────────────────────────────────────────
   generateQuiz:  (text) => apiFetch('/quizzes/multiple-choice', { method: 'POST', body: { summaryText: text } }),
   generateOpenQ: (text) => apiFetch('/quizzes/open-questions',  { method: 'POST', body: { summaryText: text } }),
 };

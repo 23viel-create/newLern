@@ -17,6 +17,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // כפתורי בחינה ושאלות בעורך
+  document.getElementById('editorQuestionsBtn').addEventListener('click', () => {
+    const node = EditorManager.getCurrentNode();
+    if (!node) return;
+    QuizManager.openEditor(node.path, node.title || node.path);
+  });
+  document.getElementById('editorQuizBtn').addEventListener('click', () => {
+    const node = EditorManager.getCurrentNode();
+    if (!node) return;
+    QuizManager.startQuiz([node.path], node.title || node.path);
+  });
+
   // תצוגת ברירת מחדל — לוח בקרה עם לוח שנה
   WindowManager.showView('dashboard');
   CalendarManager.init();

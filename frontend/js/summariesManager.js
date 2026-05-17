@@ -145,6 +145,7 @@ const SummariesManager = (() => {
             <span class="tree-node__icon" aria-hidden="true">📁</span>
             <span class="tree-node__name">${title}</span>
             <div class="tree-node__actions">
+              <button class="btn btn--xs btn--ghost" data-action="quiz-folder" data-path="${p}" data-name="${rawName}" title="בחן על כל הסיכומים בתיקייה">🎯</button>
               <button class="btn btn--xs btn--ghost" data-action="new-folder"  data-path="${p}" title="תיקייה חדשה בתוך ${rawName}">📁+</button>
               <button class="btn btn--xs btn--ghost" data-action="new-summary" data-path="${p}" title="סיכום חדש בתוך ${rawName}">📄+</button>
               <button class="btn btn--xs btn--ghost" data-action="rename"      data-path="${p}" data-name="${rawName}">✏️</button>
@@ -164,6 +165,8 @@ const SummariesManager = (() => {
                 data-action="open" data-path="${p}"
                 role="button" tabindex="0" title="פתח סיכום">${title}</span>
           <div class="tree-node__actions">
+            <button class="btn btn--xs btn--ghost" data-action="quiz-node"  data-path="${p}" data-name="${rawName}" title="התחל בחינה על סיכום זה">🎯</button>
+            <button class="btn btn--xs btn--ghost" data-action="edit-questions" data-path="${p}" data-name="${rawName}" title="ערוך שאלות">📝</button>
             <button class="btn btn--xs btn--ghost" data-action="plan"   data-path="${p}" data-name="${rawName}" title="תזמן חזרות מרווחות">📅</button>
             <button class="btn btn--xs btn--ghost" data-action="rename" data-path="${p}" data-name="${rawName}">✏️</button>
             <button class="btn btn--xs btn--danger-ghost" data-action="delete" data-path="${p}" data-name="${rawName}" data-type="summary">🗑️</button>
@@ -261,6 +264,21 @@ const SummariesManager = (() => {
         const flatList = flattenSummaries(sortTree(treeData));
         const node     = flatList.find(n => n.path === nodePath);
         if (node) EditorManager.open(node, flatList);
+        break;
+      }
+
+      case 'edit-questions': {
+        QuizManager.openEditor(nodePath, nodeName);
+        break;
+      }
+
+      case 'quiz-node': {
+        QuizManager.startQuiz([nodePath], nodeName);
+        break;
+      }
+
+      case 'quiz-folder': {
+        QuizManager.startQuiz([nodePath], `תיקייה: ${nodeName}`);
         break;
       }
 

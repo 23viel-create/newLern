@@ -449,5 +449,5 @@ const EditorManager = (() => {
 
   // ─── ממשק ציבורי ─────────────────────────────────────────────────────────────
 
-  return { init, open };
+  return { init, open, getCurrentNode: () => currentNode };
 })();

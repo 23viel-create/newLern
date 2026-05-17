@@ -112,7 +112,9 @@
         </div>
         <div class="editor-header-actions">
           <span id="editorSaveStatus" class="save-status save-status--saved">נשמר ✓</span>
-          <button id="bulkImportBtn" class="btn btn--secondary btn--sm">📥 ייבוא בתפזורת</button>
+          <button id="editorQuizBtn"   class="btn btn--ghost btn--sm" title="בחינה על סיכום זה">🎯 בחן</button>
+          <button id="editorQuestionsBtn" class="btn btn--ghost btn--sm" title="ערוך שאלות">📝 שאלות</button>
+          <button id="bulkImportBtn"   class="btn btn--secondary btn--sm">📥 ייבוא בתפזורת</button>
         </div>
       </div>
 
@@ -329,11 +331,131 @@
     </div>
   </div>
 
+  <!-- ══════════════════ מודל עורך שאלות ══════════════════ -->
+  <div id="qeModal" class="modal hidden"
+       role="dialog" aria-modal="true" aria-labelledby="qeModalTitle">
+    <div class="modal__overlay"></div>
+    <div class="modal__box modal__box--quiz-editor">
+
+      <div class="qe-header">
+        <h2 id="qeModalTitle">📝 שאלות: <span id="qeTitle"></span></h2>
+        <button id="qeCloseBtn" class="btn btn--ghost btn--sm">✕ סגור</button>
+      </div>
+
+      <!-- Tabs -->
+      <div class="qe-tabs">
+        <button class="qe-tab qe-tab--active" data-tab="open">
+          שאלות פתוחות (<span id="qeOpenCount">0</span>)
+        </button>
+        <button class="qe-tab" data-tab="mc">
+          בחירה מרובה (<span id="qeMcCount">0</span>)
+        </button>
+      </div>
+
+      <!-- Open questions list -->
+      <div id="qeTabOpen" class="qe-tab-content">
+        <div id="qeOpenList" class="qe-list"></div>
+        <button id="qeAddOpenBtn" class="btn btn--primary btn--sm qe-add-btn">
+          + הוסף שאלה פתוחה
+        </button>
+      </div>
+
+      <!-- MC questions list -->
+      <div id="qeTabMc" class="qe-tab-content hidden">
+        <div id="qeMcList" class="qe-list"></div>
+        <button id="qeAddMcBtn" class="btn btn--primary btn--sm qe-add-btn">
+          + הוסף שאלת בחירה מרובה
+        </button>
+      </div>
+
+      <!-- Dynamic add/edit form (filled by JS) -->
+      <div id="qeForm" class="qe-form hidden"></div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ מודל מסך בחינה ══════════════════ -->
+  <div id="quizModal" class="modal hidden"
+       role="dialog" aria-modal="true" aria-labelledby="quizConfigTitle">
+    <div class="modal__overlay"></div>
+    <div class="modal__box modal__box--quiz">
+
+      <!-- ── שלב 1: הגדרות ── -->
+      <div id="quizConfig" class="quiz-step">
+        <h2 id="quizConfigTitle">הגדרות בחינה</h2>
+        <p id="quizConfigInfo" class="quiz-config-info"></p>
+
+        <div class="form-group">
+          <label class="form-label">פורמט תצוגה:</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="quizLayout" value="one" checked />
+              שאלה אחת בכל פעם
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="quizLayout" value="all" />
+              כל השאלות בדף אחד
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">משוב:</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="quizFeedback" value="instant" checked />
+              מיידי — אחרי כל שאלה
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="quizFeedback" value="end" />
+              בסוף הבחינה בלבד
+            </label>
+          </div>
+        </div>
+
+        <div class="modal__actions">
+          <button id="quizCancelBtn" class="btn btn--secondary">ביטול</button>
+          <button id="quizStartBtn"  class="btn btn--primary">התחל בחינה ▶</button>
+        </div>
+      </div>
+
+      <!-- ── שלב 2: שאלות ── -->
+      <div id="quizTestArea" class="quiz-step hidden">
+        <div class="quiz-progress-wrap">
+          <div class="quiz-progress-bar">
+            <div id="quizProgressFill" class="quiz-progress-fill"></div>
+          </div>
+          <span id="quizProgressLabel" class="quiz-progress-label"></span>
+        </div>
+
+        <div id="quizQuestionContainer" class="quiz-question-container"></div>
+
+        <div class="quiz-nav-actions">
+          <button id="quizPrevBtn"   class="btn btn--ghost btn--sm hidden">❮ הקודם</button>
+          <button id="quizNextBtn"   class="btn btn--primary btn--sm">הבא ❯</button>
+          <button id="quizFinishBtn" class="btn btn--success btn--sm hidden">סיים בחינה ✓</button>
+        </div>
+      </div>
+
+      <!-- ── שלב 3: תוצאות ── -->
+      <div id="quizResults" class="quiz-step hidden">
+        <h2 class="quiz-results-title">תוצאות הבחינה</h2>
+        <div id="quizScoreDisplay" class="quiz-score-display"></div>
+        <div id="quizResultsList"  class="quiz-results-list"></div>
+        <div class="modal__actions">
+          <button id="quizCloseResultsBtn" class="btn btn--primary">סגור</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <script src="js/api.js"></script>
   <script src="js/windowManager.js"></script>
   <script src="js/summariesManager.js"></script>
   <script src="js/editorManager.js"></script>
   <script src="js/calendarManager.js"></script>
+  <script src="js/quizManager.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
