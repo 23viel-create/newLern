@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>מערכת למידה פעילה</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/rtl.css" />
+</head>
+<body>
+
+  <!-- ══════════════════ סרגל ניווט עליון ══════════════════ -->
+  <header class="navbar">
+    <div class="navbar__brand">📚 למידה פעילה</div>
+    <nav class="navbar__links">
+      <a href="#" data-view="dashboard"  class="nav-link active">לוח בקרה</a>
+      <a href="#" data-view="summaries"  class="nav-link">בחירת תכנים</a>
+      <a href="#" data-view="schedule"   class="nav-link">לוח זמנים</a>
+      <a href="#" data-view="settings"   class="nav-link">הגדרות</a>
+      <a href="#" data-view="help"       class="nav-link">❓ עזרה</a>
+    </nav>
+    <div class="navbar__status">
+      <span id="offlineIndicator" class="badge badge--offline hidden">אין חיבור לאינטרנט</span>
+      <span id="aiKeysBattery"    class="badge badge--info">מפתחות AI: <strong id="keyCount">0</strong></span>
+    </div>
+  </header>
+
+  <!-- ══════════════════ תוכן ראשי ══════════════════ -->
+  <main id="mainContent" class="container">
+
+    <!-- ── לוח בקרה ── -->
+    <section id="view-dashboard" class="view active">
+      <div class="dashboard-split">
+
+        <!-- לוח שנה (מימין ב-RTL) -->
+        <div class="dashboard-calendar card">
+          <div class="cal-nav">
+            <button id="calPrevMonth" class="btn btn--ghost btn--sm" title="חודש קודם">❮</button>
+            <span id="calMonthLabel" class="cal-month-label">טוען...</span>
+            <button id="calNextMonth" class="btn btn--ghost btn--sm" title="חודש הבא">❯</button>
+            <button id="calTodayBtn"  class="btn btn--secondary btn--sm">היום</button>
+          </div>
+          <div class="cal-legend">
+            <span class="legend-item legend-item--done">הושלם</span>
+            <span class="legend-item legend-item--partial">חלקי</span>
+            <span class="legend-item legend-item--missed">לא בוצע</span>
+            <span class="legend-sep">|</span>
+            <span class="legend-item legend-item--load-low">1–3 משימות</span>
+            <span class="legend-item legend-item--load-mid">4–8 משימות</span>
+            <span class="legend-item legend-item--load-high">עומס כבד</span>
+          </div>
+          <div id="calGrid" class="cal-grid">
+            <p class="placeholder-text">טוען לוח שנה...</p>
+          </div>
+        </div>
+
+        <!-- פאנל משימות (משמאל ב-RTL) -->
+        <div class="dashboard-tasks card">
+          <h3 class="dashboard-tasks__title">משימות</h3>
+          <p id="calTaskDate" class="cal-task-header">בחר יום</p>
+          <div id="calTaskPanel">
+            <p class="placeholder-text">לחץ על יום בלוח לצפייה במשימות</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── מסך בחירת תכנים ── -->
+    <section id="view-summaries" class="view hidden">
+      <div class="page-header">
+        <h1>בחירת תכנים</h1>
+        <div class="tree-toolbar">
+          <div class="tree-toolbar__actions">
+            <button class="btn btn--secondary" data-action="new-folder" data-path="">
+              📁 תיקייה חדשה
+            </button>
+            <button class="btn btn--primary" data-action="new-summary" data-path="">
+              📄 סיכום חדש
+            </button>
+          </div>
+          <div class="tree-toolbar__controls">
+            <div class="sort-group">
+              <label for="treeSort">מיין לפי:</label>
+              <select id="treeSort" class="select-field">
+                <option value="name">שם</option>
+                <option value="createdAt">תאריך יצירה</option>
+                <option value="updatedAt">תאריך עדכון</option>
+              </select>
+            </div>
+            <div class="search-group">
+              <input type="search" id="treeSearch" class="input-field search-field"
+                     placeholder="🔍 חיפוש סיכומים..." autocomplete="off" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="summariesTree" class="tree-container">
+        <p class="placeholder-text">טוען סיכומים...</p>
+      </div>
+    </section>
+
+    <!-- ── עורך סיכום (full-bleed, overrides container) ── -->
+    <section id="view-editor" class="view hidden editor-view">
+
+      <!-- כותרת עם ניווט -->
+      <div class="editor-header">
+        <button id="editorBackBtn" class="btn btn--secondary btn--sm">← חזרה</button>
+        <div class="editor-nav">
+          <button id="editorPrevBtn" class="btn btn--ghost btn--sm" title="סיכום קודם (Alt+←)">❮ הקודם</button>
+          <h2 id="editorTitle" class="editor-title">—</h2>
+          <button id="editorNextBtn" class="btn btn--ghost btn--sm" title="סיכום הבא (Alt+→)">הבא ❯</button>
+        </div>
+        <div class="editor-header-actions">
+          <span id="editorSaveStatus" class="save-status save-status--saved">נשמר ✓</span>
+          <button id="editorQuizBtn"   class="btn btn--ghost btn--sm" title="בחינה על סיכום זה">🎯 בחן</button>
+          <button id="editorQuestionsBtn" class="btn btn--ghost btn--sm" title="ערוך שאלות">📝 שאלות</button>
+          <button id="bulkImportBtn"   class="btn btn--secondary btn--sm">📥 ייבוא בתפזורת</button>
+          <button id="exportDocxBtn"  class="btn btn--ghost btn--sm" title="ייצוא ל-Word">📄 Word</button>
+          <button id="historyBtn"     class="btn btn--ghost btn--sm" title="היסטוריית גרסאות">🕐 גרסאות</button>
+        </div>
+      </div>
+
+      <!-- גוף 3 עמודות -->
+      <div class="editor-body">
+
+        <!-- עמודה ימין: הקלטות שמע -->
+        <aside class="editor-panel editor-panel--audio" id="audioPanel">
+          <div class="panel-header">
+            <h3>הקלטות שמע</h3>
+          </div>
+          <div class="audio-actions">
+            <button id="recordBtn" class="btn btn--primary btn--sm">🎤 הקלט</button>
+            <label class="btn btn--secondary btn--sm" for="audioUploadInput" style="cursor:pointer">📤 העלה</label>
+            <input type="file" id="audioUploadInput" accept="audio/*" hidden />
+          </div>
+          <div id="recordingStatus" class="recording-status hidden">
+            <span class="rec-dot"></span>
+            <span id="recordingTime">00:00</span>
+            <button id="stopRecordBtn" class="btn btn--danger btn--xs">⏹ עצור</button>
+          </div>
+          <ul id="audioList" class="audio-list">
+            <li class="audio-empty placeholder-text">אין הקלטות</li>
+          </ul>
+        </aside>
+
+        <!-- עמודה אמצע: עורך -->
+        <div class="editor-main">
+          <div class="editor-toolbar" id="editorToolbar">
+            <button class="fmt-btn" data-cmd="bold"               title="מודגש (Ctrl+B)"><b>ב</b></button>
+            <button class="fmt-btn" data-cmd="italic"             title="נטוי (Ctrl+I)"><i>נ</i></button>
+            <button class="fmt-btn" data-cmd="underline"          title="קו תחתון (Ctrl+U)"><u>ק</u></button>
+            <span class="toolbar-sep"></span>
+            <select id="editorFontFamily" class="select-field select-field--sm" title="גופן">
+              <option value="Arial, sans-serif">Arial</option>
+              <option value="'David', serif">David</option>
+              <option value="'Times New Roman', serif">Times</option>
+              <option value="'Courier New', monospace">Courier</option>
+            </select>
+            <select id="editorFontSize" class="select-field select-field--sm" title="גודל גופן">
+              <option value="12px">12</option>
+              <option value="14px">14</option>
+              <option value="16px" selected>16</option>
+              <option value="18px">18</option>
+              <option value="20px">20</option>
+              <option value="24px">24</option>
+              <option value="32px">32</option>
+            </select>
+            <span class="toolbar-sep"></span>
+            <button class="fmt-btn" data-cmd="insertUnorderedList" title="רשימה">•≡</button>
+            <button class="fmt-btn" data-cmd="insertOrderedList"   title="רשימה ממוספרת">1≡</button>
+            <span class="toolbar-sep"></span>
+            <button class="fmt-btn" data-cmd="justifyRight"  title="יישור לימין">⬛R</button>
+            <button class="fmt-btn" data-cmd="justifyCenter" title="מרכוז">⬛C</button>
+            <button class="fmt-btn" data-cmd="justifyLeft"   title="יישור לשמאל">⬛L</button>
+            <span class="toolbar-sep"></span>
+            <button class="fmt-btn" data-cmd="removeFormat" title="נקה עיצוב">✕</button>
+          </div>
+
+          <div id="editorContent"
+               class="editor-content"
+               contenteditable="true"
+               dir="rtl"
+               spellcheck="true"
+               data-placeholder="התחל לכתוב את הסיכום כאן..."></div>
+        </div>
+
+        <!-- עמודה שמאל: מסייע AI -->
+        <aside class="editor-panel editor-panel--ai" id="aiPanel">
+          <div class="panel-header ai-panel-header">
+            <h3>🤖 מסייע AI</h3>
+            <span id="aiOfflineBadge" class="badge badge--offline hidden">אופליין</span>
+          </div>
+
+          <!-- בנר אופליין -->
+          <div id="aiOfflineBanner" class="ai-offline-banner hidden">
+            מצב אופליין — ה-AI כבוי
+          </div>
+
+          <!-- כפתורי הקשר -->
+          <div id="aiContextActions" class="ai-context-actions"></div>
+
+          <!-- אזור צ'אט -->
+          <div id="aiChatMessages" class="ai-chat-messages"></div>
+
+          <!-- שדה קלט -->
+          <div class="ai-input-row">
+            <textarea id="aiChatInput" class="ai-chat-input"
+                      rows="2"
+                      placeholder="שאל שאלה..."
+                      dir="rtl"></textarea>
+            <button id="aiSendBtn" class="btn btn--primary btn--sm ai-send-btn">שלח</button>
+          </div>
+        </aside>
+
+      </div>
+    </section>
+
+    <!-- ── לוח זמנים ── -->
+    <section id="view-schedule" class="view hidden">
+      <h1>לוח זמנים חזרות</h1>
+      <div id="scheduleContainer">
+        <p class="placeholder-text">טוען לוח זמנים...</p>
+      </div>
+    </section>
+
+    <!-- ── הגדרות ── -->
+    <section id="view-settings" class="view hidden">
+      <h1>הגדרות</h1>
+
+      <!-- הגדרות חזרה מרווחת -->
+      <div class="settings-panel card">
+        <h2>חזרה מרווחת (Spaced Repetition)</h2>
+        <p class="hint">קבע כיצד יתוזמנו חזרות על סיכומים שתסמן ב-📅 בעץ התכנים.</p>
+
+        <div class="form-group">
+          <label class="form-label" for="srAlgorithm">אלגוריתם:</label>
+          <select id="srAlgorithm" class="select-field">
+            <option value="powers2">חזקות של 2 (1, 2, 4, 8, 16, 32, 64 ימים)</option>
+            <option value="custom">רצף מותאם אישית</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="srCustomSeqGroup">
+          <label class="form-label" for="srCustomSeq">רצף ימים מותאם (מופרד בפסיקים):</label>
+          <input type="text" id="srCustomSeq" class="input-field" placeholder="1, 7, 30, 90" />
+          <p class="hint">לדוגמה: 1, 7, 30, 90 — מספר ימים מיום הלימוד הראשון</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="srHeavyLoad">סף עומס כבד (מספר משימות ביום):</label>
+          <input type="number" id="srHeavyLoad" class="input-field input-field--narrow"
+                 min="1" max="99" value="9" />
+          <p class="hint">ימים עם מספר משימות גדול מהסף יסומנו בשחור בלוח השנה</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="calDisplayPref">תצוגת לוח השנה:</label>
+          <select id="calDisplayPref" class="select-field">
+            <option value="combined">משולב — עברי ראשי + לועזי משני</option>
+            <option value="hebrew">עברי בלבד</option>
+            <option value="gregorian">לועזי בלבד</option>
+          </select>
+          <p class="hint">קובע אילו שמות חודשים יוצגו בכותרת לוח השנה</p>
+        </div>
+
+        <div class="form-row-actions">
+          <button id="saveSrSettingsBtn" class="btn btn--primary">שמור הגדרות</button>
+          <span id="srSettingsSavedMsg" class="save-status save-status--saved hidden">נשמר ✓</span>
+        </div>
+      </div>
+
+      <!-- מפתחות API -->
+      <div class="settings-panel card">
+        <h2>מפתחות Gemini API</h2>
+        <p class="hint">הוסף עד 5 מפתחות API להגדלת המכסה הזמינה. המפתחות נשמרים מקומית בלבד.</p>
+
+        <!-- "סוללת" מפתחות -->
+        <div id="keyBattery" class="key-battery"></div>
+
+        <!-- שדות מפתחות -->
+        <div id="apiKeysList" class="api-keys-list"></div>
+
+        <div class="form-row-actions">
+          <button id="saveKeysBtn" class="btn btn--primary">שמור מפתחות</button>
+          <span id="keysSavedMsg" class="save-status save-status--saved hidden">נשמר ✓</span>
+        </div>
+
+        <!-- צ'אט מאמרים — מחייב לפחות מפתח אחד -->
+        <hr class="settings-divider" />
+        <h3>צ'אט למידה פעילה</h3>
+        <p class="hint">שוחח עם ספריית המאמרים בנושא תיאוריות למידה פעילה.</p>
+        <div id="articlesChat" class="articles-chat">
+          <div id="articlesChatMessages" class="ai-chat-messages ai-chat-messages--settings"></div>
+          <div class="ai-input-row">
+            <textarea id="articlesChatInput" class="ai-chat-input"
+                      rows="2"
+                      placeholder="שאל על למידה פעילה, חזרה מרווחת ועוד..."
+                      dir="rtl"></textarea>
+            <button id="articlesChatSendBtn" class="btn btn--primary btn--sm ai-send-btn">שלח</button>
+          </div>
+          <button id="learningProgramBtn" class="btn btn--secondary btn--full">✨ צור תוכנית לימוד אישית</button>
+        </div>
+      </div>
+
+      <!-- גיבוי ותחזוקה -->
+      <div class="settings-panel card">
+        <h2>💾 גיבוי ותחזוקה</h2>
+        <p class="hint">ייצא את כל הסיכומים לקובץ ZIP, ייבא מגיבוי קיים, ועקוב אחר גרסאות.</p>
+
+        <!-- ייצוא ZIP -->
+        <div class="backup-section">
+          <h3>ייצוא גיבוי</h3>
+          <div class="form-row-actions">
+            <button id="exportZipBtn"     class="btn btn--primary">⬇️ ייצא הכל כ-ZIP</button>
+            <button id="exportZipSaveBtn" class="btn btn--secondary">💾 שמור גיבוי מקומי</button>
+          </div>
+        </div>
+
+        <!-- ייבוא ZIP -->
+        <div class="backup-section">
+          <h3>ייבוא מגיבוי</h3>
+          <div class="form-group">
+            <label class="form-label" for="importZipFile">קובץ ZIP לייבוא</label>
+            <input type="file" id="importZipFile" class="input-field" accept=".zip" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="importTargetPath">תיקיית יעד (אופציונלי)</label>
+            <input type="text" id="importTargetPath" class="input-field"
+                   placeholder="לדוגמה: ארכיון — ריק = תיקיית שורש" dir="rtl" />
+          </div>
+          <button id="importZipBtn" class="btn btn--primary">⬆️ ייבא ZIP</button>
+          <span id="importZipMsg" class="save-status hidden"></span>
+        </div>
+
+        <!-- גיבויים מקומיים -->
+        <div class="backup-section">
+          <h3>גיבויים שמורים</h3>
+          <div id="backupsList" class="backups-list">
+            <p class="placeholder-text">טוען...</p>
+          </div>
+          <button id="refreshBackupsBtn" class="btn btn--ghost btn--sm">↻ רענן</button>
+        </div>
+      </div>
+
+      <!-- אבחון מערכת -->
+      <div class="settings-panel card">
+        <h2>🔍 אבחון מערכת</h2>
+        <p class="hint">בדיקת תקינות כל מודולי המערכת.</p>
+        <button id="runDiagnosticsBtn" class="btn btn--secondary">▶ הפעל בדיקות</button>
+        <div id="diagnosticsResult" class="diagnostics-result hidden"></div>
+      </div>
+
+    </section>
+
+    <!-- ── מסך עזרה ── -->
+    <section id="view-help" class="view hidden">
+      <div class="help-screen">
+        <h1 class="help-title">📖 מדריך למשתמש — מערכת למידה פעילה</h1>
+        <p class="help-intro">המערכת מיועדת ללמידה אישית עצמאית, שמירת סיכומים, בחינה עצמית וחזרה מרווחת. כל הנתונים שמורים <strong>מקומית בלבד</strong> במחשבך.</p>
+
+        <div class="help-section">
+          <h2>📊 לוח בקרה</h2>
+          <p>מסך הפתיחה מציג לוח שנה עברי-לועזי עם משימות החזרה שלך לכל יום.</p>
+          <ul class="help-list">
+            <li><strong>לחץ על יום</strong> — ראה את כל הסיכומים לחזרה באותו יום.</li>
+            <li><strong>כפתור "בוצע"</strong> — סמן חזרה כהושלמת; הצבע ישתנה ל<span class="help-color help-color--done">ירוק</span>.</li>
+            <li><strong>צבעי הלוח:</strong> <span class="help-color help-color--done">ירוק</span> = הושלם, <span class="help-color help-color--partial">כתום</span> = חלקי, <span class="help-color help-color--missed">אדום</span> = פוסח.</li>
+            <li><strong>עומס כבד</strong> (שחור) — יותר מ-9 פריטים ביום. ניתן לשנות את הסף בהגדרות.</li>
+            <li>שבתות וחגים חסומים — לא ניתן לקבוע חזרות בהם.</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>📁 בחירת תכנים</h2>
+          <p>כאן מנהלים את עץ הסיכומים — תיקיות וסיכומים בתוכן.</p>
+          <ul class="help-list">
+            <li><strong>📁 תיקייה חדשה</strong> — צור קטגוריה (למשל: "גמרא", "הלכה").</li>
+            <li><strong>📄 סיכום חדש</strong> — צור מסמך ריק לכתיבת סיכום.</li>
+            <li><strong>לחיצה על סיכום</strong> — פותח את העורך במסך מלא.</li>
+            <li><strong>📅 תזמן חזרה</strong> (מתפריט הפריט) — הוסף את הסיכום ללוח החזרות.</li>
+            <li><strong>מיון וחיפוש</strong> — חפש סיכומים לפי שם, מיין לפי תאריך.</li>
+            <li><strong>ייבוא בתפזורת</strong> (📥) — הכנס מספר סיכומים מקובץ טקסט אחד בעזרת מפריד.</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>✏️ עורך הסיכום</h2>
+          <p>מסך עריכה מלא עם שלוש עמודות: הקלטות שמע (ימין), עורך טקסט (מרכז), מסייע AI (שמאל).</p>
+          <ul class="help-list">
+            <li><strong>עיצוב טקסט</strong> — Ctrl+B (מודגש), Ctrl+I (נטוי), Ctrl+U (קו תחתון). בחר גופן וגודל מהסרגל.</li>
+            <li><strong>שמירה אוטומטית</strong> — השינויים נשמרים 1.5 שניות אחרי עצירת ההקלדה.</li>
+            <li><strong>🎤 הקלט</strong> — הקלט שמע ישירות לסיכום. <strong>📤 העלה</strong> — העלה קובץ שמע.</li>
+            <li><strong>❮ הקודם / הבא ❯</strong> — עבור בין סיכומים בסדר העץ ללא חזרה לרשימה.</li>
+            <li><strong>📝 שאלות</strong> — ערוך שאלות פתוחות ורב-ברירה לסיכום זה.</li>
+            <li><strong>🎯 בחן</strong> — התחל בחינה עצמית מיידית על הסיכום.</li>
+            <li><strong>📄 Word</strong> — ייצא את הסיכום לקובץ Word להדפסה לשבת.</li>
+            <li><strong>🕐 גרסאות</strong> — צפה וזשחזר עד 5 גרסאות קודמות של הסיכום.</li>
+            <li><strong>← חזרה</strong> — חזור לרשימת הסיכומים (השינויים נשמרים אוטומטית).</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>🤖 מסייע AI (עמודה שמאלית בעורך)</h2>
+          <p>דורש הגדרת מפתח Gemini API בהגדרות. בלי מפתח — כל שאר הפונקציות עובדות!</p>
+          <ul class="help-list">
+            <li><strong>📖 הסבר את הסיכום</strong> — קבל נקודות מפתח מהתוכן הנוכחי.</li>
+            <li><strong>🔍 מצא מקורות</strong> — הצע מקורות ומראי מקומות רלוונטיים.</li>
+            <li><strong>📝 הצע שאלות</strong> — קבל שאלות לבחינה עצמית שלא הוספת עדיין.</li>
+            <li><strong>שדה הצ'אט</strong> — שאל שאלה חופשית על הסיכום (Ctrl+Enter לשליחה).</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>🎯 בחינה עצמית</h2>
+          <p>מערכת הבחינה תומכת בשאלות פתוחות ובחירה מרובה.</p>
+          <ul class="help-list">
+            <li><strong>שאלות פתוחות</strong> — כתוב תשובה, לחץ "גלה תשובה", ודרג עצמך 1–5.</li>
+            <li><strong>שאלות רב-ברירה</strong> — בחר תשובה, קבל משוב מיידי עם הסבר.</li>
+            <li><strong>ציון מתחת 70%</strong> — הסיכום יתוזמן מחדש לחזרה בלוח המרווח.</li>
+            <li><strong>בחינת תיקייה</strong> — בחן מכל הסיכומים בתיקייה בשאיפה אחת.</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>⚙️ הגדרות</h2>
+          <ul class="help-list">
+            <li><strong>אלגוריתם חזרה מרווחת</strong> — "חזקות של 2" (1,2,4,8,16...) או רצף מותאם אישית.</li>
+            <li><strong>סף עומס כבד</strong> — כמות המשימות המקסימלית לפני שיום מסומן כ"כבד".</li>
+            <li><strong>תצוגת לוח שנה</strong> — בחר עברי, לועזי, או משולב.</li>
+            <li><strong>מפתחות Gemini API</strong> — הוסף כמה מפתחות שרוצה (חינמיים, ב-aistudio.google.com).</li>
+            <li><strong>צ'אט מאמרים</strong> — שוחח עם ספריית מאמרי למידה פעילה.</li>
+            <li><strong>גיבוי ותחזוקה</strong> — ייצא ZIP של כל הנתונים, ייבא מגיבוי, צפה בגרסאות.</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>💡 טיפים למשתמש מתקדם</h2>
+          <ul class="help-list">
+            <li>לחץ Alt+← / Alt+→ בעורך לניווט מהיר בין סיכומים.</li>
+            <li>גרסאות סיכום (🕐) שומרות אוטומטית בכל שמירה — עד 5 גרסאות אחורה.</li>
+            <li>ייצא ZIP לפני כל עדכון מערכת כגיבוי.</li>
+            <li>צור תוכנית לימוד מותאמת אישית דרך ה-AI בהגדרות → צ'אט מאמרים.</li>
+            <li>המערכת עובדת לגמרי offline — רק ה-AI דורש חיבור לאינטרנט.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ══════════════════ מודל אישור מחיקה ══════════════════ -->
+  <div id="confirmModal" class="modal hidden"
+       role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+    <div class="modal__overlay"></div>
+    <div class="modal__box">
+      <h2 id="confirmModalTitle">אישור מחיקה</h2>
+      <p id="modalMessage">האם אתה בטוח שברצונך למחוק פריט זה? לא ניתן לשחזר את הפעולה.</p>
+      <div class="modal__actions">
+        <button id="modalCancelBtn"  class="btn btn--secondary" autofocus>ביטול</button>
+        <button id="modalConfirmBtn" class="btn btn--danger">כן, מחק</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ מודל קלט שם ══════════════════ -->
+  <div id="inputModal" class="modal hidden"
+       role="dialog" aria-modal="true" aria-labelledby="inputModalTitle">
+    <div class="modal__overlay"></div>
+    <div class="modal__box">
+      <h2 id="inputModalTitle">הזן שם</h2>
+      <input type="text" id="inputModalField" class="input-field input-field--full"
+             placeholder="" maxlength="100" />
+      <p id="inputModalError" class="input-error hidden"></p>
+      <div class="modal__actions">
+        <button id="inputModalCancelBtn"  class="btn btn--secondary">ביטול</button>
+        <button id="inputModalConfirmBtn" class="btn btn--primary">אישור</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ מודל ייבוא בתפזורת ══════════════════ -->
+  <div id="bulkImportModal" class="modal hidden"
+       role="dialog" aria-modal="true" aria-labelledby="bulkImportTitle">
+    <div class="modal__overlay"></div>
+    <div class="modal__box modal__box--wide">
+      <h2 id="bulkImportTitle">📥 ייבוא תוכן בתפזורת</h2>
+
+      <div class="form-group">
+        <label class="form-label" for="bulkParentSelect">תיקיית יעד</label>
+        <select id="bulkParentSelect" class="select-field input-field--full"></select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group form-group--half">
+          <label class="form-label" for="bulkBaseName">שם בסיס לסיכומים</label>
+          <input type="text" id="bulkBaseName" class="input-field input-field--full"
+                 placeholder="לדוגמה: פרק" value="סיכום" maxlength="80" />
+        </div>
+        <div class="form-group form-group--half">
+          <label class="form-label" for="bulkDelimiter">מפריד (delimiter)</label>
+          <input type="text" id="bulkDelimiter" class="input-field input-field--full"
+                 value="---" maxlength="50" />
+          <p class="hint">הטקסט יפוצל בכל הופעת המפריד</p>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">קובץ טקסט (אופציונלי)</label>
+        <input type="file" id="bulkFileInput" class="input-field" accept=".txt,.md" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="bulkContent">תוכן לייבוא</label>
+        <textarea id="bulkContent" class="input-field input-field--full editor-textarea"
+                  rows="10" placeholder="הדבק תוכן כאן, או העלה קובץ..."></textarea>
+      </div>
+
+      <div id="bulkPreview" class="bulk-preview hidden">
+        <strong id="bulkPreviewCount"></strong>
+      </div>
+
+      <div class="modal__actions">
+        <button id="bulkCancelBtn"  class="btn btn--secondary">ביטול</button>
+        <button id="bulkPreviewBtn" class="btn btn--ghost">תצוגה מקדימה</button>
+        <button id="bulkConfirmBtn" class="btn btn--primary">ייבא</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ מודל עורך שאלות ══════════════════ -->
+  <div id="qeModal" class="modal hidden"
+       role="dialog" aria-modal="true" aria-labelledby="qeModalTitle">
+    <div class="modal__overlay"></div>
+    <div class="modal__box modal__box--quiz-editor">
+
+      <div class="qe-header">
+        <h2 id="qeModalTitle">📝 שאלות: <span id="qeTitle"></span></h2>
+        <button id="qeCloseBtn" class="btn btn--ghost btn--sm">✕ סגור</button>
+      </div>
+
+      <!-- Tabs -->
+      <div class="qe-tabs">
+        <button class="qe-tab qe-tab--active" data-tab="open">
+          שאלות פתוחות (<span id="qeOpenCount">0</span>)
+        </button>
+        <button class="qe-tab" data-tab="mc">
+          בחירה מרובה (<span id="qeMcCount">0</span>)
+        </button>
+      </div>
+
+      <!-- Open questions list -->
+      <div id="qeTabOpen" class="qe-tab-content">
+        <div id="qeOpenList" class="qe-list"></div>
+        <button id="qeAddOpenBtn" class="btn btn--primary btn--sm qe-add-btn">
+          + הוסף שאלה פתוחה
+        </button>
+      </div>
+
+      <!-- MC questions list -->
+      <div id="qeTabMc" class="qe-tab-content hidden">
+        <div id="qeMcList" class="qe-list"></div>
+        <button id="qeAddMcBtn" class="btn btn--primary btn--sm qe-add-btn">
+          + הוסף שאלת בחירה מרובה
+        </button>
+      </div>
+
+      <!-- Dynamic add/edit form (filled by JS) -->
+      <div id="qeForm" class="qe-form hidden"></div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ מודל מסך בחינה ══════════════════ -->
+  <div id="quizModal" class="modal hidden"
+       role="dialog" aria-modal="true" aria-labelledby="quizConfigTitle">
+    <div class="modal__overlay"></div>
+    <div class="modal__box modal__box--quiz">
+
+      <!-- ── שלב 1: הגדרות ── -->
+      <div id="quizConfig" class="quiz-step">
+        <h2 id="quizConfigTitle">הגדרות בחינה</h2>
+        <p id="quizConfigInfo" class="quiz-config-info"></p>
+
+        <div class="form-group">
+          <label class="form-label">פורמט תצוגה:</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="quizLayout" value="one" checked />
+              שאלה אחת בכל פעם
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="quizLayout" value="all" />
+              כל השאלות בדף אחד
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">משוב:</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="quizFeedback" value="instant" checked />
+              מיידי — אחרי כל שאלה
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="quizFeedback" value="end" />
+              בסוף הבחינה בלבד
+            </label>
+          </div>
+        </div>
+
+        <div class="modal__actions">
+          <button id="quizCancelBtn" class="btn btn--secondary">ביטול</button>
+          <button id="quizStartBtn"  class="btn btn--primary">התחל בחינה ▶</button>
+        </div>
+      </div>
+
+      <!-- ── שלב 2: שאלות ── -->
+      <div id="quizTestArea" class="quiz-step hidden">
+        <div class="quiz-progress-wrap">
+          <div class="quiz-progress-bar">
+            <div id="quizProgressFill" class="quiz-progress-fill"></div>
+          </div>
+          <span id="quizProgressLabel" class="quiz-progress-label"></span>
+        </div>
+
+        <div id="quizQuestionContainer" class="quiz-question-container"></div>
+
+        <div class="quiz-nav-actions">
+          <button id="quizPrevBtn"   class="btn btn--ghost btn--sm hidden">❮ הקודם</button>
+          <button id="quizNextBtn"   class="btn btn--primary btn--sm">הבא ❯</button>
+          <button id="quizFinishBtn" class="btn btn--success btn--sm hidden">סיים בחינה ✓</button>
+        </div>
+      </div>
+
+      <!-- ── שלב 3: תוצאות ── -->
+      <div id="quizResults" class="quiz-step hidden">
+        <h2 class="quiz-results-title">תוצאות הבחינה</h2>
+        <div id="quizScoreDisplay" class="quiz-score-display"></div>
+        <div id="quizResultsList"  class="quiz-results-list"></div>
+        <div class="modal__actions">
+          <button id="quizCloseResultsBtn" class="btn btn--primary">סגור</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ מודל היסטוריית גרסאות ══════════════════ -->
+  <div id="historyModal" class="modal hidden"
+       role="dialog" aria-modal="true" aria-labelledby="historyModalTitle">
+    <div class="modal__overlay"></div>
+    <div class="modal__box">
+      <h2 id="historyModalTitle">🕐 היסטוריית גרסאות</h2>
+      <p class="hint">עד 5 גרסאות אחרונות. שחזור יחליף את התוכן הנוכחי.</p>
+      <div id="historyList" class="history-list"></div>
+      <div class="modal__actions">
+        <button id="historyCloseBtn" class="btn btn--secondary">סגור</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/windowManager.js"></script>
+  <script src="js/summariesManager.js"></script>
+  <script src="js/editorManager.js"></script>
+  <script src="js/calendarManager.js"></script>
+  <script src="js/quizManager.js"></script>
+  <script src="js/aiManager.js"></script>
+  <script src="js/backupManager.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

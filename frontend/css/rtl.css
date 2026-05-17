@@ -1,0 +1,79 @@
+/* RTL corrections — all pages have dir="rtl" in HTML */
+
+.navbar            { flex-direction: row-reverse; }
+.navbar__links     { flex-direction: row-reverse; }
+.navbar__status    { flex-direction: row-reverse; }
+
+.modal__actions    { flex-direction: row-reverse; }
+.tree-toolbar      { flex-direction: row-reverse; }
+.tree-toolbar__actions  { flex-direction: row-reverse; }
+.tree-toolbar__controls { flex-direction: row-reverse; }
+
+.tree-node__actions { margin-inline-start: auto; }
+
+/* Editor header — back button on right, actions on left */
+.editor-header { flex-direction: row-reverse; }
+.editor-nav    { flex-direction: row-reverse; }
+.editor-header-actions { flex-direction: row-reverse; }
+
+/* 3-column layout: audio panel on right, AI panel on left */
+.editor-body { flex-direction: row-reverse; }
+
+/* Audio panel border */
+.editor-panel--audio {
+  border-inline-start: none;
+  border-inline-end: 1px solid var(--color-border);
+}
+.editor-panel--ai { border-inline-start: 1px solid var(--color-border); border-inline-end: none; }
+
+/* Formatting toolbar RTL */
+.editor-toolbar { flex-direction: row-reverse; }
+
+/* Modal actions */
+.modal__actions { flex-direction: row-reverse; }
+.audio-actions  { flex-direction: row-reverse; }
+
+/* Bulk import */
+.form-row { flex-direction: row-reverse; }
+
+/* Calendar nav — prev on left, next on right in RTL */
+.cal-nav { flex-direction: row-reverse; }
+
+/* Dashboard split — calendar on right, tasks on left */
+.dashboard-split { flex-direction: row; }
+
+/* Settings form-row-actions */
+.form-row-actions { flex-direction: row-reverse; }
+
+/* Quiz editor */
+.qe-header         { flex-direction: row-reverse; }
+.qe-item           { flex-direction: row-reverse; }
+.qe-item__body     { flex-direction: row-reverse; }
+.qe-item__actions  { flex-direction: row-reverse; }
+.mc-opt-row        { flex-direction: row-reverse; }
+.mc-opt-label      { flex-direction: row-reverse; }
+
+/* Quiz test screen */
+.quiz-card__header  { flex-direction: row-reverse; }
+.quiz-progress-wrap { flex-direction: row-reverse; }
+.quiz-options       { align-items: stretch; }
+.quiz-option        { text-align: right; }
+.quiz-self-assess   { flex-direction: row-reverse; }
+.quiz-nav-actions   { flex-direction: row-reverse; }
+.quiz-result-row    { flex-direction: row-reverse; }
+.quiz-score-display { flex-direction: row-reverse; }
+.quiz-score-stats   { text-align: right; }
+
+/* AI Panel RTL */
+.ai-context-actions { align-items: stretch; }
+.ai-msg--user       { align-self: flex-end; }
+.ai-input-row       { flex-direction: row-reverse; }
+
+/* Backup RTL */
+.backup-item        { flex-direction: row-reverse; }
+.history-item__meta { flex-direction: row-reverse; }
+.diag-row           { flex-direction: row-reverse; }
+
+/* Help RTL */
+.help-list li::before { content: '→ '; }
+.api-key-input-wrap   { flex-direction: row-reverse; }
