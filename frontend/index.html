@@ -182,15 +182,31 @@
                data-placeholder="התחל לכתוב את הסיכום כאן..."></div>
         </div>
 
-        <!-- עמודה שמאל: מסייע AI (placeholder) -->
-        <aside class="editor-panel editor-panel--ai">
-          <div class="panel-header">
-            <h3>מסייע AI</h3>
+        <!-- עמודה שמאל: מסייע AI -->
+        <aside class="editor-panel editor-panel--ai" id="aiPanel">
+          <div class="panel-header ai-panel-header">
+            <h3>🤖 מסייע AI</h3>
+            <span id="aiOfflineBadge" class="badge badge--offline hidden">אופליין</span>
           </div>
-          <div class="ai-placeholder">
-            <div class="ai-placeholder__icon">🤖</div>
-            <p>מסייע ה-AI יהיה זמין בשלב 6 של הפיתוח.</p>
-            <p class="hint">יצירת שאלות, סיכום אוטומטי וניתוח תוכן.</p>
+
+          <!-- בנר אופליין -->
+          <div id="aiOfflineBanner" class="ai-offline-banner hidden">
+            מצב אופליין — ה-AI כבוי
+          </div>
+
+          <!-- כפתורי הקשר -->
+          <div id="aiContextActions" class="ai-context-actions"></div>
+
+          <!-- אזור צ'אט -->
+          <div id="aiChatMessages" class="ai-chat-messages"></div>
+
+          <!-- שדה קלט -->
+          <div class="ai-input-row">
+            <textarea id="aiChatInput" class="ai-chat-input"
+                      rows="2"
+                      placeholder="שאל שאלה..."
+                      dir="rtl"></textarea>
+            <button id="aiSendBtn" class="btn btn--primary btn--sm ai-send-btn">שלח</button>
           </div>
         </aside>
 
@@ -244,9 +260,34 @@
       <!-- מפתחות API -->
       <div class="settings-panel card">
         <h2>מפתחות Gemini API</h2>
-        <p class="hint">הוסף עד 5 מפתחות API להגדלת המכסה הזמינה.</p>
-        <div id="apiKeysList"></div>
-        <button id="saveKeysBtn" class="btn btn--primary">שמור מפתחות</button>
+        <p class="hint">הוסף עד 5 מפתחות API להגדלת המכסה הזמינה. המפתחות נשמרים מקומית בלבד.</p>
+
+        <!-- "סוללת" מפתחות -->
+        <div id="keyBattery" class="key-battery"></div>
+
+        <!-- שדות מפתחות -->
+        <div id="apiKeysList" class="api-keys-list"></div>
+
+        <div class="form-row-actions">
+          <button id="saveKeysBtn" class="btn btn--primary">שמור מפתחות</button>
+          <span id="keysSavedMsg" class="save-status save-status--saved hidden">נשמר ✓</span>
+        </div>
+
+        <!-- צ'אט מאמרים — מחייב לפחות מפתח אחד -->
+        <hr class="settings-divider" />
+        <h3>צ'אט למידה פעילה</h3>
+        <p class="hint">שוחח עם ספריית המאמרים בנושא תיאוריות למידה פעילה.</p>
+        <div id="articlesChat" class="articles-chat">
+          <div id="articlesChatMessages" class="ai-chat-messages ai-chat-messages--settings"></div>
+          <div class="ai-input-row">
+            <textarea id="articlesChatInput" class="ai-chat-input"
+                      rows="2"
+                      placeholder="שאל על למידה פעילה, חזרה מרווחת ועוד..."
+                      dir="rtl"></textarea>
+            <button id="articlesChatSendBtn" class="btn btn--primary btn--sm ai-send-btn">שלח</button>
+          </div>
+          <button id="learningProgramBtn" class="btn btn--secondary btn--full">✨ צור תוכנית לימוד אישית</button>
+        </div>
       </div>
     </section>
 
@@ -456,6 +497,7 @@
   <script src="js/editorManager.js"></script>
   <script src="js/calendarManager.js"></script>
   <script src="js/quizManager.js"></script>
+  <script src="js/aiManager.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

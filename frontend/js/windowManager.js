@@ -104,9 +104,15 @@ const WindowManager = (() => {
 
   // ─── זיהוי מצב אופליין ────────────────────────────────────────────────────
 
-  function initOfflineDetection() {
+  let _offlineCallback = null;
+
+  function initOfflineDetection(offlineCb) {
+    if (offlineCb) _offlineCallback = offlineCb;
     const indicator = document.getElementById('offlineIndicator');
-    const update    = () => indicator.classList.toggle('hidden', navigator.onLine);
+    const update    = () => {
+      indicator.classList.toggle('hidden', navigator.onLine);
+      if (_offlineCallback) _offlineCallback(!navigator.onLine);
+    };
     window.addEventListener('online',  update);
     window.addEventListener('offline', update);
     update();

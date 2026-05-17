@@ -1,7 +1,8 @@
 // נקודת כניסה ראשית של האפליקציה
 document.addEventListener('DOMContentLoaded', () => {
-  WindowManager.initOfflineDetection();
+  WindowManager.initOfflineDetection((isOffline) => AiManager.setOffline(isOffline));
   EditorManager.init();
+  AiManager.init();
   loadKeyCount();
 
   // ניווט בין תצוגות
@@ -12,8 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.classList.remove('editor-open');
       WindowManager.showView(view);
       if (view === 'summaries') SummariesManager.init();
-      if (view === 'dashboard') CalendarManager.init();
-      if (view === 'settings')  loadSrSettings();
+      if (view === 'dashboard') { CalendarManager.init(); AiManager.setContext('calendar'); }
+      if (view === 'settings')  { loadSrSettings(); AiManager.refreshBattery(); }
+      if (view === 'editor')    AiManager.setContext('editor');
     });
   });
 
@@ -21,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('editorQuestionsBtn').addEventListener('click', () => {
     const node = EditorManager.getCurrentNode();
     if (!node) return;
+    AiManager.setContext('quiz');
     QuizManager.openEditor(node.path, node.title || node.path);
   });
   document.getElementById('editorQuizBtn').addEventListener('click', () => {

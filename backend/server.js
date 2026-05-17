@@ -6,6 +6,7 @@ const path = require('path');
 const summariesRouter = require('./routes/summaries');
 const quizzesRouter = require('./routes/quizzes');
 const scheduleRouter = require('./routes/schedule');
+const aiRouter = require('./routes/ai');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,6 +20,7 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 app.use('/api/summaries', summariesRouter);
 app.use('/api/quizzes', quizzesRouter);
 app.use('/api/schedule', scheduleRouter);
+app.use('/api/ai', aiRouter);
 
 // בדיקת תקינות השרת
 app.get('/api/health', (_req, res) => {

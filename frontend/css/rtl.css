@@ -63,3 +63,8 @@
 .quiz-result-row    { flex-direction: row-reverse; }
 .quiz-score-display { flex-direction: row-reverse; }
 .quiz-score-stats   { text-align: right; }
+
+/* AI Panel RTL */
+.ai-context-actions { align-items: stretch; }
+.ai-msg--user       { align-self: flex-end; }
+.ai-input-row       { flex-direction: row-reverse; }

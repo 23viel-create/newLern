@@ -20,6 +20,17 @@ async function apiFormFetch(endpoint, formData) {
   return data.data;
 }
 
+async function apiFetchPlain(endpoint, options = {}) {
+  const res = await fetch(`${API_BASE}${endpoint}`, {
+    headers: { 'Content-Type': 'application/json', ...options.headers },
+    ...options,
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `שגיאת שרת ${res.status}`);
+  return data;
+}
+
 const Api = {
   // ── כללי ──────────────────────────────────────────────────────────────────
   health: () => apiFetch('/health'),
@@ -104,7 +115,18 @@ const Api = {
   submitQuizResult: (summaryPath, totalScore, questionResults) =>
     apiFetch('/quizzes/submit', { method: 'POST', body: { summaryPath, totalScore, questionResults } }),
 
-  // ── חידונים AI ────────────────────────────────────────────────────────────
-  generateQuiz:  (text) => apiFetch('/quizzes/multiple-choice', { method: 'POST', body: { summaryText: text } }),
-  generateOpenQ: (text) => apiFetch('/quizzes/open-questions',  { method: 'POST', body: { summaryText: text } }),
+  // ── מסייע AI ─────────────────────────────────────────────────────────────
+  aiAsk: (context, userMessage, extra) =>
+    apiFetchPlain('/ai/ask', { method: 'POST', body: { context, userMessage, extra } }),
+  aiSuggestQuestions: (summaryContent, summaryTitle, existingQuestions, type) =>
+    apiFetchPlain('/ai/suggest-questions', { method: 'POST', body: { summaryContent, summaryTitle, existingQuestions, type } }),
+  aiScheduleAdvice: (heavyDays, totalTasks) =>
+    apiFetchPlain('/ai/schedule-advice', { method: 'POST', body: { heavyDays, totalTasks } }),
+  aiArticlesChat: (userMessage) =>
+    apiFetchPlain('/ai/articles-chat', { method: 'POST', body: { userMessage } }),
+  aiLearningProgram: (goals, daysPerWeek, hoursPerDay) =>
+    apiFetchPlain('/ai/learning-program', { method: 'POST', body: { goals, daysPerWeek, hoursPerDay } }),
+  aiGetKeys: () => apiFetchPlain('/ai/keys', {}),
+  aiSaveKeys: (keys) => apiFetchPlain('/ai/keys', { method: 'PUT', body: { keys } }),
+  aiKeyStatus: () => apiFetchPlain('/ai/key-status', {}),
 };
