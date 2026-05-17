@@ -35,3 +35,12 @@
 
 /* Bulk import */
 .form-row { flex-direction: row-reverse; }
+
+/* Calendar nav — prev on left, next on right in RTL */
+.cal-nav { flex-direction: row-reverse; }
+
+/* Dashboard split — calendar on right, tasks on left */
+.dashboard-split { flex-direction: row; }
+
+/* Settings form-row-actions */
+.form-row-actions { flex-direction: row-reverse; }

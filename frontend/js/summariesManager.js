@@ -164,6 +164,7 @@ const SummariesManager = (() => {
                 data-action="open" data-path="${p}"
                 role="button" tabindex="0" title="פתח סיכום">${title}</span>
           <div class="tree-node__actions">
+            <button class="btn btn--xs btn--ghost" data-action="plan"   data-path="${p}" data-name="${rawName}" title="תזמן חזרות מרווחות">📅</button>
             <button class="btn btn--xs btn--ghost" data-action="rename" data-path="${p}" data-name="${rawName}">✏️</button>
             <button class="btn btn--xs btn--danger-ghost" data-action="delete" data-path="${p}" data-name="${rawName}" data-type="summary">🗑️</button>
           </div>
@@ -260,6 +261,20 @@ const SummariesManager = (() => {
         const flatList = flattenSummaries(sortTree(treeData));
         const node     = flatList.find(n => n.path === nodePath);
         if (node) EditorManager.open(node, flatList);
+        break;
+      }
+
+      case 'plan': {
+        const confirmed = await WindowManager.confirm(
+          `לתזמן חזרות מרווחות לסיכום "${nodeName}"?\n\nיווצרו משימות חזרה לפי ההגדרות הנוכחיות.`
+        );
+        if (!confirmed) return;
+        try {
+          const tasks = await Api.planSummary(nodePath, nodeName);
+          alert(`✓ תוזמנו ${tasks.length} משימות חזרה לסיכום "${nodeName}"`);
+        } catch (err) {
+          alert(`שגיאה: ${err.message}`);
+        }
         break;
       }
 

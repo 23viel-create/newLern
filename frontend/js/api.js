@@ -73,9 +73,13 @@ const Api = {
   },
 
   // ── לוח זמנים ────────────────────────────────────────────────────────────
-  getSchedule:  ()              => apiFetch('/schedule'),
-  getTodayTasks: ()             => apiFetch('/schedule/today'),
-  completeTask: (id, quality)   => apiFetch(`/schedule/${id}/complete`, { method: 'PATCH', body: { quality } }),
+  getSchedule:      ()              => apiFetch('/schedule'),
+  getTodayTasks:    ()              => apiFetch('/schedule/today'),
+  completeTask:     (id, quality)   => apiFetch(`/schedule/${id}/complete`, { method: 'PATCH', body: { quality } }),
+  getCalendarData:  (month)         => apiFetch(`/schedule/calendar?month=${encodeURIComponent(month)}`),
+  planSummary:      (summaryPath, title) => apiFetch('/schedule/plan', { method: 'POST', body: { summaryPath, title } }),
+  getScheduleSettings:  ()          => apiFetch('/schedule/settings'),
+  saveScheduleSettings: (settings)  => apiFetch('/schedule/settings', { method: 'PUT', body: settings }),
 
   // ── חידונים ──────────────────────────────────────────────────────────────
   generateQuiz:  (text) => apiFetch('/quizzes/multiple-choice', { method: 'POST', body: { summaryText: text } }),

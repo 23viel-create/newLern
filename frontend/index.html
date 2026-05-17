@@ -29,9 +29,39 @@
 
     <!-- ── לוח בקרה ── -->
     <section id="view-dashboard" class="view active">
-      <h1>שלום! מה נלמד היום?</h1>
-      <div class="card-grid" id="todayTasks">
-        <p class="placeholder-text">טוען משימות להיום...</p>
+      <div class="dashboard-split">
+
+        <!-- לוח שנה (מימין ב-RTL) -->
+        <div class="dashboard-calendar card">
+          <div class="cal-nav">
+            <button id="calPrevMonth" class="btn btn--ghost btn--sm" title="חודש קודם">❮</button>
+            <span id="calMonthLabel" class="cal-month-label">טוען...</span>
+            <button id="calNextMonth" class="btn btn--ghost btn--sm" title="חודש הבא">❯</button>
+            <button id="calTodayBtn"  class="btn btn--secondary btn--sm">היום</button>
+          </div>
+          <div class="cal-legend">
+            <span class="legend-item legend-item--done">הושלם</span>
+            <span class="legend-item legend-item--partial">חלקי</span>
+            <span class="legend-item legend-item--missed">לא בוצע</span>
+            <span class="legend-sep">|</span>
+            <span class="legend-item legend-item--load-low">1–3 משימות</span>
+            <span class="legend-item legend-item--load-mid">4–8 משימות</span>
+            <span class="legend-item legend-item--load-high">עומס כבד</span>
+          </div>
+          <div id="calGrid" class="cal-grid">
+            <p class="placeholder-text">טוען לוח שנה...</p>
+          </div>
+        </div>
+
+        <!-- פאנל משימות (משמאל ב-RTL) -->
+        <div class="dashboard-tasks card">
+          <h3 class="dashboard-tasks__title">משימות</h3>
+          <p id="calTaskDate" class="cal-task-header">בחר יום</p>
+          <div id="calTaskPanel">
+            <p class="placeholder-text">לחץ על יום בלוח לצפייה במשימות</p>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -176,6 +206,40 @@
     <!-- ── הגדרות ── -->
     <section id="view-settings" class="view hidden">
       <h1>הגדרות</h1>
+
+      <!-- הגדרות חזרה מרווחת -->
+      <div class="settings-panel card">
+        <h2>חזרה מרווחת (Spaced Repetition)</h2>
+        <p class="hint">קבע כיצד יתוזמנו חזרות על סיכומים שתסמן ב-📅 בעץ התכנים.</p>
+
+        <div class="form-group">
+          <label class="form-label" for="srAlgorithm">אלגוריתם:</label>
+          <select id="srAlgorithm" class="select-field">
+            <option value="powers2">חזקות של 2 (1, 2, 4, 8, 16, 32, 64 ימים)</option>
+            <option value="custom">רצף מותאם אישית</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="srCustomSeqGroup">
+          <label class="form-label" for="srCustomSeq">רצף ימים מותאם (מופרד בפסיקים):</label>
+          <input type="text" id="srCustomSeq" class="input-field" placeholder="1, 7, 30, 90" />
+          <p class="hint">לדוגמה: 1, 7, 30, 90 — מספר ימים מיום הלימוד הראשון</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="srHeavyLoad">סף עומס כבד (מספר משימות ביום):</label>
+          <input type="number" id="srHeavyLoad" class="input-field input-field--narrow"
+                 min="1" max="99" value="9" />
+          <p class="hint">ימים עם מספר משימות גדול מהסף יסומנו בשחור בלוח השנה</p>
+        </div>
+
+        <div class="form-row-actions">
+          <button id="saveSrSettingsBtn" class="btn btn--primary">שמור הגדרות</button>
+          <span id="srSettingsSavedMsg" class="save-status save-status--saved hidden">נשמר ✓</span>
+        </div>
+      </div>
+
+      <!-- מפתחות API -->
       <div class="settings-panel card">
         <h2>מפתחות Gemini API</h2>
         <p class="hint">הוסף עד 5 מפתחות API להגדלת המכסה הזמינה.</p>
@@ -269,6 +333,7 @@
   <script src="js/windowManager.js"></script>
   <script src="js/summariesManager.js"></script>
   <script src="js/editorManager.js"></script>
+  <script src="js/calendarManager.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

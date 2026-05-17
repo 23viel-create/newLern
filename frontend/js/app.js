@@ -12,51 +12,73 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.classList.remove('editor-open');
       WindowManager.showView(view);
       if (view === 'summaries') SummariesManager.init();
+      if (view === 'dashboard') CalendarManager.init();
+      if (view === 'settings')  loadSrSettings();
     });
   });
 
-  // תצוגת ברירת מחדל
+  // תצוגת ברירת מחדל — לוח בקרה עם לוח שנה
   WindowManager.showView('dashboard');
-  loadTodayTasks();
+  CalendarManager.init();
+  _bindSrSettings();
 });
 
-// ─── לוח בקרה ─────────────────────────────────────────────────────────────────
+// ─── הגדרות חזרה מרווחת ──────────────────────────────────────────────────────
 
-async function loadTodayTasks() {
-  const container = document.getElementById('todayTasks');
-  try {
-    const tasks = await Api.getTodayTasks();
-    if (!tasks.length) {
-      container.innerHTML = '<p class="placeholder-text">אין משימות להיום — כל הכבוד! 🎉</p>';
-      return;
+function _bindSrSettings() {
+  const algoSel  = document.getElementById('srAlgorithm');
+  const seqGroup = document.getElementById('srCustomSeqGroup');
+
+  function toggleSeqGroup() {
+    seqGroup.style.display = algoSel.value === 'custom' ? '' : 'none';
+  }
+  algoSel.addEventListener('change', toggleSeqGroup);
+
+  document.getElementById('saveSrSettingsBtn').addEventListener('click', async () => {
+    const algorithm = algoSel.value;
+    const heavyLoadThreshold = parseInt(document.getElementById('srHeavyLoad').value, 10) || 9;
+    let customSequence;
+
+    if (algorithm === 'custom') {
+      const raw = document.getElementById('srCustomSeq').value;
+      customSequence = raw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => n > 0);
+      if (!customSequence.length) {
+        alert('יש להזין לפחות ערך אחד ברצף המותאם');
+        return;
+      }
     }
-    container.innerHTML = tasks
-      .map((t) => `
-        <div class="card">
-          <h3>${escHtml(t.title || t.id)}</h3>
-          <p class="hint">מועד: ${escHtml(t.dueDate)}</p>
-          <button class="btn btn--primary" onclick="markDone('${escHtml(t.id)}')">סיימתי ✓</button>
-        </div>`)
-      .join('');
-  } catch {
-    container.innerHTML = '<p class="placeholder-text">לא ניתן לטעון משימות</p>';
-  }
+
+    try {
+      await Api.saveScheduleSettings({ algorithm, customSequence, heavyLoadThreshold });
+      const msg = document.getElementById('srSettingsSavedMsg');
+      msg.classList.remove('hidden');
+      setTimeout(() => msg.classList.add('hidden'), 2500);
+      CalendarManager.loadCalendar(); // refresh color coding
+    } catch (err) {
+      alert(`שגיאה בשמירת הגדרות: ${err.message}`);
+    }
+  });
 }
 
-async function markDone(taskId) {
+async function loadSrSettings() {
   try {
-    await Api.completeTask(taskId, 3);
-    loadTodayTasks();
-  } catch (err) {
-    alert(`שגיאה: ${err.message}`);
-  }
+    const s = await Api.getScheduleSettings();
+    document.getElementById('srAlgorithm').value = s.algorithm || 'powers2';
+    document.getElementById('srHeavyLoad').value  = s.heavyLoadThreshold ?? 9;
+    if (s.customSequence) {
+      document.getElementById('srCustomSeq').value = s.customSequence.join(', ');
+    }
+    // Show/hide custom sequence group
+    document.getElementById('srCustomSeqGroup').style.display =
+      s.algorithm === 'custom' ? '' : 'none';
+  } catch { /* fail silently */ }
 }
+
+// ─── עזר גלובלי ───────────────────────────────────────────────────────────────
 
 async function loadKeyCount() {
   try { await Api.health(); } catch {}
 }
-
-// ─── עזר גלובלי ───────────────────────────────────────────────────────────────
 
 function escHtml(str) {
   return String(str)
