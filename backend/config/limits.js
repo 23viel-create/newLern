@@ -7,8 +7,8 @@ module.exports = {
   MAX_QUIZ_QUESTIONS: 20,
   MAX_OPEN_QUESTIONS: 10,
 
-  // ספריית הנתונים
-  DATA_DIR: '../data',
-  SUMMARIES_DIR: '../data/summaries_tree',
-  SCHEDULE_FILE: '../data/schedule.json',
+  // ספריית הנתונים (נתיבים יחסיים מתוך backend/controllers/)
+  DATA_DIR: '../../data',
+  SUMMARIES_DIR: '../../data/summaries_tree',
+  SCHEDULE_FILE: '../../data/schedule.json',
 };
