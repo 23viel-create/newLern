@@ -10,6 +10,8 @@ const {
   deleteNode,
   getSummaryContent,
   setSummaryContent,
+  getSummaryHistory,
+  restoreHistoryVersion,
   listAudioFiles,
   saveAudioBuffer,
   deleteAudioFile,
@@ -103,6 +105,25 @@ router.put('/content', (req, res) => {
     if (!nodePath) return res.status(400).json({ success: false, message: 'נדרש nodePath' });
     setSummaryContent(nodePath, text);
     res.json({ success: true, message: 'התוכן נשמר' });
+  } catch (err) { res.status(400).json({ success: false, message: err.message }); }
+});
+
+// GET history list
+router.get('/history', (req, res) => {
+  try {
+    const { path: nodePath } = req.query;
+    if (!nodePath) return res.status(400).json({ success: false, message: 'נדרש path' });
+    res.json({ success: true, data: getSummaryHistory(nodePath) });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// POST restore history version
+router.post('/history/restore', (req, res) => {
+  try {
+    const { nodePath, versionIndex } = req.body;
+    if (!nodePath) return res.status(400).json({ success: false, message: 'נדרש nodePath' });
+    const content = restoreHistoryVersion(nodePath, versionIndex ?? 0);
+    res.json({ success: true, data: content });
   } catch (err) { res.status(400).json({ success: false, message: err.message }); }
 });
 

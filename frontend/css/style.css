@@ -815,3 +815,64 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
   background: #eef2ff; color: #312e81;
   border: 1px solid #c7d2fe;
 }
+
+/* ══════════════════ Backup & History ══════════════════ */
+.backup-section {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.backup-section:last-child { border-bottom: none; }
+.backup-section h3         { margin-bottom: 0.6rem; font-size: 0.95rem; }
+
+.backups-list  { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 0.5rem; }
+.backup-item {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-border); border-radius: var(--radius);
+  font-size: 0.82rem; background: var(--color-bg);
+}
+.backup-item__name { flex: 1; font-weight: 500; font-family: monospace; }
+.backup-item__size { color: var(--color-text-muted); white-space: nowrap; }
+.backup-item__date { color: var(--color-text-muted); white-space: nowrap; }
+
+/* ── History modal ── */
+.history-list  { display: flex; flex-direction: column; gap: 0.5rem; max-height: 360px; overflow-y: auto; }
+.history-item {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border); border-radius: var(--radius);
+  background: var(--color-bg);
+}
+.history-item__meta {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 0.3rem;
+}
+.history-item__date    { font-size: 0.78rem; color: var(--color-text-muted); }
+.history-item__preview {
+  font-size: 0.8rem; color: var(--color-text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 0.4rem; direction: rtl;
+}
+
+/* ── Diagnostics ── */
+.diagnostics-result {
+  margin-top: 0.75rem;
+  display: flex; flex-direction: column; gap: 0.3rem;
+}
+.diag-row {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius); font-size: 0.85rem;
+  background: var(--color-bg); border: 1px solid var(--color-border);
+}
+.diag-icon          { font-weight: 700; min-width: 20px; text-align: center; }
+.diag-icon--ok      { color: var(--color-success); }
+.diag-icon--fail    { color: var(--color-danger); }
+.diag-label         { flex: 1; }
+.diag-status        { font-size: 0.78rem; color: var(--color-text-muted); }
+
+/* ── save-status error variant ── */
+.save-status--error { color: var(--color-danger); }
+
+/* ── btn--xs ── */
+.btn--xs { padding: 0.15rem 0.45rem; font-size: 0.75rem; }

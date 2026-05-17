@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
   WindowManager.initOfflineDetection((isOffline) => AiManager.setOffline(isOffline));
   EditorManager.init();
   AiManager.init();
+  BackupManager.init();
   loadKeyCount();
 
   // ניווט בין תצוגות
@@ -14,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
       WindowManager.showView(view);
       if (view === 'summaries') SummariesManager.init();
       if (view === 'dashboard') { CalendarManager.init(); AiManager.setContext('calendar'); }
-      if (view === 'settings')  { loadSrSettings(); AiManager.refreshBattery(); }
+      if (view === 'settings')  { loadSrSettings(); AiManager.refreshBattery(); BackupManager.loadBackupList(); }
       if (view === 'editor')    AiManager.setContext('editor');
     });
   });

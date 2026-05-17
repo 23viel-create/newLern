@@ -68,3 +68,8 @@
 .ai-context-actions { align-items: stretch; }
 .ai-msg--user       { align-self: flex-end; }
 .ai-input-row       { flex-direction: row-reverse; }
+
+/* Backup RTL */
+.backup-item        { flex-direction: row-reverse; }
+.history-item__meta { flex-direction: row-reverse; }
+.diag-row           { flex-direction: row-reverse; }

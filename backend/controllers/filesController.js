@@ -171,9 +171,52 @@ function getSummaryContent(nodeRelPath) {
   return fs.readFileSync(contentPath, 'utf-8');
 }
 
+const MAX_HISTORY = 5;
+
+function _saveHistory(nodePath) {
+  const contentPath = path.join(nodePath, 'content.txt');
+  if (!fs.existsSync(contentPath)) return;
+  const prev = fs.readFileSync(contentPath, 'utf-8');
+  if (!prev.trim()) return;
+
+  const histDir = path.join(nodePath, '.history');
+  ensureDir(histDir);
+
+  const histFile = path.join(histDir, 'versions.json');
+  let versions = [];
+  if (fs.existsSync(histFile)) {
+    try { versions = JSON.parse(fs.readFileSync(histFile, 'utf-8')); } catch { versions = []; }
+  }
+  versions.unshift({ savedAt: new Date().toISOString(), content: prev });
+  versions = versions.slice(0, MAX_HISTORY);
+  fs.writeFileSync(histFile, JSON.stringify(versions, null, 2), 'utf-8');
+}
+
+function getSummaryHistory(nodeRelPath) {
+  const nodePath  = safePath(nodeRelPath);
+  const histFile  = path.join(nodePath, '.history', 'versions.json');
+  if (!fs.existsSync(histFile)) return [];
+  try {
+    const versions = JSON.parse(fs.readFileSync(histFile, 'utf-8'));
+    return versions.map((v, i) => ({ index: i, savedAt: v.savedAt, preview: v.content.slice(0, 120) }));
+  } catch { return []; }
+}
+
+function restoreHistoryVersion(nodeRelPath, versionIndex) {
+  const nodePath  = safePath(nodeRelPath);
+  const histFile  = path.join(nodePath, '.history', 'versions.json');
+  if (!fs.existsSync(histFile)) throw new Error('אין גרסאות קודמות');
+  const versions = JSON.parse(fs.readFileSync(histFile, 'utf-8'));
+  if (!versions[versionIndex]) throw new Error('גרסה לא נמצאה');
+  _saveHistory(nodePath); // save current as history first
+  setSummaryContent(nodeRelPath, versions[versionIndex].content);
+  return versions[versionIndex].content;
+}
+
 function setSummaryContent(nodeRelPath, html) {
   const nodePath = safePath(nodeRelPath);
   if (!fs.existsSync(nodePath)) throw new Error('הסיכום לא נמצא');
+  _saveHistory(nodePath);
   fs.writeFileSync(path.join(nodePath, 'content.txt'), html || '', 'utf-8');
   const meta     = readMeta(nodePath);
   meta.updatedAt = new Date().toISOString();
@@ -295,10 +338,13 @@ module.exports = {
   deleteNode,
   getSummaryContent,
   setSummaryContent,
+  getSummaryHistory,
+  restoreHistoryVersion,
   listAudioFiles,
   saveAudioBuffer,
   deleteAudioFile,
   getAudioFilePath,
   bulkImport,
   getNeighbors,
+  summariesRoot,
 };

@@ -115,6 +115,35 @@ const Api = {
   submitQuizResult: (summaryPath, totalScore, questionResults) =>
     apiFetch('/quizzes/submit', { method: 'POST', body: { summaryPath, totalScore, questionResults } }),
 
+  // ── גיבוי וייצוא ────────────────────────────────────────────────────────
+  /** Returns a download URL for the ZIP — open in tab or anchor */
+  backupZipUrl: (subPath, save) => {
+    let url = `${API_BASE}/backup/zip`;
+    const params = [];
+    if (subPath) params.push(`subPath=${encodeURIComponent(subPath)}`);
+    if (save)    params.push('save=1');
+    if (params.length) url += '?' + params.join('&');
+    return url;
+  },
+  backupList:   ()              => apiFetchPlain('/backup/list', {}),
+  backupImport: (file, targetPath) => {
+    const fd = new FormData();
+    fd.append('zip', file);
+    if (targetPath) fd.append('targetPath', targetPath);
+    return fetch(`${API_BASE}/backup/import`, { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(d => { if (d.error) throw new Error(d.error); return d; });
+  },
+
+  // ── ייצוא Word ─────────────────────────────────────────────────────────
+  docxExportUrl: (nodePath, title) =>
+    `${API_BASE}/backup/docx`, // POST — handled via fetch+blob in backupManager
+
+  // ── היסטוריית גרסאות ─────────────────────────────────────────────────
+  getHistory:     (nodePath) => apiFetch(`/summaries/history?path=${encodeURIComponent(nodePath)}`),
+  restoreVersion: (nodePath, versionIndex) =>
+    apiFetch('/summaries/history/restore', { method: 'POST', body: { nodePath, versionIndex } }),
+
   // ── מסייע AI ─────────────────────────────────────────────────────────────
   aiAsk: (context, userMessage, extra) =>
     apiFetchPlain('/ai/ask', { method: 'POST', body: { context, userMessage, extra } }),
