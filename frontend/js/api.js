@@ -139,6 +139,12 @@ const Api = {
   docxExportUrl: (nodePath, title) =>
     `${API_BASE}/backup/docx`, // POST — handled via fetch+blob in backupManager
 
+  openInWord: (nodePath, title, html) =>
+    apiFetchPlain('/backup/open-in-word', { method: 'POST', body: { nodePath, title, html } }),
+
+  wordSync: (nodePath, title) =>
+    apiFetchPlain(`/backup/word-sync?nodePath=${encodeURIComponent(nodePath)}&title=${encodeURIComponent(title || nodePath)}`, {}),
+
   // ── היסטוריית גרסאות ─────────────────────────────────────────────────
   getHistory:     (nodePath) => apiFetch(`/summaries/history?path=${encodeURIComponent(nodePath)}`),
   restoreVersion: (nodePath, versionIndex) =>

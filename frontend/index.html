@@ -13,9 +13,8 @@
   <header class="navbar">
     <div class="navbar__brand">📚 למידה פעילה</div>
     <nav class="navbar__links">
-      <a href="#" data-view="dashboard"  class="nav-link active">לוח בקרה</a>
-      <a href="#" data-view="summaries"  class="nav-link">בחירת תכנים</a>
-      <a href="#" data-view="schedule"   class="nav-link">לוח זמנים</a>
+      <a href="#" data-view="dashboard"  class="nav-link active">מסך ראשי</a>
+      <a href="#" data-view="summaries"  class="nav-link">עיון בקבצים</a>
       <a href="#" data-view="settings"   class="nav-link">הגדרות</a>
       <a href="#" data-view="help"       class="nav-link">❓ עזרה</a>
     </nav>
@@ -28,17 +27,22 @@
   <!-- ══════════════════ תוכן ראשי ══════════════════ -->
   <main id="mainContent" class="container">
 
-    <!-- ── לוח בקרה ── -->
+    <!-- ── מסך ראשי ── -->
     <section id="view-dashboard" class="view active">
       <div class="dashboard-split">
 
         <!-- לוח שנה (מימין ב-RTL) -->
         <div class="dashboard-calendar card">
           <div class="cal-nav">
-            <button id="calPrevMonth" class="btn btn--ghost btn--sm" title="חודש קודם">❮</button>
+            <button id="calPrevMonth" class="btn btn--ghost btn--sm" title="קודם">❮</button>
             <span id="calMonthLabel" class="cal-month-label">טוען...</span>
-            <button id="calNextMonth" class="btn btn--ghost btn--sm" title="חודש הבא">❯</button>
+            <button id="calNextMonth" class="btn btn--ghost btn--sm" title="הבא">❯</button>
             <button id="calTodayBtn"  class="btn btn--secondary btn--sm">היום</button>
+          </div>
+          <div class="cal-view-tabs">
+            <button class="cal-view-btn cal-view-btn--active" data-view="monthly">חודשי</button>
+            <button class="cal-view-btn" data-view="weekly">שבועי</button>
+            <button class="cal-view-btn" data-view="daily">יומי</button>
           </div>
           <div class="cal-legend">
             <span class="legend-item legend-item--done">הושלם</span>
@@ -66,10 +70,10 @@
       </div>
     </section>
 
-    <!-- ── מסך בחירת תכנים ── -->
+    <!-- ── עיון בקבצים ── -->
     <section id="view-summaries" class="view hidden">
       <div class="page-header">
-        <h1>בחירת תכנים</h1>
+        <h1>עיון בקבצים</h1>
         <div class="tree-toolbar">
           <div class="tree-toolbar__actions">
             <button class="btn btn--secondary" data-action="new-folder" data-path="">
@@ -117,6 +121,7 @@
           <button id="editorQuestionsBtn" class="btn btn--ghost btn--sm" title="ערוך שאלות">📝 שאלות</button>
           <button id="bulkImportBtn"   class="btn btn--secondary btn--sm">📥 ייבוא בתפזורת</button>
           <button id="exportDocxBtn"  class="btn btn--ghost btn--sm" title="ייצוא ל-Word">📄 Word</button>
+          <button id="openInWordBtn" class="btn btn--ghost btn--sm" title="פתח ב-Word המקומי">📂 פתח ב-Word</button>
           <button id="historyBtn"     class="btn btn--ghost btn--sm" title="היסטוריית גרסאות">🕐 גרסאות</button>
         </div>
       </div>
@@ -213,14 +218,6 @@
           </div>
         </aside>
 
-      </div>
-    </section>
-
-    <!-- ── לוח זמנים ── -->
-    <section id="view-schedule" class="view hidden">
-      <h1>לוח זמנים חזרות</h1>
-      <div id="scheduleContainer">
-        <p class="placeholder-text">טוען לוח זמנים...</p>
       </div>
     </section>
 
@@ -360,7 +357,7 @@
         <p class="help-intro">המערכת מיועדת ללמידה אישית עצמאית, שמירת סיכומים, בחינה עצמית וחזרה מרווחת. כל הנתונים שמורים <strong>מקומית בלבד</strong> במחשבך.</p>
 
         <div class="help-section">
-          <h2>📊 לוח בקרה</h2>
+          <h2>📊 מסך ראשי</h2>
           <p>מסך הפתיחה מציג לוח שנה עברי-לועזי עם משימות החזרה שלך לכל יום.</p>
           <ul class="help-list">
             <li><strong>לחץ על יום</strong> — ראה את כל הסיכומים לחזרה באותו יום.</li>
@@ -372,7 +369,7 @@
         </div>
 
         <div class="help-section">
-          <h2>📁 בחירת תכנים</h2>
+          <h2>📁 עיון בקבצים</h2>
           <p>כאן מנהלים את עץ הסיכומים — תיקיות וסיכומים בתוכן.</p>
           <ul class="help-list">
             <li><strong>📁 תיקייה חדשה</strong> — צור קטגוריה (למשל: "גמרא", "הלכה").</li>

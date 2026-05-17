@@ -3,7 +3,7 @@ const multer  = require('multer');
 const router  = express.Router();
 
 const {
-  buildDocx, exportZip, importZip, listBackups, saveBackup,
+  buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache,
 } = require('../controllers/backupController');
 const {
   getSummaryContent, getSummaryHistory, restoreHistoryVersion,
@@ -94,6 +94,32 @@ router.post('/restore', (req, res) => {
     const content = restoreHistoryVersion(nodePath, versionIndex ?? 0);
     res.json({ ok: true, content });
   } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ─── Open in local Word ───────────────────────────────────────────────────────
+
+// POST /api/backup/open-in-word  { nodePath, title, html? }
+router.post('/open-in-word', async (req, res) => {
+  try {
+    const { nodePath, title, html } = req.body;
+    if (!nodePath) return res.status(400).json({ error: 'נדרש nodePath' });
+    const result = await openInWord(nodePath, title, html);
+    res.json({ ok: true, filePath: result.filePath });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/backup/word-sync?nodePath=...&title=...
+router.get('/word-sync', (req, res) => {
+  try {
+    const { nodePath, title } = req.query;
+    if (!nodePath) return res.status(400).json({ error: 'נדרש nodePath' });
+    const info = readWordCache(title, nodePath);
+    res.json({ ok: true, ...info });
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
 });
 
 module.exports = router;

@@ -1,5 +1,6 @@
 const fs   = require('fs');
 const path = require('path');
+const { exec } = require('child_process');
 const AdmZip = require('adm-zip');
 const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = require('docx');
 const { summariesRoot, getSummaryContent, createFolder } = require('./filesController');
@@ -182,4 +183,46 @@ function saveBackup(buffer) {
   return name;
 }
 
-module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup };
+// ─── Open in local Word ───────────────────────────────────────────────────────
+
+const WORD_CACHE_DIR = path.join(DATA_ROOT, 'word_cache');
+
+async function openInWord(nodePath, title, html) {
+  fs.mkdirSync(WORD_CACHE_DIR, { recursive: true });
+
+  // Build .docx and save to cache
+  const content = html !== undefined ? html : getSummaryContent(nodePath);
+  const buffer  = await buildDocx(title || nodePath, content);
+
+  const safeBase = (title || nodePath).replace(/[^\w֐-׿‏‎ -]/g, '_').slice(0, 60);
+  const filePath = path.join(WORD_CACHE_DIR, safeBase + '.docx');
+  fs.writeFileSync(filePath, buffer);
+
+  // Platform open command
+  let cmd;
+  if (process.platform === 'win32') {
+    cmd = `start "" "${filePath}"`;
+  } else if (process.platform === 'darwin') {
+    cmd = `open "${filePath}"`;
+  } else {
+    cmd = `xdg-open "${filePath}"`;
+  }
+
+  return new Promise((resolve, reject) => {
+    exec(cmd, (err) => {
+      if (err) reject(new Error(`לא ניתן לפתוח את הקובץ: ${err.message}`));
+      else     resolve({ filePath });
+    });
+  });
+}
+
+// Read back a previously cached .docx file's plain text (for Word sync)
+function readWordCache(title, nodePath) {
+  const safeBase = (title || nodePath).replace(/[^\w֐-׿‏‎ -]/g, '_').slice(0, 60);
+  const filePath = path.join(WORD_CACHE_DIR, safeBase + '.docx');
+  if (!fs.existsSync(filePath)) throw new Error('קובץ Word לא נמצא — פתח אותו תחילה');
+  const stat = fs.statSync(filePath);
+  return { filePath, size: stat.size, mtime: stat.mtimeMs };
+}
+
+module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache };

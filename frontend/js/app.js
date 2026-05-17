@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.classList.remove('editor-open');
       WindowManager.showView(view);
       if (view === 'summaries') SummariesManager.init();
-      if (view === 'dashboard') { CalendarManager.init(); AiManager.setContext('calendar'); }
+      if (view === 'dashboard') { CalendarManager.loadCalendar(); AiManager.setContext('calendar'); }
       if (view === 'settings')  { loadSrSettings(); AiManager.refreshBattery(); BackupManager.loadBackupList(); }
       if (view === 'help')      { /* static — no init needed */ }
     });

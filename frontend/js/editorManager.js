@@ -173,6 +173,24 @@ const EditorManager = (() => {
       document.body.classList.remove('editor-open');
       WindowManager.showView('summaries');
     });
+
+    // פתח ב-Word
+    document.getElementById('openInWordBtn').addEventListener('click', async () => {
+      if (!currentNode) return;
+      const btn = document.getElementById('openInWordBtn');
+      btn.disabled = true;
+      btn.textContent = 'פותח...';
+      try {
+        if (isDirty) await _save();
+        const html = document.getElementById('editorContent').innerHTML;
+        await Api.openInWord(currentNode.path, currentNode.title || currentNode.path, html);
+      } catch (err) {
+        alert(`שגיאה בפתיחת Word: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '📂 פתח ב-Word';
+      }
+    });
   }
 
   function _applyFontSize(px) {

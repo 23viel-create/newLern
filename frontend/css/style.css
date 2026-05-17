@@ -220,7 +220,9 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
    EDITOR VIEW
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.editor-view {
+.editor-view { display: none !important; }
+
+.editor-view.active {
   display: flex !important;
   flex-direction: column;
   height: calc(100vh - var(--navbar-h));
@@ -910,3 +912,50 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
 /* ── API key input with remove button ── */
 .api-key-input-wrap { display: flex; gap: 0.4rem; align-items: center; }
 .add-key-btn-wrap   { padding-top: 0.25rem; }
+
+/* ── Calendar View Toggles ── */
+.cal-view-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.6rem;
+}
+.cal-view-btn {
+  flex: 1;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.cal-view-btn:hover       { background: var(--color-hover); color: var(--color-text); }
+.cal-view-btn--active     { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+
+/* ── Hebrew-primary cell layout ── */
+.cal-cell__heb--primary { font-size: 0.9rem; font-weight: 700; display: block; }
+.cal-cell__greg--sub    { font-size: 0.65rem; color: var(--color-text-muted); display: block; }
+
+/* ── Daily view ── */
+.cal-day-single {
+  grid-column: 1 / -1;
+  padding: 1.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  text-align: center;
+}
+.cal-day-single__heb   { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.25rem; }
+.cal-day-single__greg  { font-size: 0.9rem; color: var(--color-text-muted); margin-bottom: 0.5rem; }
+.cal-day-tasks-summary { font-size: 0.85rem; font-weight: 600; }
+
+/* ── Hebrew date badge in task item ── */
+.task-item__hebdate {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  background: var(--color-hover);
+  border-radius: 4px;
+  padding: 0.05rem 0.35rem;
+  margin-inline-start: 0.25rem;
+}
