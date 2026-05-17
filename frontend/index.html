@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>מערכת למידה פעילה</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/rtl.css" />
+</head>
+<body>
+  <!-- סרגל ניווט עליון -->
+  <header class="navbar">
+    <div class="navbar__brand">📚 למידה פעילה</div>
+    <nav class="navbar__links">
+      <a href="#" data-view="dashboard" class="nav-link active">לוח בקרה</a>
+      <a href="#" data-view="summaries" class="nav-link">סיכומים</a>
+      <a href="#" data-view="schedule" class="nav-link">לוח זמנים</a>
+      <a href="#" data-view="settings" class="nav-link">הגדרות</a>
+    </nav>
+    <div class="navbar__status">
+      <span id="offlineIndicator" class="badge badge--offline hidden">אין חיבור לאינטרנט</span>
+      <span id="aiKeysBattery" class="badge badge--info">מפתחות AI: <strong id="keyCount">0</strong></span>
+    </div>
+  </header>
+
+  <!-- אזור תוכן ראשי -->
+  <main id="mainContent" class="container">
+    <!-- Dashboard View -->
+    <section id="view-dashboard" class="view active">
+      <h1>שלום! מה נלמד היום?</h1>
+      <div class="card-grid" id="todayTasks">
+        <p class="placeholder-text">טוען משימות להיום...</p>
+      </div>
+    </section>
+
+    <!-- Summaries View -->
+    <section id="view-summaries" class="view hidden">
+      <h1>סיכומים</h1>
+      <div id="summariesTree" class="tree-container">
+        <p class="placeholder-text">טוען סיכומים...</p>
+      </div>
+    </section>
+
+    <!-- Schedule View -->
+    <section id="view-schedule" class="view hidden">
+      <h1>לוח זמנים חזרות</h1>
+      <div id="scheduleContainer">
+        <p class="placeholder-text">טוען לוח זמנים...</p>
+      </div>
+    </section>
+
+    <!-- Settings View -->
+    <section id="view-settings" class="view hidden">
+      <h1>הגדרות</h1>
+      <div class="settings-panel card">
+        <h2>מפתחות Gemini API</h2>
+        <p class="hint">הוסף עד 5 מפתחות API להגדלת המכסה הזמינה.</p>
+        <div id="apiKeysList"></div>
+        <button id="saveKeysBtn" class="btn btn--primary">שמור מפתחות</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- מודל אישור מחיקה -->
+  <div id="confirmModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal__overlay"></div>
+    <div class="modal__box">
+      <h2 id="modalTitle">אישור מחיקה</h2>
+      <p id="modalMessage">האם אתה בטוח שברצונך למחוק פריט זה? לא ניתן לשחזר את הפעולה.</p>
+      <div class="modal__actions">
+        <!-- כפתור "ביטול" מסומן ראשון בכוונה למניעת מחיקה בטעות -->
+        <button id="modalCancelBtn" class="btn btn--secondary" autofocus>ביטול</button>
+        <button id="modalConfirmBtn" class="btn btn--danger">כן, מחק</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/windowManager.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
