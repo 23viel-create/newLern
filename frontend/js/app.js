@@ -3,18 +3,22 @@ document.addEventListener('DOMContentLoaded', () => {
   WindowManager.initOfflineDetection();
   loadKeyCount();
 
-  // ניווט
+  // ניווט בין תצוגות
   document.querySelectorAll('.nav-link').forEach((link) => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
-      WindowManager.showView(link.dataset.view);
+      const view = link.dataset.view;
+      WindowManager.showView(view);
+      if (view === 'summaries') SummariesManager.init();
     });
   });
 
-  // טעינת לוח הבקרה בפתיחה
+  // תצוגת ברירת מחדל
   WindowManager.showView('dashboard');
   loadTodayTasks();
 });
+
+// ─── לוח בקרה ─────────────────────────────────────────────────────────────────
 
 async function loadTodayTasks() {
   const container = document.getElementById('todayTasks');
@@ -24,13 +28,16 @@ async function loadTodayTasks() {
       container.innerHTML = '<p class="placeholder-text">אין משימות להיום — כל הכבוד! 🎉</p>';
       return;
     }
-    container.innerHTML = tasks.map((t) => `
-      <div class="card">
-        <h3>${t.title || t.id}</h3>
-        <p class="hint">מועד: ${t.dueDate}</p>
-        <button class="btn btn--primary" onclick="markDone('${t.id}')">סיימתי</button>
-      </div>
-    `).join('');
+    container.innerHTML = tasks
+      .map(
+        (t) => `
+        <div class="card">
+          <h3>${escHtml(t.title || t.id)}</h3>
+          <p class="hint">מועד: ${escHtml(t.dueDate)}</p>
+          <button class="btn btn--primary" onclick="markDone('${escHtml(t.id)}')">סיימתי ✓</button>
+        </div>`,
+      )
+      .join('');
   } catch {
     container.innerHTML = '<p class="placeholder-text">לא ניתן לטעון משימות</p>';
   }
@@ -45,11 +52,23 @@ async function markDone(taskId) {
   }
 }
 
+// ─── סטטוס AI ─────────────────────────────────────────────────────────────────
+
 async function loadKeyCount() {
   try {
     await Api.health();
-    // TODO: endpoint /api/ai/status יוחזר בשלב הבא
+    // TODO: /api/ai/status — יוחזר בשלב AI
   } catch {
     // השרת אינו זמין
   }
+}
+
+// ─── עזר גלובלי ───────────────────────────────────────────────────────────────
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }

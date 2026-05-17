@@ -1,11 +1,19 @@
-/* תמיכת RTL — כל העמוד כבר מוגדר dir="rtl" ב-HTML.
+/* תמיכת RTL — המסמך כולו מוגדר dir="rtl" ב-HTML.
    קובץ זה מטפל בתיקוני מרווח ומיקום ספציפיים ל-RTL. */
 
-.navbar { flex-direction: row-reverse; }
-.navbar__links { flex-direction: row-reverse; }
-.navbar__status { flex-direction: row-reverse; }
+.navbar            { flex-direction: row-reverse; }
+.navbar__links     { flex-direction: row-reverse; }
+.navbar__status    { flex-direction: row-reverse; }
 
-.modal__actions { flex-direction: row-reverse; }
+.modal__actions    { flex-direction: row-reverse; }
+.tree-toolbar      { flex-direction: row-reverse; }
+.tree-toolbar__actions  { flex-direction: row-reverse; }
+.tree-toolbar__controls { flex-direction: row-reverse; margin-inline-start: auto; }
 
-/* Scrollbar בצד שמאל לגלילה RTL-ית */
-.tree-container { overflow-y: auto; }
+/* הכפתורים בשורת עץ מיושרים לסוף (שמאל) */
+.tree-node__actions { margin-inline-start: auto; }
+
+/* פתיחת עץ — החץ מסתובב לאחר הרחבה */
+.tree-node--folder.tree-node--expanded > .tree-node__row .tree-node__toggle {
+  transform: rotate(90deg);
+}

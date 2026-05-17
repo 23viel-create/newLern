@@ -5,7 +5,7 @@ async function apiFetch(endpoint, options = {}) {
   const res = await fetch(`${API_BASE}${endpoint}`, {
     headers: { 'Content-Type': 'application/json', ...options.headers },
     ...options,
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
   });
   const data = await res.json();
   if (!res.ok || !data.success) throw new Error(data.message || 'שגיאה בתקשורת עם השרת');
@@ -13,13 +13,24 @@ async function apiFetch(endpoint, options = {}) {
 }
 
 const Api = {
-  health:            ()           => apiFetch('/health'),
-  getSummaries:      (parentId)   => apiFetch(`/summaries${parentId ? `?parentId=${parentId}` : ''}`),
-  createSummary:     (summaryId)  => apiFetch('/summaries', { method: 'POST', body: { summaryId } }),
-  deleteSummary:     (id)         => apiFetch(`/summaries/${id}`, { method: 'DELETE' }),
-  getSchedule:       ()           => apiFetch('/schedule'),
-  getTodayTasks:     ()           => apiFetch('/schedule/today'),
-  completeTask:      (id, quality)=> apiFetch(`/schedule/${id}/complete`, { method: 'PATCH', body: { quality } }),
-  generateQuiz:      (text)       => apiFetch('/quizzes/multiple-choice', { method: 'POST', body: { summaryText: text } }),
-  generateOpenQ:     (text)       => apiFetch('/quizzes/open-questions', { method: 'POST', body: { summaryText: text } }),
+  // ── כללי ──────────────────────────────────────────
+  health: () => apiFetch('/health'),
+
+  // ── עץ סיכומים ────────────────────────────────────
+  getTree:       ()                        => apiFetch('/summaries/tree'),
+  createFolder:  (parentPath, name)        => apiFetch('/summaries/folder',  { method: 'POST',   body: { parentPath, name } }),
+  createSummary: (parentPath, name)        => apiFetch('/summaries/summary', { method: 'POST',   body: { parentPath, name } }),
+  renameNode:    (nodePath, newName)       => apiFetch('/summaries/rename',  { method: 'PATCH',  body: { nodePath, newName } }),
+  deleteNode:    (nodePath)               => apiFetch('/summaries/node',    { method: 'DELETE', body: { nodePath } }),
+  getContent:    (nodePath)               => apiFetch(`/summaries/content?path=${encodeURIComponent(nodePath)}`),
+  saveContent:   (nodePath, text)         => apiFetch('/summaries/content',  { method: 'PUT',    body: { nodePath, text } }),
+
+  // ── לוח זמנים ─────────────────────────────────────
+  getSchedule:  ()             => apiFetch('/schedule'),
+  getTodayTasks: ()            => apiFetch('/schedule/today'),
+  completeTask: (id, quality)  => apiFetch(`/schedule/${id}/complete`, { method: 'PATCH', body: { quality } }),
+
+  // ── חידונים ───────────────────────────────────────
+  generateQuiz:  (text) => apiFetch('/quizzes/multiple-choice', { method: 'POST', body: { summaryText: text } }),
+  generateOpenQ: (text) => apiFetch('/quizzes/open-questions',  { method: 'POST', body: { summaryText: text } }),
 };
