@@ -145,10 +145,11 @@ const SummariesManager = (() => {
             <span class="tree-node__icon" aria-hidden="true">📁</span>
             <span class="tree-node__name">${title}</span>
             <div class="tree-node__actions">
-              <button class="btn btn--xs btn--ghost" data-action="quiz-folder" data-path="${p}" data-name="${rawName}" title="בחן על כל הסיכומים בתיקייה">🎯</button>
-              <button class="btn btn--xs btn--ghost" data-action="new-folder"  data-path="${p}" title="תיקייה חדשה בתוך ${rawName}">📁+</button>
-              <button class="btn btn--xs btn--ghost" data-action="new-summary" data-path="${p}" title="סיכום חדש בתוך ${rawName}">📄+</button>
-              <button class="btn btn--xs btn--ghost" data-action="rename"      data-path="${p}" data-name="${rawName}">✏️</button>
+              <button class="btn btn--xs btn--ghost" data-action="quiz-folder"   data-path="${p}" data-name="${rawName}" title="בחן על כל הסיכומים בתיקייה">🎯</button>
+              <button class="btn btn--xs btn--ghost" data-action="import-file"   data-path="${p}" data-name="${rawName}" title="ייבא קובץ Word או שמע לתיקייה">📥</button>
+              <button class="btn btn--xs btn--ghost" data-action="new-folder"    data-path="${p}" title="תיקייה חדשה בתוך ${rawName}">📁+</button>
+              <button class="btn btn--xs btn--ghost" data-action="new-summary"   data-path="${p}" title="סיכום חדש בתוך ${rawName}">📄+</button>
+              <button class="btn btn--xs btn--ghost" data-action="rename"        data-path="${p}" data-name="${rawName}">✏️</button>
               <button class="btn btn--xs btn--danger-ghost" data-action="delete" data-path="${p}" data-name="${rawName}" data-type="folder">🗑️</button>
             </div>
           </div>
@@ -283,16 +284,13 @@ const SummariesManager = (() => {
       }
 
       case 'plan': {
-        const confirmed = await WindowManager.confirm(
-          `לתזמן חזרות מרווחות לסיכום "${nodeName}"?\n\nיווצרו משימות חזרה לפי ההגדרות הנוכחיות.`
-        );
-        if (!confirmed) return;
-        try {
-          const tasks = await Api.planSummary(nodePath, nodeName);
-          alert(`✓ תוזמנו ${tasks.length} משימות חזרה לסיכום "${nodeName}"`);
-        } catch (err) {
-          alert(`שגיאה: ${err.message}`);
-        }
+        // Show program selector modal then plan
+        PlanProgramModal.open(nodePath, nodeName);
+        break;
+      }
+
+      case 'import-file': {
+        _importFileToFolder(nodePath);
         break;
       }
 
@@ -319,6 +317,25 @@ const SummariesManager = (() => {
         break;
       }
     }
+  }
+
+  // ─── ייבוא קובץ לתיקייה ─────────────────────────────────────────────────────
+
+  function _importFileToFolder(folderPath) {
+    const input = document.getElementById('folderImportInput');
+    input.value = '';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const result = await Api.importFileToFolder(folderPath, file);
+        await loadTree();
+        alert(`✓ הקובץ "${result.title}" יובא בהצלחה לתיקייה`);
+      } catch (err) {
+        alert(`שגיאה בייבוא: ${err.message}`);
+      }
+    };
+    input.click();
   }
 
   // ─── ממשק ציבורי ────────────────────────────────────────────────────────────

@@ -44,6 +44,10 @@
             <button class="cal-view-btn" data-view="weekly">שבועי</button>
             <button class="cal-view-btn" data-view="daily">יומי</button>
           </div>
+          <div class="cal-display-toggle">
+            <button class="cal-disp-btn" data-pref="hebrew">עברי</button>
+            <button class="cal-disp-btn" data-pref="gregorian">לועזי</button>
+          </div>
           <div class="cal-legend">
             <span class="legend-item legend-item--done">הושלם</span>
             <span class="legend-item legend-item--partial">חלקי</span>
@@ -297,6 +301,42 @@
             <button id="articlesChatSendBtn" class="btn btn--primary btn--sm ai-send-btn">שלח</button>
           </div>
           <button id="learningProgramBtn" class="btn btn--secondary btn--full">✨ צור תוכנית לימוד אישית</button>
+        </div>
+      </div>
+
+      <!-- תוכניות חזרה מרווחת -->
+      <div class="settings-panel card" id="programsPanel">
+        <h2>📋 תוכניות חזרה מרווחת</h2>
+        <p class="hint">הגדר מספר תוכניות חזרה ובחר תוכנית ייעודית לכל סיכום בעת תזמון.</p>
+
+        <div id="programsList" class="programs-list">
+          <p class="placeholder-text">טוען תוכניות...</p>
+        </div>
+
+        <hr class="settings-divider" />
+        <h3>➕ תוכנית חדשה</h3>
+        <div class="form-group">
+          <label class="form-label" for="newProgramName">שם התוכנית</label>
+          <input type="text" id="newProgramName" class="input-field input-field--full"
+                 placeholder="לדוגמה: חזרה שבועית" maxlength="80" dir="rtl" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="newProgramSeq">רצף ימים (מופרד בפסיקים)</label>
+          <input type="text" id="newProgramSeq" class="input-field input-field--full"
+                 placeholder="לדוגמה: 1, 7, 30, 90" dir="ltr" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">או תאר בעברית חופשית (לניתוח AI)</label>
+          <div class="ai-parse-row">
+            <input type="text" id="aiProgramText" class="input-field"
+                   placeholder="לדוגמה: חזרה אחרי יומיים, ואז שבועיים, ואז כל חודש" dir="rtl" />
+            <button id="aiParseProgramBtn" class="btn btn--ghost btn--sm">🤖 פרש</button>
+          </div>
+          <p id="aiProgramHint" class="hint" style="min-height:1.2em"></p>
+        </div>
+        <div class="form-row-actions">
+          <button id="addProgramBtn" class="btn btn--primary">הוסף תוכנית</button>
+          <span id="addProgramMsg" class="save-status hidden"></span>
         </div>
       </div>
 
@@ -657,6 +697,27 @@
       </div>
     </div>
   </div>
+
+  <!-- ══════════════════ מודל בחירת תוכנית חזרה ══════════════════ -->
+  <div id="planProgramModal" class="modal hidden"
+       role="dialog" aria-modal="true" aria-labelledby="planProgramTitle">
+    <div class="modal__overlay"></div>
+    <div class="modal__box modal__box--plan">
+      <h2 id="planProgramTitle">תזמן חזרות מרווחות</h2>
+      <p id="planProgramDesc" class="plan-desc">בחר תוכנית חזרה לסיכום</p>
+      <div class="form-group" style="margin-top:1rem">
+        <label class="form-label" for="planProgramSelect">תוכנית חזרה:</label>
+        <select id="planProgramSelect" class="select-field input-field--full"></select>
+      </div>
+      <div class="modal__actions">
+        <button id="planProgramCancelBtn"  class="btn btn--secondary">ביטול</button>
+        <button id="planProgramConfirmBtn" class="btn btn--primary">תזמן ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- hidden file input for folder import -->
+  <input type="file" id="folderImportInput" accept=".docx,audio/*" hidden />
 
   <script src="js/api.js"></script>
   <script src="js/windowManager.js"></script>

@@ -180,6 +180,35 @@ ${corpus}
   return await _callGemini(prompt);
 }
 
+// ─── Parse SR program from Hebrew text ───────────────────────────────────────
+
+async function parseSrProgramFromText(hebrewText) {
+  const safeText = _sanitize(hebrewText || '');
+  if (!safeText) throw new Error('טקסט ריק');
+
+  const prompt = `אתה עוזר בניתוח תוכניות חזרה מרווחת.
+המשתמש תיאר בעברית חופשית תוכנית חזרה. המר את התיאור למערך JSON של מספרים שלמים חיוביים (מספר ימים עד כל חזרה מיום הלימוד הראשון).
+
+תיאור המשתמש: "${safeText}"
+
+דוגמאות:
+- "חזרה אחרי יום, שבוע, חודש" → [1, 7, 30]
+- "כל שבועיים" → [14]
+- "יום, יומיים, שבוע, חודש, שלושה חודשים" → [1, 2, 7, 30, 90]
+- "חזרה אחרי יומיים, ואז אחרי שבועיים, ואז כל חודש" → [2, 14, 30]
+
+ענה אך ורק ב-JSON תקין: [מספר, מספר, ...] — ללא שום טקסט נוסף.`;
+
+  const raw = await _callGemini(prompt);
+  const jsonStr = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  let arr;
+  try { arr = JSON.parse(jsonStr); } catch { throw new Error('ה-AI לא הצליח לפרש את הטקסט. נסה ניסוח אחר.'); }
+  if (!Array.isArray(arr) || !arr.length || arr.some(n => !Number.isInteger(n) || n < 1)) {
+    throw new Error('ה-AI החזיר רצף לא תקין. בדוק את הניסוח ונסה שנית.');
+  }
+  return arr;
+}
+
 // ─── Keys management ─────────────────────────────────────────────────────────
 
 function getKeys() {
@@ -196,6 +225,7 @@ module.exports = {
   getScheduleAdvice,
   chatWithArticles,
   generateLearningProgram,
+  parseSrProgramFromText,
   getKeyStatus,
   getKeys,
   updateKeys,

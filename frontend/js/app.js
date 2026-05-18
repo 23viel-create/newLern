@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   EditorManager.init();
   AiManager.init();
   BackupManager.init();
+  PlanProgramModal.init();
   loadKeyCount();
 
   // ניווט בין תצוגות
@@ -19,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
       WindowManager.showView(view);
       if (view === 'summaries') SummariesManager.init();
       if (view === 'dashboard') { CalendarManager.loadCalendar(); AiManager.setContext('calendar'); }
-      if (view === 'settings')  { loadSrSettings(); AiManager.refreshBattery(); BackupManager.loadBackupList(); }
+      if (view === 'settings')  { loadSrSettings(); loadPrograms(); AiManager.refreshBattery(); BackupManager.loadBackupList(); }
       if (view === 'help')      { /* static — no init needed */ }
     });
   });
@@ -37,10 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
     QuizManager.startQuiz([node.path], node.title || node.path);
   });
 
-  // תצוגת ברירת מחדל — לוח בקרה עם לוח שנה
+  // תצוגת ברירת מחדל — מסך ראשי עם לוח שנה
   WindowManager.showView('dashboard');
   CalendarManager.init();
   _bindSrSettings();
+  _bindProgramsPanel();
 });
 
 // ─── הגדרות חזרה מרווחת ──────────────────────────────────────────────────────
@@ -75,7 +77,7 @@ function _bindSrSettings() {
       msg.classList.remove('hidden');
       setTimeout(() => msg.classList.add('hidden'), 2500);
       CalendarManager.setDisplayPref(calendarDisplayPreference);
-      CalendarManager.loadCalendar(); // refresh color coding
+      CalendarManager.loadCalendar();
     } catch (err) {
       alert(`שגיאה בשמירת הגדרות: ${err.message}`);
     }
@@ -90,16 +92,157 @@ async function loadSrSettings() {
     if (s.customSequence) {
       document.getElementById('srCustomSeq').value = s.customSequence.join(', ');
     }
-    // Show/hide custom sequence group
     document.getElementById('srCustomSeqGroup').style.display =
       s.algorithm === 'custom' ? '' : 'none';
-    // Calendar display preference
     const calPrefEl = document.getElementById('calDisplayPref');
     if (calPrefEl && s.calendarDisplayPreference) {
       calPrefEl.value = s.calendarDisplayPreference;
     }
   } catch { /* fail silently */ }
 }
+
+// ─── תוכניות חזרה מרווחת ──────────────────────────────────────────────────────
+
+function _bindProgramsPanel() {
+  document.getElementById('addProgramBtn').addEventListener('click', _addProgram);
+  document.getElementById('aiParseProgramBtn').addEventListener('click', _aiParseProgram);
+}
+
+async function loadPrograms() {
+  const list = document.getElementById('programsList');
+  list.innerHTML = '<p class="placeholder-text">טוען...</p>';
+  try {
+    const programs = await Api.getPrograms();
+    if (!programs.length) {
+      list.innerHTML = '<p class="placeholder-text">אין תוכניות</p>';
+      return;
+    }
+    list.innerHTML = programs.map(p => `
+      <div class="program-item">
+        <span class="program-item__name">${escHtml(p.name)}</span>
+        <span class="program-item__seq">[${(p.sequence || []).join(', ')}]</span>
+        <span class="program-item__usage">שימושים: ${p.usageCount || 0}</span>
+        ${p.id !== 'default'
+          ? `<button class="btn btn--xs btn--danger-ghost" data-prog-id="${escHtml(p.id)}" onclick="deleteProgram(this.dataset.progId)">🗑️</button>`
+          : '<span class="badge badge--info" style="font-size:0.7rem">בסיסי</span>'}
+      </div>`).join('');
+  } catch (err) {
+    list.innerHTML = `<p class="placeholder-text error-text">שגיאה: ${escHtml(err.message)}</p>`;
+  }
+}
+
+async function deleteProgram(id) {
+  const ok = await WindowManager.confirm('האם למחוק תוכנית חזרה זו?');
+  if (!ok) return;
+  try {
+    await Api.deleteProgram(id);
+    await loadPrograms();
+  } catch (err) {
+    alert(`שגיאה: ${err.message}`);
+  }
+}
+
+async function _addProgram() {
+  const name    = document.getElementById('newProgramName').value.trim();
+  const seqRaw  = document.getElementById('newProgramSeq').value;
+  const sequence = seqRaw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => n > 0);
+
+  if (!name) { alert('יש להזין שם לתוכנית'); return; }
+  if (!sequence.length) { alert('יש להזין רצף ימים תקין'); return; }
+
+  const btn = document.getElementById('addProgramBtn');
+  btn.disabled = true;
+  try {
+    await Api.createProgram(name, sequence);
+    document.getElementById('newProgramName').value = '';
+    document.getElementById('newProgramSeq').value  = '';
+    document.getElementById('aiProgramHint').textContent = '';
+    await loadPrograms();
+    const msg = document.getElementById('addProgramMsg');
+    msg.textContent = 'נשמר ✓';
+    msg.className   = 'save-status save-status--saved';
+    msg.classList.remove('hidden');
+    setTimeout(() => msg.classList.add('hidden'), 2000);
+  } catch (err) {
+    alert(`שגיאה: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function _aiParseProgram() {
+  const text = document.getElementById('aiProgramText').value.trim();
+  if (!text) { alert('הזן תיאור בעברית'); return; }
+
+  const btn  = document.getElementById('aiParseProgramBtn');
+  const hint = document.getElementById('aiProgramHint');
+  btn.disabled = true;
+  hint.textContent = '⏳ ה-AI מנתח...';
+
+  try {
+    const { sequence } = await Api.aiParseSrProgram(text);
+    document.getElementById('newProgramSeq').value = sequence.join(', ');
+    hint.textContent = `✓ רצף שהתקבל: [${sequence.join(', ')}]`;
+  } catch (err) {
+    hint.textContent = `שגיאה: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ─── מודל בחירת תוכנית — global module ───────────────────────────────────────
+
+const PlanProgramModal = (() => {
+  let _resolve = null;
+  let _nodePath = '';
+  let _nodeName = '';
+
+  function init() {
+    document.getElementById('planProgramCancelBtn').addEventListener('click', () => _close(false));
+    document.getElementById('planProgramModal').querySelector('.modal__overlay')
+      .addEventListener('click', () => _close(false));
+    document.getElementById('planProgramConfirmBtn').addEventListener('click', _confirm);
+  }
+
+  async function open(nodePath, nodeName) {
+    _nodePath = nodePath;
+    _nodeName = nodeName;
+
+    document.getElementById('planProgramDesc').textContent =
+      `בחר תוכנית חזרה לסיכום "${nodeName}"`;
+
+    const sel = document.getElementById('planProgramSelect');
+    sel.innerHTML = '<option value="">טוען...</option>';
+    document.getElementById('planProgramModal').classList.remove('hidden');
+
+    try {
+      const programs = await Api.getPrograms();
+      sel.innerHTML = programs.map(p =>
+        `<option value="${escHtml(p.id)}">${escHtml(p.name)} [${(p.sequence || []).join(',')}]</option>`
+      ).join('');
+    } catch {
+      sel.innerHTML = '<option value="default">ברירת מחדל</option>';
+    }
+  }
+
+  async function _confirm() {
+    const programId = document.getElementById('planProgramSelect').value || 'default';
+    _close(true);
+    try {
+      const tasks = await Api.planSummary(_nodePath, _nodeName, programId);
+      alert(`✓ תוזמנו ${tasks.length} משימות חזרה לסיכום "${_nodeName}"`);
+    } catch (err) {
+      alert(`שגיאה: ${err.message}`);
+    }
+  }
+
+  function _close(result) {
+    document.getElementById('planProgramModal').classList.add('hidden');
+    if (_resolve) { _resolve(result); _resolve = null; }
+  }
+
+  return { init, open };
+})();
 
 // ─── עזר גלובלי ───────────────────────────────────────────────────────────────
 

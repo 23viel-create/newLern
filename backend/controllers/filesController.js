@@ -334,6 +334,74 @@ function getNeighbors(nodeRelPath) {
   };
 }
 
+// ─── import external file into a folder ──────────────────────────────────────
+
+function _extractDocxText(buffer) {
+  try {
+    const AdmZip = require('adm-zip');
+    const zip = new AdmZip(buffer);
+    const xmlEntry = zip.getEntry('word/document.xml');
+    if (!xmlEntry) return '';
+    const xml = xmlEntry.getData().toString('utf-8');
+    return xml
+      .replace(/<w:p[ >]/g, '\n')
+      .replace(/<\/w:p>/g, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  } catch { return ''; }
+}
+
+function importFileToFolder(parentRelPath, filename, buffer, mimetype) {
+  const parentPath = safePath(parentRelPath);
+  if (!fs.existsSync(parentPath)) throw new Error('תיקיית יעד לא נמצאה');
+
+  const ext      = path.extname(filename);
+  const rawBase  = path.basename(filename, ext) || 'קובץ מיובא';
+  let   name     = validateName(rawBase.slice(0, 80));
+
+  // Resolve naming conflicts
+  let finalName = name;
+  let counter   = 1;
+  while (fs.existsSync(path.join(parentPath, finalName))) {
+    finalName = `${name} (${counter++})`;
+  }
+
+  const nodePath = path.join(parentPath, finalName);
+  ensureDir(nodePath);
+  const now  = new Date().toISOString();
+  const meta = { title: finalName, type: 'summary', createdAt: now, updatedAt: now };
+  writeMeta(nodePath, meta);
+
+  let content = '';
+  const isDocx = ext.toLowerCase() === '.docx' ||
+    mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+  if (isDocx) {
+    content = _extractDocxText(buffer);
+  }
+
+  fs.writeFileSync(path.join(nodePath, 'content.txt'), content);
+  fs.writeFileSync(path.join(nodePath, 'questions_open.json'), JSON.stringify([], null, 2));
+  fs.writeFileSync(path.join(nodePath, 'questions_mc.json'),   JSON.stringify([], null, 2));
+
+  // For audio files, save to audio subdirectory
+  if (mimetype && mimetype.startsWith('audio/')) {
+    const audioDir      = path.join(nodePath, 'audio');
+    ensureDir(audioDir);
+    const audioFilename = `imported_${Date.now()}${ext || '.audio'}`;
+    fs.writeFileSync(path.join(audioDir, audioFilename), buffer);
+    fs.writeFileSync(
+      path.join(nodePath, 'audio_meta.json'),
+      JSON.stringify([{ filename: audioFilename, recordedAt: now }], null, 2),
+    );
+  }
+
+  const relPath = parentRelPath ? `${parentRelPath}/${finalName}` : finalName;
+  return { name: finalName, title: finalName, type: 'summary', path: relPath, ...meta };
+}
+
 module.exports = {
   getFullTree,
   createFolder,
@@ -350,5 +418,6 @@ module.exports = {
   getAudioFilePath,
   bulkImport,
   getNeighbors,
+  importFileToFolder,
   summariesRoot,
 };

@@ -203,6 +203,55 @@ function getIntervals(settings) {
     : [1, 2, 4, 8, 16, 32, 64];
 }
 
+// ── Programs ───────────────────────────────────────────────────────────────────
+
+function _ensureDefaultPrograms(schedule) {
+  if (!schedule.programs) schedule.programs = [];
+  if (!schedule.programs.find(p => p.id === 'default')) {
+    schedule.programs.unshift({
+      id: 'default',
+      name: 'ברירת מחדל — חזקות של 2',
+      sequence: [1, 2, 4, 8, 16, 32, 64],
+      usageCount: 0,
+      createdAt: new Date().toISOString(),
+    });
+  }
+}
+
+function getPrograms() {
+  const schedule = readSchedule();
+  _ensureDefaultPrograms(schedule);
+  return schedule.programs.slice().sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
+}
+
+function createProgram(name, sequence) {
+  if (!name || typeof name !== 'string' || !name.trim()) throw new Error('שם תוכנית נדרש');
+  if (!Array.isArray(sequence) || !sequence.length || sequence.some(n => !Number.isInteger(n) || n < 1)) {
+    throw new Error('רצף חייב להיות מערך של מספרים שלמים חיוביים');
+  }
+  const schedule = readSchedule();
+  _ensureDefaultPrograms(schedule);
+  const program = {
+    id: `prog-${Date.now()}`,
+    name: name.trim(),
+    sequence,
+    usageCount: 0,
+    createdAt: new Date().toISOString(),
+  };
+  schedule.programs.push(program);
+  writeSchedule(schedule);
+  return program;
+}
+
+function deleteProgram(id) {
+  if (id === 'default') throw new Error('לא ניתן למחוק את התוכנית הבסיסית');
+  const schedule = readSchedule();
+  const before = (schedule.programs || []).length;
+  schedule.programs = (schedule.programs || []).filter(p => p.id !== id);
+  if (schedule.programs.length === before) throw new Error('תוכנית לא נמצאה');
+  writeSchedule(schedule);
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 function getTodayTasks() {
@@ -221,27 +270,36 @@ function completeTask(taskId) {
   return task;
 }
 
-function planSummary(summaryPath, title) {
-  const schedule  = readSchedule();
-  const intervals = getIntervals(schedule.settings);
+function planSummary(summaryPath, title, programId) {
+  const schedule = readSchedule();
+  _ensureDefaultPrograms(schedule);
+
+  // Find requested program or fall back to default
+  let program = (schedule.programs || []).find(p => p.id === programId);
+  if (!program) program = schedule.programs.find(p => p.id === 'default') || schedule.programs[0];
+
+  // Increment usage count
+  program.usageCount = (program.usageCount || 0) + 1;
+
+  const intervals = program.sequence || getIntervals(schedule.settings);
   const today     = todayStr();
   const newTasks  = [];
 
-  // Initial study task — due today
   newTasks.push({
     id: genId(), summaryPath, title,
     type: 'completion', dueDate: today,
     completed: false, completedAt: null,
     reviewNumber: 0, scheduledFrom: today,
+    programId: program.id,
   });
 
-  // Spaced review tasks
   intervals.forEach((interval, i) => {
     newTasks.push({
       id: genId(), summaryPath, title,
       type: 'review', dueDate: nextWorkDay(today, interval),
       completed: false, completedAt: null,
       reviewNumber: i + 1, scheduledFrom: today,
+      programId: program.id,
     });
   });
 
@@ -309,6 +367,7 @@ module.exports = {
   planSummary,
   getCalendarData,
   getSettings, saveSettings,
+  getPrograms, createProgram, deleteProgram,
   readSchedule, writeSchedule,
   gregorianToHebrew, HEBREW_MONTH_NAMES,
 };

@@ -124,7 +124,7 @@ const CalendarManager = (() => {
       loadCalendar();
     });
 
-    // View toggle buttons
+    // View toggle buttons (חודשי / שבועי / יומי)
     document.querySelectorAll('.cal-view-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         _viewMode = btn.dataset.view;
@@ -133,6 +133,23 @@ const CalendarManager = (() => {
         loadCalendar();
       });
     });
+
+    // Display preference toggle (עברי / לועזי)
+    document.querySelectorAll('.cal-disp-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const pref = btn.dataset.pref;
+        _calDisplayPref = pref;
+        _monthCache = {};
+        _updateDispToggle();
+        loadCalendar();
+        try { await Api.saveScheduleSettings({ calendarDisplayPreference: pref }); } catch {}
+      });
+    });
+  }
+
+  function _updateDispToggle() {
+    document.querySelectorAll('.cal-disp-btn').forEach(btn =>
+      btn.classList.toggle('cal-disp-btn--active', btn.dataset.pref === _calDisplayPref));
   }
 
   // Hebrew month navigation: find the last (or first) day of current Hebrew month,
@@ -192,6 +209,7 @@ const CalendarManager = (() => {
     try {
       calendarData = await _getMonthData(currentYear, currentMonth);
       _calDisplayPref = calendarData?.settings?.calendarDisplayPreference || 'combined';
+      _updateDispToggle();
 
       if (_viewMode === 'monthly') {
         if (_calDisplayPref === 'hebrew') {

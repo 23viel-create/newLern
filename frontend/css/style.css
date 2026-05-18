@@ -22,12 +22,18 @@
 /* ===== Reset ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── Framed layout: html shows primary color as side pillars ── */
+html { background: var(--color-primary); min-height: 100%; }
+
 body {
   font-family: 'Segoe UI', 'Arial', sans-serif;
   background: var(--color-bg);
   color: var(--color-text);
   line-height: 1.6;
   min-height: 100vh;
+  max-width: 1300px;
+  margin: 0 auto;
+  box-shadow: 0 0 60px rgba(0,0,0,.28);
 }
 
 /* ===== Navbar ===== */
@@ -959,3 +965,44 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
   padding: 0.05rem 0.35rem;
   margin-inline-start: 0.25rem;
 }
+
+/* ── Calendar display toggle (עברי / לועזי) ── */
+.cal-display-toggle {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+.cal-disp-btn {
+  flex: 1;
+  padding: 0.28rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.cal-disp-btn:hover       { background: var(--color-hover); color: var(--color-text); }
+.cal-disp-btn--active     { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+
+/* ── SR Programs list ── */
+.programs-list { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.75rem; }
+.program-item {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  padding: 0.45rem 0.75rem;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+.program-item__name  { flex: 1; font-weight: 600; min-width: 0; }
+.program-item__usage { font-size: 0.75rem; color: var(--color-text-muted); white-space: nowrap; }
+.program-item__seq   { font-size: 0.72rem; color: var(--color-text-muted); font-family: monospace; direction: ltr; }
+
+/* ── AI parse row ── */
+.ai-parse-row { display: flex; gap: 0.5rem; align-items: center; }
+.ai-parse-row .input-field { flex: 1; }
+
+/* ── Plan program modal ── */
+.modal__box--plan { max-width: 400px; }

@@ -89,4 +89,16 @@ router.post('/learning-program', async (req, res) => {
   }
 });
 
+// POST /api/ai/parse-sr-program  { hebrewText }
+router.post('/parse-sr-program', async (req, res) => {
+  try {
+    const { hebrewText } = req.body;
+    if (!hebrewText) return res.status(400).json({ error: 'hebrewText נדרש' });
+    const sequence = await ctrl.parseSrProgramFromText(hebrewText);
+    res.json({ sequence });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

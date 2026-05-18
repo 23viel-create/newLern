@@ -88,9 +88,23 @@ const Api = {
   getTodayTasks:    ()              => apiFetch('/schedule/today'),
   completeTask:     (id, quality)   => apiFetch(`/schedule/${id}/complete`, { method: 'PATCH', body: { quality } }),
   getCalendarData:  (month)         => apiFetch(`/schedule/calendar?month=${encodeURIComponent(month)}`),
-  planSummary:      (summaryPath, title) => apiFetch('/schedule/plan', { method: 'POST', body: { summaryPath, title } }),
+  planSummary:      (summaryPath, title, programId) =>
+    apiFetch('/schedule/plan', { method: 'POST', body: { summaryPath, title, programId } }),
   getScheduleSettings:  ()          => apiFetch('/schedule/settings'),
   saveScheduleSettings: (settings)  => apiFetch('/schedule/settings', { method: 'PUT', body: settings }),
+
+  // ── תוכניות חזרה ─────────────────────────────────────────────────────────
+  getPrograms:    ()                       => apiFetch('/schedule/programs'),
+  createProgram:  (name, sequence)         => apiFetch('/schedule/programs', { method: 'POST', body: { name, sequence } }),
+  deleteProgram:  (id)                     => apiFetch(`/schedule/programs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  // ── ייבוא קובץ לתיקייה ───────────────────────────────────────────────────
+  importFileToFolder: (folderPath, file) => {
+    const fd = new FormData();
+    fd.append('folderPath', folderPath);
+    fd.append('file', file);
+    return apiFormFetch('/summaries/import-file', fd);
+  },
 
   // ── שאלות (CRUD ידני) ─────────────────────────────────────────────────────
   getQuizQuestions: (nodePath) =>
@@ -164,4 +178,6 @@ const Api = {
   aiGetKeys: () => apiFetchPlain('/ai/keys', {}),
   aiSaveKeys: (keys) => apiFetchPlain('/ai/keys', { method: 'PUT', body: { keys } }),
   aiKeyStatus: () => apiFetchPlain('/ai/key-status', {}),
+  aiParseSrProgram: (hebrewText) =>
+    apiFetchPlain('/ai/parse-sr-program', { method: 'POST', body: { hebrewText } }),
 };
