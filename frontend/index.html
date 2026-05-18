@@ -265,6 +265,19 @@
           <p class="hint">קובע אילו שמות חודשים יוצגו בכותרת לוח השנה</p>
         </div>
 
+        <div class="form-group">
+          <label class="toggle-label" for="strictKodeshToggle"
+                 title="מגביל את עוזר ה-AI למענה על חומר הסיכום ומקורות תורניים בלבד">
+            <span class="toggle-label__text">מצב לימוד ממוקד (חומר מקומי ומקורות קודש בלבד)</span>
+            <span class="toggle-switch">
+              <input type="checkbox" id="strictKodeshToggle" role="switch"
+                     aria-label="מצב לימוד ממוקד תורני" />
+              <span class="toggle-switch__track" aria-hidden="true"></span>
+            </span>
+          </label>
+          <p class="hint">כשמופעל, עוזר ה-AI יסרב לענות על שאלות חילוניות כלליות שאינן בסיכום — למעט מקורות קודש (תנ"ך, גמרא, הלכה ומפרשים)</p>
+        </div>
+
         <div class="form-row-actions">
           <button id="saveSrSettingsBtn" class="btn btn--primary">שמור הגדרות</button>
           <span id="srSettingsSavedMsg" class="save-status save-status--saved hidden">נשמר ✓</span>

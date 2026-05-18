@@ -60,6 +60,7 @@ function _bindSrSettings() {
     const algorithm = algoSel.value;
     const heavyLoadThreshold = parseInt(document.getElementById('srHeavyLoad').value, 10) || 9;
     const calendarDisplayPreference = document.getElementById('calDisplayPref')?.value || 'combined';
+    const strictKodeshMode = document.getElementById('strictKodeshToggle')?.checked || false;
     let customSequence;
 
     if (algorithm === 'custom') {
@@ -72,7 +73,7 @@ function _bindSrSettings() {
     }
 
     try {
-      await Api.saveScheduleSettings({ algorithm, customSequence, heavyLoadThreshold, calendarDisplayPreference });
+      await Api.saveScheduleSettings({ algorithm, customSequence, heavyLoadThreshold, calendarDisplayPreference, strictKodeshMode });
       const msg = document.getElementById('srSettingsSavedMsg');
       msg.classList.remove('hidden');
       setTimeout(() => msg.classList.add('hidden'), 2500);
@@ -98,6 +99,8 @@ async function loadSrSettings() {
     if (calPrefEl && s.calendarDisplayPreference) {
       calPrefEl.value = s.calendarDisplayPreference;
     }
+    const toggleEl = document.getElementById('strictKodeshToggle');
+    if (toggleEl) toggleEl.checked = !!s.strictKodeshMode;
   } catch { /* fail silently */ }
 }
 

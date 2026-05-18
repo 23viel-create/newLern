@@ -3,8 +3,17 @@ const path = require('path');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { getNextKey, recordUsage, recordError, getKeyStatus, getApiKeys, saveApiKeys } = require('../config/gemini');
 const { MAX_PROMPT_CHARS, MAX_CONTEXT_CHARS, ARTICLES_DIR } = require('../config/limits');
+const { getSettings } = require('./srController');
 
 const ARTICLES_PATH = path.join(__dirname, ARTICLES_DIR);
+
+// ─── Strict Kodesh Mode guardrail ─────────────────────────────────────────────
+
+const STRICT_KODESH_GUARDRAIL = `[הוראת מערכת — מצב לימוד ממוקד תורני]
+אתה עוזר לימודי בהגבלה מחמירה. עליך לענות אך ורק על שאלות הנוגעות לטקסט הסיכום שסופק.
+חריג: מותר לך להשתמש בידע הפנימי שלך לצורך מענה על שאלות הנוגעות למקורות קודש — תנ"ך, גמרא, הלכה, מפרשים, מדרש וכדומה.
+אם המשתמש שואל שאלה חיצונית חילונית (כגון: ספורט, תרבות פופולרית, פוליטיקה עולמית, מדע כללי וכדומה) שאינה מופיעה בסיכום ואינה נוגעת למקורות קודש — סרב בנימוס בעברית בלבד, בנוסח:
+"אני מוגבל במצב לימוד ממוקד ואיני יכול לענות על שאלות שאינן קשורות לחומר הסיכום הנוכחי או למקורות קודש. אנא שאל שאלה הנוגעת לחומר הלימוד."`;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -60,6 +69,9 @@ async function askContextual({ context, userMessage, extra }) {
   const safeMsg = _sanitize(userMessage);
   if (!safeMsg) throw new Error('הודעה ריקה');
 
+  const strictMode = (() => { try { return !!getSettings().strictKodeshMode; } catch { return false; } })();
+  const guardrail  = strictMode ? STRICT_KODESH_GUARDRAIL + '\n\n' : '';
+
   let systemPart = '';
 
   if (context === 'editor') {
@@ -98,7 +110,7 @@ ${corpus}
     systemPart = 'אתה מסייע לימודי כללי. ענה בעברית בלבד.';
   }
 
-  const prompt = `${systemPart}\n\nשאלת המשתמש: ${safeMsg}`;
+  const prompt = `${guardrail}${systemPart}\n\nשאלת המשתמש: ${safeMsg}`;
   return await _callGemini(prompt);
 }
 
