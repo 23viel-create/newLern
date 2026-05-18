@@ -186,6 +186,10 @@ const Api = {
     apiFetchPlain('/ai/grade-answer', { method: 'POST', body: { question, sampleAnswer, userAnswer, strictness } }),
   aiSystemHelp: (userMessage) =>
     apiFetchPlain('/ai/system-help', { method: 'POST', body: { userMessage } }),
+  calendarExtendParashot: () =>
+    apiFetch('/calendar/extend-parashot', { method: 'POST' }),
+  learningPlanGenerate: (params) =>
+    apiFetch('/learning-plans/generate', { method: 'POST', body: params }),
 
   // ── מאגר ספרים ───────────────────────────────────────────────────────────
   getBooks:      () => apiFetch('/books'),

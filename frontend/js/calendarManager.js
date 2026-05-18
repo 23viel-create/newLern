@@ -150,6 +150,30 @@ const CalendarManager = (() => {
 
   const _PARASHA_BY_DATE = _generateParashaByDate();
 
+  // ── Holiday names lookup (Hebrew month:day → display name) ───────────────
+  // Covers work-prohibited days AND Chol HaMoed (notable but not blocked).
+  const _HOLIDAY_NAMES = {
+    // תשרי — Tishrei
+    '7:1':  'ראש השנה',    '7:2':  'ראש השנה',
+    '7:10': 'יום כיפור',
+    '7:15': 'סוכות',       '7:16': 'חוה"מ סוכות',
+    '7:17': 'חוה"מ סוכות', '7:18': 'חוה"מ סוכות',
+    '7:19': 'חוה"מ סוכות', '7:20': 'חוה"מ סוכות',
+    '7:21': 'הושענה רבה',  '7:22': 'שמחת תורה',  '7:23': 'שמחת תורה',
+    // ניסן — Nisan
+    '1:14': 'ערב פסח',
+    '1:15': 'פסח',         '1:16': 'חוה"מ פסח',
+    '1:17': 'חוה"מ פסח',   '1:18': 'חוה"מ פסח',
+    '1:19': 'חוה"מ פסח',   '1:20': 'חוה"מ פסח',
+    '1:21': 'פסח',         '1:22': 'פסח',
+    // סיוון — Sivan
+    '3:6':  'שבועות',      '3:7':  'שבועות',
+  };
+
+  function _getHolidayName(day) {
+    return _HOLIDAY_NAMES[`${day.hebrewMonth}:${day.hebrewDay}`] || '';
+  }
+
   const MONTH_NAMES_GREG = [
     '', 'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
     'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר',
@@ -554,6 +578,10 @@ const CalendarManager = (() => {
     const parashaHtml = parasha
       ? `<span class="cal-cell__parasha" title="פרשת ${parasha}">פ׳ ${parasha}</span>`
       : '';
+    const holidayName = _getHolidayName(day);
+    const holidayHtml = holidayName
+      ? `<span class="cal-cell__holiday" title="${holidayName}">${holidayName}</span>`
+      : '';
 
     if (hebPrimary || _calDisplayPref === 'hebrew') {
       // Hebrew-primary: bold Gregorian "1" on start of Gregorian month
@@ -564,7 +592,7 @@ const CalendarManager = (() => {
         ${badge}
         <span class="cal-cell__heb cal-cell__heb--primary">${hebDayStr}</span>
         ${gregSpan}
-        ${parashaHtml}
+        ${holidayHtml}${parashaHtml}
       </div>`;
     }
     // Gregorian-primary: bold "א׳" on Rosh Chodesh
@@ -575,7 +603,7 @@ const CalendarManager = (() => {
       ${badge}
       <span class="cal-cell__greg">${gregDay}</span>
       ${hebSpan}
-      ${parashaHtml}
+      ${holidayHtml}${parashaHtml}
     </div>`;
   }
 

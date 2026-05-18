@@ -391,7 +391,14 @@
 
     <!-- ── למידה פעילה (צ'אט מאמרים עצמאי) ── -->
     <section id="view-active-chat" class="view hidden active-chat-view">
-      <div class="active-chat-layout">
+      <!-- כרטיסיות -->
+      <div class="ac-tabs">
+        <button class="ac-tab ac-tab--active" data-actab="chat">💬 צ'אט למידה פעילה</button>
+        <button class="ac-tab" data-actab="syllabus">📖 גנרטור מסלולי לימוד</button>
+      </div>
+
+      <!-- כרטיסית צ'אט -->
+      <div id="acTabChat" class="ac-tab-content active-chat-layout">
         <div class="active-chat-sidebar card">
           <h2>🧠 למידה פעילה</h2>
           <p class="hint">שוחח עם ספריית המאמרים בנושא תיאוריות למידה, חזרה מרווחת ושיטות לימוד יעיל.</p>
@@ -406,6 +413,76 @@
                       placeholder="שאל על שיטות לימוד, חזרה מרווחת, למידה פעילה..." dir="rtl"></textarea>
             <button id="acChatSendBtn" class="btn btn--primary btn--sm ai-send-btn">שלח</button>
           </div>
+        </div>
+      </div>
+
+      <!-- כרטיסית גנרטור מסלולים -->
+      <div id="acTabSyllabus" class="ac-tab-content hidden">
+        <div class="syllabus-form card">
+          <h2>📖 גנרטור מסלולי לימוד דינמי</h2>
+          <p class="hint">הגדר ספר, קצב והגבלות — ה-AI יתכנן את לוח הלמידה שלך ויזריק אותו ישירות ללוח השנה.</p>
+
+          <div class="form-group">
+            <label class="form-label" for="syllabusBook">שם הספר</label>
+            <input type="text" id="syllabusBook" class="input-field input-field--full"
+                   placeholder="לדוגמה: גמרא יומא, משנה תורה הלכות דעות, מסילת ישרים..." dir="rtl" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="syllabusAuthor">שם המחבר (אופציונלי)</label>
+            <input type="text" id="syllabusAuthor" class="input-field input-field--full"
+                   placeholder="לדוגמה: הרמב\"ם, הגר\"א..." dir="rtl" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="syllabusPace">קצב התקדמות</label>
+            <input type="text" id="syllabusPace" class="input-field input-field--full"
+                   placeholder="לדוגמה: דף אחד, שני פרקים, הלכה אחת, עמוד אחד..." dir="rtl" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="syllabusStartDate">תאריך התחלה</label>
+            <input type="date" id="syllabusStartDate" class="input-field" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">תנאי סיום</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="radio" name="syllabusEnd" value="book" checked />
+                עד סוף הספר
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="syllabusEnd" value="date" />
+                עד תאריך יעד מסוים
+              </label>
+            </div>
+            <div id="syllabusTargetDateRow" class="hidden" style="margin-top:0.4rem">
+              <label class="form-label" for="syllabusTargetDate">תאריך יעד</label>
+              <input type="date" id="syllabusTargetDate" class="input-field" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">הגבלות לוח שנה</label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="syllabusSkipShabbat" checked />
+              דלג על ימי שבת (שבת)
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="syllabusSkipHolidays" checked />
+              דלג על חגים ומועדים יהודיים
+            </label>
+          </div>
+
+          <div class="form-row-actions">
+            <button id="syllabusGenerateBtn" class="btn btn--primary">
+              📅 צור תוכנית לימוד
+            </button>
+            <span id="syllabusStatus" class="save-status hidden"></span>
+          </div>
+
+          <div id="syllabusResult" class="syllabus-result hidden"></div>
         </div>
       </div>
     </section>
@@ -638,6 +715,19 @@
           </div>
           <button id="refreshBackupsBtn" class="btn btn--ghost btn--sm">↻ רענן</button>
         </div>
+      </div>
+
+      <!-- לוח שנה — הרחבת פרשיות -->
+      <div class="settings-panel card">
+        <h2>📅 לוח שנה — פרשיות השבוע</h2>
+        <p class="hint">בנה/הרחב את מאגר פרשיות השבוע לשנים עתידיות באמצעות AI (מחזור ישראל).</p>
+        <div class="form-row-actions">
+          <button id="extendParashotBtn" class="btn btn--secondary">
+            🤖 טען/הרחב פרשיות באמצעות AI
+          </button>
+          <span id="extendParashotStatus" class="save-status hidden"></span>
+        </div>
+        <div id="extendParashotResult" class="hidden" style="margin-top:0.75rem;font-size:0.85rem"></div>
       </div>
 
       <!-- אבחון מערכת -->

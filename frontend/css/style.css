@@ -1165,6 +1165,20 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
 }
 
 /* Parashat Hashavua label on Shabbat cells */
+.cal-cell__holiday {
+  display: block;
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: #b45309;          /* amber-700 — warm holiday tone */
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+.cal-cell--holiday .cal-cell__holiday,
+.cal-cell--blocked  .cal-cell__holiday { color: #92400e; }
+
 .cal-cell__parasha {
   display: block;
   font-size: 0.58rem;
@@ -1328,3 +1342,31 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
   border: 1px solid var(--color-border); border-radius: var(--radius);
   overflow: hidden; margin-top: 0.5rem;
 }
+
+/* ── כרטיסיות למידה פעילה (ac-tabs) ─────────────────────────────────────── */
+.ac-tabs {
+  display: flex; gap: 0.5rem; margin-bottom: 1rem;
+  border-bottom: 2px solid var(--color-border); padding-bottom: 0.4rem;
+}
+.ac-tab {
+  background: none; border: none; padding: 0.45rem 1rem;
+  font-size: 0.9rem; cursor: pointer; border-radius: var(--radius) var(--radius) 0 0;
+  color: var(--color-text-muted); font-weight: 500;
+}
+.ac-tab--active { color: var(--color-primary); border-bottom: 2px solid var(--color-primary); margin-bottom: -2px; }
+
+/* ── גנרטור מסלולי לימוד ─────────────────────────────────────────────────── */
+.syllabus-form { max-width: 620px; margin: 0 auto; }
+.checkbox-label {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.9rem; margin-bottom: 0.3rem; cursor: pointer;
+}
+.syllabus-result {
+  margin-top: 1rem; padding: 0.9rem 1.1rem;
+  background: var(--color-bg); border: 1px solid var(--color-border);
+  border-radius: var(--radius); font-size: 0.88rem; line-height: 1.7;
+}
+.syllabus-result__title { font-weight: 700; font-size: 1rem; margin-bottom: 0.4rem; }
+.syllabus-result__preview { max-height: 220px; overflow-y: auto; }
+.syllabus-day { padding: 0.2rem 0; border-bottom: 1px solid var(--color-border); }
+.syllabus-day:last-child { border-bottom: none; }

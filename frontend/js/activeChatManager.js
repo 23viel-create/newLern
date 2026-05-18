@@ -2,6 +2,7 @@
 const ActiveChatManager = (() => {
   let _bound = false;
 
+  // ── Markdown renderer ──────────────────────────────────────────────────────
   function _mdToHtml(text) {
     return String(text)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -10,6 +11,7 @@ const ActiveChatManager = (() => {
       .replace(/\n/g, '<br>');
   }
 
+  // ── Chat helpers ──────────────────────────────────────────────────────────
   function _appendMsg(role, text) {
     const box = document.getElementById('acChatMessages');
     if (!box) return;
@@ -59,6 +61,98 @@ const ActiveChatManager = (() => {
     }
   }
 
+  // ── Tab switching ─────────────────────────────────────────────────────────
+  function _bindTabs() {
+    document.querySelectorAll('.ac-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.actab;
+        document.querySelectorAll('.ac-tab').forEach(b =>
+          b.classList.toggle('ac-tab--active', b === btn));
+        document.getElementById('acTabChat')?.classList.toggle('hidden', tab !== 'chat');
+        document.getElementById('acTabSyllabus')?.classList.toggle('hidden', tab !== 'syllabus');
+      });
+    });
+  }
+
+  // ── Syllabus form ─────────────────────────────────────────────────────────
+  function _bindSyllabusForm() {
+    // Set today as default start date
+    const startEl = document.getElementById('syllabusStartDate');
+    if (startEl && !startEl.value) {
+      startEl.value = new Date().toISOString().slice(0, 10);
+    }
+
+    // Toggle target date picker
+    document.querySelectorAll('input[name="syllabusEnd"]').forEach(r => {
+      r.addEventListener('change', () => {
+        const showDate = document.querySelector('input[name="syllabusEnd"]:checked')?.value === 'date';
+        document.getElementById('syllabusTargetDateRow')?.classList.toggle('hidden', !showDate);
+      });
+    });
+
+    // Generate button
+    document.getElementById('syllabusGenerateBtn')?.addEventListener('click', _generateSyllabus);
+  }
+
+  async function _generateSyllabus() {
+    const bookName   = document.getElementById('syllabusBook')?.value.trim();
+    const authorName = document.getElementById('syllabusAuthor')?.value.trim() || '';
+    const pace       = document.getElementById('syllabusPace')?.value.trim();
+    const startDate  = document.getElementById('syllabusStartDate')?.value || '';
+    const endCond    = document.querySelector('input[name="syllabusEnd"]:checked')?.value || 'book';
+    const targetDate = document.getElementById('syllabusTargetDate')?.value || '';
+    const skipShabbat  = document.getElementById('syllabusSkipShabbat')?.checked ?? true;
+    const skipHolidays = document.getElementById('syllabusSkipHolidays')?.checked ?? true;
+
+    if (!bookName) { alert('יש להזין שם ספר'); return; }
+    if (!pace)     { alert('יש להזין קצב התקדמות'); return; }
+    if (endCond === 'date' && !targetDate) { alert('יש להזין תאריך יעד'); return; }
+
+    const btn    = document.getElementById('syllabusGenerateBtn');
+    const status = document.getElementById('syllabusStatus');
+    const result = document.getElementById('syllabusResult');
+    btn.disabled = true;
+    status.textContent = '⏳ ה-AI מכין את תוכנית הלימוד...';
+    status.className   = 'save-status';
+    status.classList.remove('hidden');
+    result.classList.add('hidden');
+
+    try {
+      const res = await Api.learningPlanGenerate({
+        bookName, authorName, pace, endCondition: endCond,
+        targetDate: endCond === 'date' ? targetDate : undefined,
+        startDate, skipShabbat, skipHolidays,
+      });
+
+      const { count, firstDate, lastDate, tasks } = res;
+
+      // Build preview
+      const previewItems = tasks.slice(0, 7)
+        .map(t => `<div class="syllabus-day"><span class="badge" style="background:#e0e7ff;color:#4f46e5;margin-left:0.4rem">${t.dueDate}</span>${escHtml(t.title)}</div>`)
+        .join('');
+      const moreNote = count > 7 ? `<div class="hint" style="margin-top:0.4rem">...ועוד ${count - 7} ימי לימוד נוספים</div>` : '';
+
+      result.innerHTML = `
+        <div class="syllabus-result__title">✅ תוכנית לימוד נוצרה בהצלחה!</div>
+        <p class="hint">נוצרו <strong>${count}</strong> ימי לימוד — מ-<strong>${firstDate}</strong> עד <strong>${lastDate}</strong>.</p>
+        <p class="hint" style="margin-bottom:0.6rem">הימים הוזרקו ללוח השנה שלך ויופיעו ב<strong>מסך ראשי</strong>.</p>
+        <div class="syllabus-result__preview">${previewItems}${moreNote}</div>`;
+      result.classList.remove('hidden');
+
+      status.textContent = `✓ ${count} ימי לימוד נוצרו`;
+      status.className   = 'save-status save-status--saved';
+      setTimeout(() => status.classList.add('hidden'), 4000);
+    } catch (err) {
+      status.textContent = `שגיאה: ${err.message}`;
+      status.className   = 'save-status';
+      status.style.color = 'var(--color-danger)';
+      setTimeout(() => { status.classList.add('hidden'); status.style.color = ''; }, 6000);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
   function init() {
     if (_bound) return;
     _bound = true;
@@ -67,6 +161,8 @@ const ActiveChatManager = (() => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') _send();
     });
     document.getElementById('acLearningProgramBtn')?.addEventListener('click', _generateProgram);
+    _bindTabs();
+    _bindSyllabusForm();
   }
 
   return { init };

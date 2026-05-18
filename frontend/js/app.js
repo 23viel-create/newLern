@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
   _bindSrSettings();
   _bindAiScope();
   _bindProgramsPanel();
+  _bindExtendParashot();
 });
 
 // ─── הגדרות חזרה מרווחת ──────────────────────────────────────────────────────
@@ -130,6 +131,39 @@ async function loadAiScope() {
     const el = document.getElementById('aiScopeSelect');
     if (el && s.aiScopePreference) el.value = s.aiScopePreference;
   } catch { /* fail silently */ }
+}
+
+// ─── הרחבת פרשיות ─────────────────────────────────────────────────────────────
+
+function _bindExtendParashot() {
+  document.getElementById('extendParashotBtn')?.addEventListener('click', async () => {
+    const btn    = document.getElementById('extendParashotBtn');
+    const status = document.getElementById('extendParashotStatus');
+    const result = document.getElementById('extendParashotResult');
+    btn.disabled = true;
+    status.textContent = '⏳ ה-AI מכין את טבלת הפרשיות...';
+    status.className   = 'save-status';
+    status.classList.remove('hidden');
+    result.classList.add('hidden');
+    try {
+      const res = await Api.calendarExtendParashot();
+      const { count, entries } = res;
+      const sample = Object.entries(entries || {}).slice(0, 5)
+        .map(([d, p]) => `<strong>${d}</strong> — ${escHtml(p)}`).join('<br>');
+      result.innerHTML = `✓ ה-AI הפיק ${count} ערכי פרשה. דוגמאות:<br>${sample}`;
+      result.classList.remove('hidden');
+      status.textContent = `✓ ${count} פרשיות נטענו`;
+      status.className = 'save-status save-status--saved';
+      setTimeout(() => status.classList.add('hidden'), 4000);
+    } catch (err) {
+      status.textContent = `שגיאה: ${err.message}`;
+      status.className = 'save-status';
+      status.style.color = 'var(--color-danger)';
+      setTimeout(() => { status.classList.add('hidden'); status.style.color = ''; }, 5000);
+    } finally {
+      btn.disabled = false;
+    }
+  });
 }
 
 // ─── תוכניות חזרה מרווחת ──────────────────────────────────────────────────────
