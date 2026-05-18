@@ -2,7 +2,7 @@ const fs   = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const AdmZip = require('adm-zip');
-const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = require('docx');
+const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageOrientation } = require('docx');
 const { summariesRoot, getSummaryContent, createFolder } = require('./filesController');
 
 const DATA_ROOT = path.resolve(__dirname, '../../data');
@@ -13,56 +13,93 @@ function _ts() {
   return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 }
 
-// Strip HTML tags, preserving newlines at block boundaries
-function _htmlToText(html) {
-  return (html || '')
+// ─── HTML → docx rich paragraphs ─────────────────────────────────────────────
+
+function _parseInlineHtml(fragment) {
+  const runs = [];
+  let bold = false, underline = false, italic = false;
+
+  // Split on HTML tags, keeping the delimiters
+  const parts = fragment.split(/(<[^>]+>)/);
+  for (const part of parts) {
+    if (!part) continue;
+    if (part.startsWith('<')) {
+      const isClosing = part.startsWith('</');
+      const tagName   = part.replace(/<\/?([a-zA-Z][^>\s]*)[\s\S]*>/, '$1').toLowerCase();
+      if (['strong', 'b'].includes(tagName))  bold      = !isClosing;
+      else if (['u', 'ins'].includes(tagName)) underline = !isClosing;
+      else if (['em', 'i'].includes(tagName))  italic    = !isClosing;
+      // all other tags: skip silently
+    } else {
+      const text = part
+        .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+      if (!text) continue;
+      const props = { text, size: 24 };
+      if (bold)      props.bold      = true;
+      if (underline) props.underline = {};
+      if (italic)    props.italics   = true;
+      runs.push(new TextRun(props));
+    }
+  }
+
+  if (!runs.length) runs.push(new TextRun({ text: '', size: 24 }));
+  return runs;
+}
+
+function _htmlToDocxParagraphs(html) {
+  const paragraphs = [];
+  const BULLET     = '\x00BULLET\x00';
+
+  // Normalise block boundaries → newline markers; bullet items get a prefix
+  const normalised = (html || '')
+    .replace(/<li[^>]*>/gi,  BULLET)
+    .replace(/<\/li>/gi,     '\n')
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<\/div>/gi, '\n')
-    .replace(/<\/li>/gi, '\n')
-    .replace(/<li[^>]*>/gi, '• ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+    .replace(/<\/p>/gi,      '\n')
+    .replace(/<\/div>/gi,    '\n')
+    .replace(/<p[^>]*>/gi,   '')
+    .replace(/<div[^>]*>/gi, '');
+
+  for (let line of normalised.split('\n')) {
+    const isBullet = line.includes(BULLET);
+    line = line.replace(new RegExp(BULLET, 'g'), '').trim();
+
+    const runs     = _parseInlineHtml(line);
+    const paraProps = { children: runs, alignment: AlignmentType.RIGHT, bidirectional: true };
+    if (isBullet) paraProps.bullet = { level: 0 };
+    paragraphs.push(new Paragraph(paraProps));
+  }
+
+  if (!paragraphs.length) {
+    paragraphs.push(new Paragraph({ text: '', alignment: AlignmentType.RIGHT, bidirectional: true }));
+  }
+  return paragraphs;
 }
 
 // ─── DOCX export ─────────────────────────────────────────────────────────────
 
 async function buildDocx(title, htmlContent) {
-  const plainText = _htmlToText(htmlContent);
-  const paragraphs = [];
-
-  // Title
-  paragraphs.push(
-    new Paragraph({
-      text: title || 'סיכום',
-      heading: HeadingLevel.HEADING_1,
-      alignment: AlignmentType.RIGHT,
-      bidirectional: true,
-    })
-  );
-  paragraphs.push(new Paragraph({ text: '' }));
-
-  // Body — split by newlines
-  for (const line of plainText.split('\n')) {
-    paragraphs.push(
-      new Paragraph({
-        children: [new TextRun({ text: line, size: 24 })],
-        alignment: AlignmentType.RIGHT,
-        bidirectional: true,
-      })
-    );
-  }
+  const bodyParagraphs = _htmlToDocxParagraphs(htmlContent);
 
   const doc = new Document({
     sections: [{
-      properties: { page: { textDirection: 'rl' } },
-      children: paragraphs,
+      properties: {
+        page: {
+          size: { orientation: PageOrientation.LANDSCAPE },
+          textDirection: 'rl',
+        },
+      },
+      children: [
+        new Paragraph({
+          children: [new TextRun({ text: title || 'סיכום', bold: true, size: 32 })],
+          heading: HeadingLevel.HEADING_1,
+          alignment: AlignmentType.RIGHT,
+          bidirectional: true,
+        }),
+        new Paragraph({ text: '' }),
+        ...bodyParagraphs,
+      ],
     }],
   });
 
@@ -190,10 +227,17 @@ const WORD_CACHE_DIR = path.join(DATA_ROOT, 'word_cache');
 async function openInWord(nodePath, title, html) {
   fs.mkdirSync(WORD_CACHE_DIR, { recursive: true });
 
-  // Build .docx and save to cache
+  // Build .docx
   const content = html !== undefined ? html : getSummaryContent(nodePath);
   const buffer  = await buildDocx(title || nodePath, content);
 
+  // Save to summary folder as the canonical document.docx (dual-file architecture)
+  const summaryFolderPath = path.join(summariesRoot, nodePath);
+  if (fs.existsSync(summaryFolderPath)) {
+    fs.writeFileSync(path.join(summaryFolderPath, 'document.docx'), buffer);
+  }
+
+  // Also save a named copy in word_cache for the OS open command
   const safeBase = (title || nodePath).replace(/[^\w֐-׿‏‎ -]/g, '_').slice(0, 60);
   const filePath = path.join(WORD_CACHE_DIR, safeBase + '.docx');
   fs.writeFileSync(filePath, buffer);
@@ -216,13 +260,29 @@ async function openInWord(nodePath, title, html) {
   });
 }
 
-// Read back a previously cached .docx file's plain text (for Word sync)
+// Read back .docx metadata for Word sync — checks summary folder first (dual-file)
 function readWordCache(title, nodePath) {
+  // Primary: document.docx inside the summary folder
+  if (nodePath) {
+    const summaryDocx   = path.join(summariesRoot, nodePath, 'document.docx');
+    const contentFile   = path.join(summariesRoot, nodePath, 'content.txt');
+    if (fs.existsSync(summaryDocx)) {
+      const docxStat     = fs.statSync(summaryDocx);
+      const contentMtime = fs.existsSync(contentFile) ? fs.statSync(contentFile).mtimeMs : 0;
+      return {
+        filePath:         summaryDocx,
+        size:             docxStat.size,
+        mtime:            docxStat.mtimeMs,
+        newerThanContent: docxStat.mtimeMs > contentMtime + 2000, // 2 s grace period
+      };
+    }
+  }
+  // Fallback: named file in word_cache
   const safeBase = (title || nodePath).replace(/[^\w֐-׿‏‎ -]/g, '_').slice(0, 60);
   const filePath = path.join(WORD_CACHE_DIR, safeBase + '.docx');
   if (!fs.existsSync(filePath)) throw new Error('קובץ Word לא נמצא — פתח אותו תחילה');
   const stat = fs.statSync(filePath);
-  return { filePath, size: stat.size, mtime: stat.mtimeMs };
+  return { filePath, size: stat.size, mtime: stat.mtimeMs, newerThanContent: false };
 }
 
 module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache };

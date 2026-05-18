@@ -225,6 +225,18 @@ function setSummaryContent(nodeRelPath, html) {
   const meta     = readMeta(nodePath);
   meta.updatedAt = new Date().toISOString();
   writeMeta(nodePath, meta);
+  // Keep document.docx mirror in sync (fire-and-forget, never blocks the save)
+  setImmediate(() => _syncDocxMirror(nodePath, meta.title || path.basename(nodePath), html || ''));
+}
+
+function _syncDocxMirror(nodePath, title, html) {
+  try {
+    // Lazy require avoids a circular-dependency issue at module-load time
+    const { buildDocx } = require('./backupController');
+    buildDocx(title, html).then(buf => {
+      fs.writeFileSync(path.join(nodePath, 'document.docx'), buf);
+    }).catch(() => {});
+  } catch { /* mirror is optional — never propagate */ }
 }
 
 // ─── audio management ────────────────────────────────────────────────────────

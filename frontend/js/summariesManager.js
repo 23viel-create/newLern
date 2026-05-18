@@ -1,10 +1,11 @@
 // מנהל מסך בחירת תכנים — עץ תיקיות וסיכומים
 const SummariesManager = (() => {
 
-  let treeData     = [];   // עץ מלא מהשרת
-  let sortBy       = 'name';
-  let searchQuery  = '';
-  const expanded   = new Set(); // paths של תיקיות פתוחות
+  let treeData        = [];   // עץ מלא מהשרת
+  let sortBy          = 'name';
+  let searchQuery     = '';
+  let _eventsAttached = false;
+  const expanded      = new Set(); // paths של תיקיות פתוחות
 
   // ─── עזרים ──────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,10 @@ const SummariesManager = (() => {
 
   async function init() {
     bindToolbar();
+    if (!_eventsAttached) {
+      attachEvents(document.getElementById('summariesTree'));
+      _eventsAttached = true;
+    }
     await loadTree();
   }
 
@@ -120,7 +125,6 @@ const SummariesManager = (() => {
         if (toggle) toggle.textContent = '▼';
       }
     });
-    attachEvents(container);
   }
 
   function renderNodes(nodes, depth) {

@@ -152,6 +152,15 @@ const AiManager = (() => {
     }
   }
 
+  // ─── Markdown renderer (safe — escapes HTML before converting) ───────────────
+  function _mdToHtml(text) {
+    return String(text)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/\n/g, '<br>');
+  }
+
   // ─── Chat ────────────────────────────────────────────────────────────────────
   async function _sendToChat(context, message, extra) {
     _appendMessage('user', message);
@@ -177,7 +186,11 @@ const AiManager = (() => {
     if (!box) return;
     const div = document.createElement('div');
     div.className = `ai-msg ai-msg--${role}`;
-    div.textContent = text;
+    if (role === 'ai') {
+      div.innerHTML = _mdToHtml(text);
+    } else {
+      div.textContent = text;
+    }
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
   }
@@ -308,7 +321,11 @@ const AiManager = (() => {
     if (!box) return;
     const div = document.createElement('div');
     div.className = `ai-msg ai-msg--${role}`;
-    div.textContent = text;
+    if (role === 'ai') {
+      div.innerHTML = _mdToHtml(text);
+    } else {
+      div.textContent = text;
+    }
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
   }

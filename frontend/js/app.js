@@ -157,8 +157,9 @@ async function _addProgram() {
   btn.disabled = true;
   try {
     await Api.createProgram(name, sequence);
-    document.getElementById('newProgramName').value = '';
-    document.getElementById('newProgramSeq').value  = '';
+    document.getElementById('newProgramName').value  = '';
+    document.getElementById('newProgramSeq').value   = '';
+    document.getElementById('aiProgramText').value   = '';
     document.getElementById('aiProgramHint').textContent = '';
     await loadPrograms();
     const msg = document.getElementById('addProgramMsg');
