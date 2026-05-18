@@ -184,10 +184,13 @@ const Api = {
     apiFetchPlain('/ai/suggest-single-question', { method: 'POST', body: { summaryPath, summaryTitle, type } }),
   aiGradeAnswer: (question, sampleAnswer, userAnswer, strictness) =>
     apiFetchPlain('/ai/grade-answer', { method: 'POST', body: { question, sampleAnswer, userAnswer, strictness } }),
+  aiSystemHelp: (userMessage) =>
+    apiFetchPlain('/ai/system-help', { method: 'POST', body: { userMessage } }),
 
   // ── מאגר ספרים ───────────────────────────────────────────────────────────
-  getBooks:   () => apiFetch('/books'),
-  deleteBook: (name) => apiFetch(`/books/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  getBooks:      () => apiFetch('/books'),
+  getBookStreamUrl: (name) => `/api/books/stream/${encodeURIComponent(name)}`,
+  deleteBook:    (name) => apiFetch(`/books/${encodeURIComponent(name)}`, { method: 'DELETE' }),
   uploadBook: (file) => {
     const fd = new FormData();
     fd.append('pdf', file);

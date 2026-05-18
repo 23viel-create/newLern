@@ -16,6 +16,7 @@
       <a href="#" data-view="dashboard"  class="nav-link active">מסך ראשי</a>
       <a href="#" data-view="summaries"  class="nav-link">עיון בקבצים</a>
       <a href="#" data-view="books"      class="nav-link">📚 מאגר ספרים</a>
+      <a href="#" data-view="active-chat" class="nav-link">🧠 למידה פעילה</a>
       <a href="#" data-view="settings"   class="nav-link">הגדרות</a>
       <a href="#" data-view="help"       class="nav-link">❓ עזרה</a>
     </nav>
@@ -128,11 +129,12 @@
           <button id="exportDocxBtn"  class="btn btn--ghost btn--sm" title="ייצוא ל-Word">📄 Word</button>
           <button id="openInWordBtn" class="btn btn--ghost btn--sm" title="פתח ב-Word המקומי">📂 פתח ב-Word</button>
           <button id="historyBtn"     class="btn btn--ghost btn--sm" title="היסטוריית גרסאות">🕐 גרסאות</button>
+          <button id="splitScreenBtn" class="btn btn--ghost btn--sm" title="מסך מפוצל">⇔ מפוצל</button>
         </div>
       </div>
 
       <!-- גוף 3 עמודות -->
-      <div class="editor-body">
+      <div class="editor-body" id="editorBody">
 
         <!-- עמודה ימין: הקלטות שמע -->
         <aside class="editor-panel editor-panel--audio" id="audioPanel">
@@ -222,6 +224,29 @@
             <button id="aiSendBtn" class="btn btn--primary btn--sm ai-send-btn">שלח</button>
           </div>
         </aside>
+
+        <!-- עמודה מפוצלת (חצי-מסך, נסתרת כברירת מחדל) -->
+        <div id="splitPane" class="split-pane hidden">
+          <div class="split-pane-toolbar">
+            <span id="splitPaneTitle" class="split-pane-label">—</span>
+            <div class="split-pane-controls">
+              <button id="splitUnlockBtn" class="btn btn--ghost btn--xs hidden" title="פתח לעריכה">🔓 ערוך</button>
+              <button id="splitCloseBtn"  class="btn btn--ghost btn--xs" title="סגור מסך מפוצל">✕</button>
+            </div>
+          </div>
+          <div id="splitPaneContent" class="split-pane-content" contenteditable="false" dir="rtl"></div>
+          <div id="splitPaneBookFrame" class="split-pane-book hidden">
+            <iframe id="splitBookIframe" title="ספר" src="about:blank" class="split-pane-iframe"></iframe>
+          </div>
+          <div id="splitPanePicker" class="split-pane-picker hidden">
+            <p class="hint" style="margin-bottom:0.5rem">בחר סיכום לפתיחה לצד:</p>
+            <input type="search" id="splitPickerSearch" class="input-field" placeholder="🔍 חיפוש סיכום..." dir="rtl" />
+            <div id="splitPickerList" class="split-picker-list"></div>
+            <hr class="settings-divider" />
+            <p class="hint" style="margin-bottom:0.3rem">או פתח ספר:</p>
+            <div id="splitPickerBooks" class="split-picker-list"></div>
+          </div>
+        </div>
 
       </div>
 
@@ -364,6 +389,27 @@
       </div>
     </section>
 
+    <!-- ── למידה פעילה (צ'אט מאמרים עצמאי) ── -->
+    <section id="view-active-chat" class="view hidden active-chat-view">
+      <div class="active-chat-layout">
+        <div class="active-chat-sidebar card">
+          <h2>🧠 למידה פעילה</h2>
+          <p class="hint">שוחח עם ספריית המאמרים בנושא תיאוריות למידה, חזרה מרווחת ושיטות לימוד יעיל.</p>
+          <button id="acLearningProgramBtn" class="btn btn--secondary btn--full" style="margin-top:0.8rem">✨ צור תוכנית לימוד אישית</button>
+          <hr class="settings-divider" />
+          <p class="hint" style="font-size:0.8rem">המאמרים מאוחסנים מקומית. ה-AI מבסס תשובותיו אך ורק עליהם.</p>
+        </div>
+        <div class="active-chat-main card">
+          <div id="acChatMessages" class="ai-chat-messages active-chat-messages"></div>
+          <div class="ai-input-row">
+            <textarea id="acChatInput" class="ai-chat-input" rows="2"
+                      placeholder="שאל על שיטות לימוד, חזרה מרווחת, למידה פעילה..." dir="rtl"></textarea>
+            <button id="acChatSendBtn" class="btn btn--primary btn--sm ai-send-btn">שלח</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ── מאגר ספרים ── -->
     <section id="view-books" class="view hidden">
       <h1>📚 מאגר ספרים</h1>
@@ -386,6 +432,21 @@
         <h2>ספרים במאגר</h2>
         <div id="booksList">
           <p class="placeholder-text">טוען...</p>
+        </div>
+      </div>
+
+      <!-- מציג ספר inline -->
+      <div id="bookViewerCard" class="card book-viewer-card hidden">
+        <div class="book-viewer-header">
+          <h2 id="bookViewerTitle">—</h2>
+          <button id="bookViewerCloseBtn" class="btn btn--ghost btn--sm">✕ סגור</button>
+        </div>
+        <div class="book-viewer-body">
+          <iframe id="bookViewerFrame" class="book-viewer-frame" title="מציג ספר" src="about:blank"></iframe>
+          <div id="bookViewerFallback" class="book-viewer-fallback hidden">
+            <p class="hint">לא ניתן להציג קובץ זה ישירות בדפדפן.</p>
+            <a id="bookViewerDownloadLink" class="btn btn--primary" download>⬇️ הורד קובץ</a>
+          </div>
         </div>
       </div>
     </section>
@@ -671,6 +732,19 @@
         </div>
 
         <div class="help-section">
+          <h2>🤖 עוזר תמיכה AI</h2>
+          <p>שאל שאלה חופשית על השימוש במערכת — העוזר יענה על בסיס המדריך בלבד.</p>
+          <div class="help-chat-box">
+            <div id="helpChatMessages" class="ai-chat-messages ai-chat-messages--settings"></div>
+            <div class="ai-input-row">
+              <textarea id="helpChatInput" class="ai-chat-input" rows="2"
+                        placeholder="שאל שאלה על השימוש במערכת..." dir="rtl"></textarea>
+              <button id="helpChatSendBtn" class="btn btn--primary btn--sm ai-send-btn">שלח</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="help-section">
           <h2>💡 טיפים למשתמש מתקדם</h2>
           <ul class="help-list">
             <li>לחץ Alt+← / Alt+→ בעורך לניווט מהיר בין סיכומים.</li>
@@ -851,6 +925,9 @@
   <script src="js/aiManager.js"></script>
   <script src="js/backupManager.js"></script>
   <script src="js/booksManager.js"></script>
+  <script src="js/activeChatManager.js"></script>
+  <script src="js/helpChatManager.js"></script>
+  <script src="js/splitScreenManager.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

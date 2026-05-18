@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   AiManager.init();
   BackupManager.init();
   PlanProgramModal.init();
+  SplitScreenManager.init();
   loadKeyCount();
 
   // ניווט בין תצוגות
@@ -18,11 +19,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       document.body.classList.remove('editor-open');
       WindowManager.showView(view);
-      if (view === 'summaries') SummariesManager.init();
-      if (view === 'books')     BooksManager.init();
-      if (view === 'dashboard') { CalendarManager.loadCalendar(); AiManager.setContext('calendar'); }
-      if (view === 'settings')  { loadSrSettings(); loadAiScope(); loadPrograms(); AiManager.refreshBattery(); BackupManager.loadBackupList(); }
-      if (view === 'help')      { /* static — no init needed */ }
+      if (view === 'summaries')    SummariesManager.init();
+      if (view === 'books')        BooksManager.init();
+      if (view === 'active-chat')  ActiveChatManager.init();
+      if (view === 'dashboard')    { CalendarManager.loadCalendar(); AiManager.setContext('calendar'); }
+      if (view === 'settings')     { loadSrSettings(); loadAiScope(); loadPrograms(); AiManager.refreshBattery(); BackupManager.loadBackupList(); }
+      if (view === 'help')         { HelpChatManager.init(); }
     });
   });
 

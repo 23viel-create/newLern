@@ -284,8 +284,16 @@ async function suggestSingleQuestion({ summaryPath, summaryTitle, type }) {
 
   let content = '';
   try {
-    const { getSummaryContent } = require('./filesController');
-    content = getSummaryContent(summaryPath) || '';
+    const { summariesRoot } = require('./filesController');
+    const summaryDir = path.join(summariesRoot, summaryPath);
+    const txtFile  = path.join(summaryDir, 'content.txt');
+    const htmlFile = path.join(summaryDir, 'content.html');
+    if (fs.existsSync(txtFile)) {
+      content = fs.readFileSync(txtFile, 'utf-8');
+    } else if (fs.existsSync(htmlFile)) {
+      content = fs.readFileSync(htmlFile, 'utf-8')
+        .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
   } catch { /* content stays empty */ }
 
   const safeTitle   = _sanitize(summaryTitle || summaryPath);
@@ -376,6 +384,39 @@ score הוא מספר שלם בין 0 ל-100.`;
   return { score, critique: json.critique || '' };
 }
 
+// ─── System help chat ────────────────────────────────────────────────────────
+
+const SYSTEM_GUIDE = `מדריך למשתמש — מערכת למידה פעילה:
+
+1. מסך ראשי: לוח שנה עברי-לועזי עם משימות חזרה יומיות. לחץ על יום לצפייה במשימות.
+2. עיון בקבצים: ניהול עץ סיכומים — תיקיות וסיכומים. יצירה, עריכה, מחיקה, חיפוש.
+3. עורך סיכום: עורך עשיר עם 3 עמודות — הקלטות שמע, עריכה, מסייע AI. שמירה אוטומטית.
+4. שאלות ובחינה: עורך שאלות פתוחות ורב-ברירה דרך כפתור "📝 שאלות". בחינה עצמית דרך "🎯 בחן".
+5. למידה פעילה: צ'אט עם ספריית מאמרים בנושא שיטות לימוד. יצירת תוכנית לימוד אישית.
+6. מאגר ספרים: העלאת קבצי PDF/Word/PowerPoint לשימוש כהקשר ל-AI.
+7. הגדרות: קביעת אלגוריתם חזרה מרווחת, מפתחות API, תצוגת לוח שנה, גיבוי.
+8. חזרה מרווחת: תזמן סיכום ע"י לחיצה על "📅 תזמן" בתפריט הפריט. האלגוריתם קובע מתי תחזור.
+9. ייצוא Word: כפתור "📄 Word" בעורך מייצא לקובץ .docx עם RTL עברי.
+10. גיבוי: ייצוא ZIP של כל הסיכומים, ייבוא מגיבוי — בהגדרות → גיבוי ותחזוקה.
+11. מצב אופליין: כל פונקציות הסיכומים עובדות ללא אינטרנט. רק ה-AI דורש חיבור.
+12. מפתחות Gemini: הוסף מפתחות חינמיים מ-aistudio.google.com בהגדרות → מפתחות API.`;
+
+async function systemHelpChat(userMessage) {
+  const safeMsg = _sanitize(userMessage);
+  if (!safeMsg) throw new Error('הודעה ריקה');
+  const prompt = `אתה עוזר תמיכה למשתמש במערכת למידה פעילה.
+ענה אך ורק על בסיס מדריך המשתמש הבא. אל תמציא מידע שאינו במדריך.
+אם השאלה אינה קשורה למערכת — ענה: "שאלה זו אינה קשורה למערכת הלמידה. אוכל לעזור בכל שאלה הנוגעת לשימוש במערכת."
+
+מדריך המשתמש:
+${SYSTEM_GUIDE}
+
+שאלת המשתמש: ${safeMsg}
+
+ענה בעברית, בצורה ידידותית וקצרה (עד 5 משפטים).`;
+  return await _callGemini(prompt);
+}
+
 // ─── Keys management ─────────────────────────────────────────────────────────
 
 function getKeys() {
@@ -395,6 +436,7 @@ module.exports = {
   chatWithArticles,
   generateLearningProgram,
   parseSrProgramFromText,
+  systemHelpChat,
   getKeyStatus,
   getKeys,
   updateKeys,

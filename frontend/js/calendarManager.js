@@ -1,56 +1,154 @@
 // מנהל לוח השנה הדו-לשוני ולוח בקרה
 const CalendarManager = (() => {
 
-  // ── Parashat Hashavua lookup (Israel cycle, 5785–5787) ────────────────────
-  // Key = ISO date of Shabbat; value = parasha display name.
-  // Special non-regular Shabbatot (Chol HaMoed etc.) use descriptive label.
-  const _PARASHA_BY_DATE = {
-    // ── 5785 (2024–2025) ──
-    '2024-10-26':'בראשית',   '2024-11-02':'נח',          '2024-11-09':'לך לך',
-    '2024-11-16':'וירא',     '2024-11-23':'חיי שרה',      '2024-11-30':'תולדות',
-    '2024-12-07':'ויצא',     '2024-12-14':'וישלח',        '2024-12-21':'וישב',
-    '2024-12-28':'מקץ',      '2025-01-04':'ויגש',         '2025-01-11':'ויחי',
-    '2025-01-18':'שמות',     '2025-01-25':'וארא',         '2025-02-01':'בא',
-    '2025-02-08':'בשלח',     '2025-02-15':'יתרו',         '2025-02-22':'משפטים',
-    '2025-03-01':'תרומה',    '2025-03-08':'תצוה',         '2025-03-15':'כי תשא',
-    '2025-03-22':'ויקהל-פקודי','2025-03-29':'ויקרא',      '2025-04-05':'צו',
-    '2025-04-12':'שמיני',    // Shabbat HaGadol — regular parasha
-    // Apr 19 = 7th day Pesach (special, no regular parasha)
-    '2025-04-26':'תזריע-מצורע','2025-05-03':'אחרי מות-קדושים','2025-05-10':'אמור',
-    '2025-05-17':'בהר',      '2025-05-24':'בחוקותי',      '2025-05-31':'במדבר',
-    '2025-06-07':'נשא',      '2025-06-14':'בהעלותך',      '2025-06-21':'שלח לך',
-    '2025-06-28':'קורח',     '2025-07-05':'חוקת',         '2025-07-12':'בלק',
-    '2025-07-19':'פינחס',    '2025-07-26':'מטות-מסעי',    '2025-08-02':'דברים',
-    '2025-08-09':'ואתחנן',   '2025-08-16':'עקב',          '2025-08-23':'ראה',
-    '2025-08-30':'שופטים',   '2025-09-06':'כי תצא',       '2025-09-13':'כי תבוא',
-    '2025-09-20':'ניצבים-וילך',
+  // ── Parashat Hashavua — procedurally generated for 5776–5807 (2015–2047) ────
+  // Key = ISO date of Shabbat (Saturday); value = parasha display name (Israel cycle).
+  //
+  // Algorithm: for each Hebrew year, the Bereshit Shabbat (first Shabbat after
+  // Simchat Torah = 23 Tishrei) is the anchor. Parashiot are assigned in order
+  // from index 0 (בראשית). Certain pairs are combined when the year is short.
+  // Pesach and Sukkot Chol HaMoed Shabbatot skip regular parasha numbering.
 
-    // ── 5786 (2025–2026) ──
-    '2025-10-18':'בראשית',   '2025-10-25':'נח',           '2025-11-01':'לך לך',
-    '2025-11-08':'וירא',     '2025-11-15':'חיי שרה',      '2025-11-22':'תולדות',
-    '2025-11-29':'ויצא',     '2025-12-06':'וישלח',        '2025-12-13':'וישב',
-    '2025-12-20':'מקץ',      '2025-12-27':'ויגש',         '2026-01-03':'ויחי',
-    '2026-01-10':'שמות',     '2026-01-17':'וארא',         '2026-01-24':'בא',
-    '2026-01-31':'בשלח',     '2026-02-07':'יתרו',         '2026-02-14':'משפטים',
-    '2026-02-21':'תרומה',    '2026-02-28':'תצוה',         '2026-03-07':'כי תשא',
-    '2026-03-14':'ויקהל-פקודי','2026-03-21':'ויקרא',      '2026-03-28':'צו',
-    '2026-04-04':'חוה"מ פסח', // Shabbat Chol HaMoed Pesach
-    '2026-04-11':'שמיני',    '2026-04-18':'תזריע-מצורע',  '2026-04-25':'אחרי מות-קדושים',
-    '2026-05-02':'אמור',     '2026-05-09':'בהר-בחוקותי',  '2026-05-16':'במדבר',
-    '2026-05-23':'נשא',      '2026-05-30':'בהעלותך',      '2026-06-06':'שלח לך',
-    '2026-06-13':'קורח',     '2026-06-20':'חוקת',         '2026-06-27':'בלק',
-    '2026-07-04':'פינחס',    '2026-07-11':'מטות-מסעי',    '2026-07-18':'דברים',
-    '2026-07-25':'ואתחנן',   '2026-08-01':'עקב',          '2026-08-08':'ראה',
-    '2026-08-15':'שופטים',   '2026-08-22':'כי תצא',       '2026-08-29':'כי תבוא',
-    '2026-09-05':'ניצבים',   '2026-09-12':'וילך',         // Shabbat Shuvah
-    '2026-09-26':'חוה"מ סוכות', // Shabbat Chol HaMoed Sukkot
+  const _PARASHA_NAMES = [
+    'בראשית','נח','לך לך','וירא','חיי שרה','תולדות','ויצא','וישלח','וישב','מקץ',
+    'ויגש','ויחי','שמות','וארא','בא','בשלח','יתרו','משפטים','תרומה','תצוה',
+    'כי תשא','ויקהל','פקודי','ויקרא','צו','שמיני','תזריע','מצורע','אחרי מות',
+    'קדושים','אמור','בהר','בחוקותי','במדבר','נשא','בהעלותך','שלח לך','קורח',
+    'חוקת','בלק','פינחס','מטות','מסעי','דברים','ואתחנן','עקב','ראה','שופטים',
+    'כי תצא','כי תבוא','ניצבים','וילך','האזינו',
+  ];
 
-    // ── 5787 (2026–2027) ──
-    '2026-10-10':'בראשית',   '2026-10-17':'נח',           '2026-10-24':'לך לך',
-    '2026-10-31':'וירא',     '2026-11-07':'חיי שרה',      '2026-11-14':'תולדות',
-    '2026-11-21':'ויצא',     '2026-11-28':'וישלח',        '2026-12-05':'וישב',
-    '2026-12-12':'מקץ',      '2026-12-19':'ויגש',         '2026-12-26':'ויחי',
+  // Combination pairs (index of first in pair): applied when year needs fewer Shabbatot
+  // non-leap standard: combine ויקהל-פקודי(21-22), תזריע-מצורע(26-27),
+  //                    אחרי מות-קדושים(28-29), בהר-בחוקותי(31-32),
+  //                    מטות-מסעי(41-42), ניצבים-וילך(50-51)
+  // leap year: only ניצבים-וילך may combine depending on year length
+  const _COMBO_NONLEAP = new Set([21, 26, 28, 31, 41, 50]);
+  const _COMBO_LEAP     = new Set([50]);
+
+  // Bereshit Shabbat anchor dates for Hebrew years 5776–5807
+  // = first Shabbat on or after 24 Tishrei (day after Simchat Torah in Israel)
+  const _BERESHIT_ANCHORS = {
+    5776:'2015-10-10', 5777:'2016-10-29', 5778:'2017-10-14', 5779:'2018-10-06',
+    5780:'2019-10-26', 5781:'2020-10-17', 5782:'2021-10-02', 5783:'2022-10-22',
+    5784:'2023-10-14', 5785:'2024-10-26', 5786:'2025-10-18', 5787:'2026-10-03',
+    5788:'2027-10-23', 5789:'2028-10-14', 5790:'2029-09-29', 5791:'2030-10-19',
+    5792:'2031-10-11', 5793:'2032-09-25', 5794:'2033-10-15', 5795:'2034-10-06',
+    5796:'2035-10-20', 5797:'2036-10-11', 5798:'2037-09-26', 5799:'2038-10-16',
+    5800:'2039-10-08', 5801:'2040-09-22', 5802:'2041-10-12', 5803:'2042-10-04',
+    5804:'2043-10-17', 5805:'2044-10-08', 5806:'2045-09-30', 5807:'2046-10-13',
   };
+
+  // Leap years (month 13 exists): mod-19 positions {0,3,6,8,11,14,17}
+  function _isHebrewLeap(year) {
+    return [0, 3, 6, 8, 11, 14, 17].includes(((year * 7) + 1) % 19);
+  }
+
+  // Pesach start dates (15 Nisan) for each Hebrew year (approx Gregorian)
+  // used to detect Chol HaMoed Pesach Shabbat (between day 2 and day 8)
+  // and Chol HaMoed Sukkot (between 16-21 Tishrei)
+  // We store year → Pesach start ISO date
+  const _PESACH_START = {
+    5776:'2016-04-23', 5777:'2017-04-11', 5778:'2018-03-31', 5779:'2019-04-20',
+    5780:'2020-04-09', 5781:'2021-03-28', 5782:'2022-04-16', 5783:'2023-04-06',
+    5784:'2024-04-23', 5785:'2025-04-13', 5786:'2026-04-02', 5787:'2027-04-22',
+    5788:'2028-04-11', 5789:'2029-04-01', 5790:'2030-04-18', 5791:'2031-04-08',
+    5792:'2032-03-28', 5793:'2033-04-14', 5794:'2034-04-04', 5795:'2035-04-24',
+    5796:'2036-04-12', 5797:'2037-04-01', 5798:'2038-04-21', 5799:'2039-04-10',
+    5800:'2040-03-30', 5801:'2041-04-17', 5802:'2042-04-07', 5803:'2043-03-28',
+    5804:'2044-04-14', 5805:'2045-04-04', 5806:'2046-04-23', 5807:'2047-04-13',
+  };
+
+  function _addDays(isoDate, n) {
+    const d = new Date(isoDate + 'T12:00:00Z');
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function _isoToMs(iso) { return new Date(iso + 'T12:00:00Z').getTime(); }
+
+  function _generateParashaByDate() {
+    const result = {};
+
+    for (const [yearStr, bereshitDate] of Object.entries(_BERESHIT_ANCHORS)) {
+      const year = parseInt(yearStr, 10);
+      const nextYear = year + 1;
+      const nextBereshit = _BERESHIT_ANCHORS[nextYear];
+      if (!nextBereshit) continue;
+
+      const leap   = _isHebrewLeap(year);
+      const combos = leap ? _COMBO_LEAP : _COMBO_NONLEAP;
+
+      // Build the ordered parasha sequence for this year (with combinations)
+      const sequence = [];
+      for (let i = 0; i < _PARASHA_NAMES.length; i++) {
+        if (combos.has(i) && i + 1 < _PARASHA_NAMES.length) {
+          sequence.push(_PARASHA_NAMES[i] + '-' + _PARASHA_NAMES[i + 1]);
+          i++; // skip next
+        } else {
+          sequence.push(_PARASHA_NAMES[i]);
+        }
+      }
+
+      // Pesach window for this year: Shabbat between Pesach day 1 (15 Nisan) and Pesach day 8
+      const pesachStart = _PESACH_START[year];
+      const pesachEnd   = pesachStart ? _addDays(pesachStart, 7) : null;
+
+      // Sukkot: Rosh Hashana of next Hebrew year → Sukkot starts 14 days later (15 Tishrei)
+      // We approximate: 14 days before next Bereshit anchor ≈ Shemini Atzeret,
+      // so Sukkot Chol HaMoed Shabbat ≈ 7–12 days before Shemini Atzeret
+      // i.e. 2–7 days before nextBereshit (nextBereshit is first Shabbat after 23 Tishrei)
+      // Simpler: Sukkot starts ~14 days before nextBereshit-anchor
+      // Chol HaMoed Sukkot Shabbat = between 16 and 21 Tishrei = between nextBereshit-9 and nextBereshit-4
+      const sukkotShabbat = (() => {
+        const nb = _isoToMs(nextBereshit);
+        for (let d = -9; d <= -4; d++) {
+          const candidate = _addDays(nextBereshit, d);
+          const dow = new Date(candidate + 'T12:00:00Z').getUTCDay();
+          if (dow === 6) return candidate;
+        }
+        return null;
+      })();
+
+      // Assign parashiot to each Shabbat from bereshit to day before next bereshit
+      let shabbat = bereshitDate;
+      let seqIdx = 0;
+
+      while (_isoToMs(shabbat) < _isoToMs(nextBereshit)) {
+        const dow = new Date(shabbat + 'T12:00:00Z').getUTCDay();
+        if (dow !== 6) { shabbat = _addDays(shabbat, 1); continue; }
+
+        // Check Pesach Chol HaMoed
+        if (pesachStart && pesachEnd) {
+          const ms = _isoToMs(shabbat);
+          const p1 = _isoToMs(pesachStart);
+          const p8 = _isoToMs(pesachEnd);
+          if (ms >= p1 && ms <= p8) {
+            result[shabbat] = 'חוה"מ פסח';
+            shabbat = _addDays(shabbat, 7);
+            continue;
+          }
+        }
+
+        // Check Sukkot Chol HaMoed
+        if (sukkotShabbat && shabbat === sukkotShabbat) {
+          result[shabbat] = 'חוה"מ סוכות';
+          shabbat = _addDays(shabbat, 7);
+          continue;
+        }
+
+        // Regular parasha
+        if (seqIdx < sequence.length) {
+          result[shabbat] = sequence[seqIdx++];
+        }
+        shabbat = _addDays(shabbat, 7);
+      }
+    }
+
+    return result;
+  }
+
+  const _PARASHA_BY_DATE = _generateParashaByDate();
 
   const MONTH_NAMES_GREG = [
     '', 'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',

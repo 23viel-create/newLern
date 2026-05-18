@@ -44,6 +44,27 @@ router.post('/upload', upload.single('pdf'), (req, res) => {
   res.json({ success: true, data: { name: req.file.filename, size: req.file.size } });
 });
 
+// GET /api/books/stream/:name  — serve file for inline viewer
+router.get('/stream/:name', (req, res) => {
+  try {
+    const safeName = path.basename(req.params.name);
+    if (!SUPPORTED_EXTS.includes(path.extname(safeName).toLowerCase())) {
+      return res.status(400).json({ success: false, message: 'סוג קובץ לא נתמך' });
+    }
+    const filePath = path.join(BOOKS_DIR, safeName);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: 'הקובץ לא נמצא' });
+    }
+    const ext = path.extname(safeName).toLowerCase();
+    const mimeTypes = { '.pdf': 'application/pdf', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation' };
+    res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(safeName)}"`);
+    fs.createReadStream(filePath).pipe(res);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // DELETE /api/books/:name
 router.delete('/:name', (req, res) => {
   try {

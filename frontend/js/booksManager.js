@@ -94,6 +94,9 @@ const BooksManager = (() => {
           <label for="book_${escHtml(b.name)}" class="book-item__icon" aria-hidden="true">${_bookIcon(b.name)}</label>
           <span class="book-item__name">${escHtml(b.name)}</span>
           <span class="book-item__size">${_fmtSize(b.size)}</span>
+          <button class="btn btn--xs btn--ghost"
+                  onclick="BooksManager.viewBook('${escHtml(b.name)}')"
+                  title="הצג ספר">👁️ הצג</button>
           <button class="btn btn--xs btn--danger-ghost"
                   onclick="BooksManager.deleteBook('${escHtml(b.name)}')"
                   title="מחק ספר">🗑️</button>
@@ -116,6 +119,41 @@ const BooksManager = (() => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
+  // ─── הצגת ספר ───────────────────────────────────────────────────────────────
+
+  function viewBook(name) {
+    const card   = document.getElementById('bookViewerCard');
+    const frame  = document.getElementById('bookViewerFrame');
+    const title  = document.getElementById('bookViewerTitle');
+    const fallback = document.getElementById('bookViewerFallback');
+    const dlLink = document.getElementById('bookViewerDownloadLink');
+    const closeBtn = document.getElementById('bookViewerCloseBtn');
+
+    const url = Api.getBookStreamUrl(name);
+    const ext = name.split('.').pop().toLowerCase();
+
+    title.textContent = name;
+    card.classList.remove('hidden');
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    closeBtn.onclick = () => {
+      card.classList.add('hidden');
+      frame.src = 'about:blank';
+    };
+
+    if (ext === 'pdf') {
+      frame.classList.remove('hidden');
+      fallback.classList.add('hidden');
+      frame.src = url;
+    } else {
+      // docx/pptx — cannot display inline; show download link
+      frame.classList.add('hidden');
+      fallback.classList.remove('hidden');
+      dlLink.href = url;
+      dlLink.download = name;
+    }
+  }
+
   // ─── מחיקה ──────────────────────────────────────────────────────────────────
 
   async function deleteBook(name) {
@@ -129,5 +167,5 @@ const BooksManager = (() => {
     }
   }
 
-  return { init, loadBooks, deleteBook, getSelectedBooks };
+  return { init, loadBooks, deleteBook, viewBook, getSelectedBooks };
 })();

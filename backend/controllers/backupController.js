@@ -2,7 +2,7 @@ const fs   = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const AdmZip = require('adm-zip');
-const { Document, Packer, Paragraph, TextRun, AlignmentType, PageOrientation } = require('docx');
+const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
 const { summariesRoot, getSummaryContent, createFolder } = require('./filesController');
 
 const DATA_ROOT = path.resolve(__dirname, '../../data');
@@ -35,7 +35,7 @@ function _parseInlineHtml(fragment) {
   const runs = [];
   let bold = false, underline = false, italic = false, color = null;
 
-  const HE_LANG = { value: 'he-IL', eastAsia: 'he-IL' };
+  const HE_LANG = { value: 'he-IL', eastAsia: 'he-IL', bidi: 'he-IL' };
 
   const parts = fragment.split(/(<[^>]+>)/);
   for (const part of parts) {
@@ -113,12 +113,7 @@ function _htmlToDocxParagraphs(html) {
 async function buildDocx(_title, htmlContent) {
   const doc = new Document({
     sections: [{
-      properties: {
-        page: {
-          size: { orientation: PageOrientation.LANDSCAPE },
-          textDirection: 'rl',
-        },
-      },
+      properties: {},
       children: _htmlToDocxParagraphs(htmlContent),
     }],
   });

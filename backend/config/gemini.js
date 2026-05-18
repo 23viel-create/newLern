@@ -53,7 +53,7 @@ function getNextKey() {
     const stats = keyStats[key] || { chars: 0, errors: 0 };
     if (stats.errors < 3) return key;
   }
-  return keys[0];
+  return null;
 }
 
 function recordUsage(key, chars) {
