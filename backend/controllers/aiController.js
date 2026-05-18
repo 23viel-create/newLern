@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { getNextKey, recordUsage, recordError, getKeyStatus, getApiKeys, saveApiKeys } = require('../config/gemini');
+const { getNextKey, recordUsage, recordError, recordQuotaExhausted, getKeyStatus, getApiKeys, saveApiKeys } = require('../config/gemini');
 const { MAX_PROMPT_CHARS, MAX_CONTEXT_CHARS, ARTICLES_DIR } = require('../config/limits');
 const { getSettings } = require('./srController');
 
@@ -27,11 +27,24 @@ const SCOPE_REPOSITORY_KODESH = `[הוראת מערכת — מאגר ספרים 
 
 {{BOOKS}}`;
 
-async function _buildScopeGuardrail(scope, strictKodesh) {
+// selectedBooks: array of filenames to restrict RAG to, or null = all books
+async function _buildScopeGuardrail(scope, strictKodesh, selectedBooks) {
   if (scope === 'repository_only' || scope === 'repository_kodesh') {
-    const { getBooksContext } = require('./booksController');
-    const booksText = await getBooksContext(2000);
-    const template  = scope === 'repository_only' ? SCOPE_REPOSITORY_ONLY : SCOPE_REPOSITORY_KODESH;
+    const { getBooksContext, listBooks } = require('./booksController');
+    // Default when no books explicitly selected: use sacred-texts (kodesh) mode
+    const books = listBooks();
+    let effectiveScope = scope;
+    let booksText;
+    if (!selectedBooks || !selectedBooks.length) {
+      if (books.length === 0) {
+        // No books at all — fall back to kodesh guardrail (sacred defaults)
+        return STRICT_KODESH_GUARDRAIL + '\n\n';
+      }
+      booksText = await getBooksContext(2000, null);
+    } else {
+      booksText = await getBooksContext(2000, selectedBooks);
+    }
+    const template = effectiveScope === 'repository_only' ? SCOPE_REPOSITORY_ONLY : SCOPE_REPOSITORY_KODESH;
     return template.replace('{{BOOKS}}', booksText || '(אין ספרים במאגר כרגע)') + '\n\n';
   }
   if (scope !== 'unlimited' && strictKodesh) {
@@ -53,6 +66,12 @@ function _sanitize(text) {
 }
 
 async function _callGemini(prompt) {
+  const status = getKeyStatus();
+  const healthyCount = status.filter(k => k.healthy).length;
+  if (status.length > 0 && healthyCount === 0) {
+    throw new Error('שגיאה: לא נשארו מפתחות API תקינים או פעילים במערכת. אנא הזן מפתח תקין במסך ההגדרות.');
+  }
+
   const key = getNextKey();
   if (!key) throw new Error('אין מפתחות Gemini API מוגדרים — הוסף מפתח בהגדרות');
 
@@ -68,6 +87,15 @@ async function _callGemini(prompt) {
     recordUsage(key, totalChars + (text?.length || 0));
     return text;
   } catch (err) {
+    const msg = err.message || '';
+    if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || /quota/i.test(msg)) {
+      recordQuotaExhausted(key);
+      throw new Error('המכסה במפתח זה הסתיימה. המערכת עוברת אוטומטית למפתח הבא.');
+    }
+    if (msg.includes('503') || msg.includes('SERVICE_UNAVAILABLE') || /overload/i.test(msg)) {
+      recordError(key);
+      throw new Error('השרתים של גוגל עמוסים כרגע באופן זמני, אנא נסה שוב בעוד מספר רגעים.');
+    }
     recordError(key);
     throw new Error(`שגיאת Gemini API: ${err.message}`);
   }
@@ -90,14 +118,15 @@ function _loadArticles() {
 
 // ─── Context-aware ask ────────────────────────────────────────────────────────
 
-async function askContextual({ context, userMessage, extra }) {
+async function askContextual({ context, userMessage, extra, selectedBooks }) {
   const safeMsg = _sanitize(userMessage);
   if (!safeMsg) throw new Error('הודעה ריקה');
 
   const settings     = (() => { try { return getSettings(); } catch { return {}; } })();
   const scope        = settings.aiScopePreference || 'unlimited';
   const strictKodesh = !!settings.strictKodeshMode;
-  const guardrail    = await _buildScopeGuardrail(scope, strictKodesh);
+  const safeBooks    = Array.isArray(selectedBooks) ? selectedBooks.map(b => String(b)).filter(Boolean) : null;
+  const guardrail    = await _buildScopeGuardrail(scope, strictKodesh, safeBooks);
 
   let systemPart = '';
 

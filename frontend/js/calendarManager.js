@@ -152,8 +152,10 @@ const CalendarManager = (() => {
       btn.classList.toggle('cal-disp-btn--active', btn.dataset.pref === _calDisplayPref));
   }
 
-  // Hebrew month navigation: find the last (or first) day of current Hebrew month,
-  // step by ±1 day to land in the adjacent Hebrew month, update currentYear/Month.
+  // Hebrew month navigation: find the boundary of the current Hebrew month,
+  // step ±1 day to land in the adjacent Hebrew month, update currentYear/Month.
+  // Guard: if the step lands back in the same Gregorian month (Hebrew month
+  // extends past the displayed midpoint), advance one additional Gregorian month.
   function _shiftHebMonth(direction) {
     if (!calendarData) {
       currentMonth += direction;
@@ -165,24 +167,37 @@ const CalendarManager = (() => {
     const hebY = mid.hebrewYear;
     const hebM = mid.hebrewMonth;
 
+    const origYear  = currentYear;
+    const origMonth = currentMonth;
+
     if (direction > 0) {
-      // Find last day of this Hebrew month, step forward 1 day
-      const lastHeb = calendarData.days.filter(d => d.hebrewYear === hebY && d.hebrewMonth === hebM);
-      if (lastHeb.length) {
-        const lastDate = new Date(lastHeb[lastHeb.length - 1].date + 'T12:00:00');
+      // Find last visible day of this Hebrew month, step forward 1 day
+      const inMonth = calendarData.days.filter(d => d.hebrewYear === hebY && d.hebrewMonth === hebM);
+      if (inMonth.length) {
+        const lastDate = new Date(inMonth[inMonth.length - 1].date + 'T12:00:00');
         lastDate.setDate(lastDate.getDate() + 1);
         currentYear  = lastDate.getFullYear();
         currentMonth = lastDate.getMonth() + 1;
+        // If still in same Gregorian month, the Hebrew month extends further — advance one more
+        if (currentYear === origYear && currentMonth === origMonth) {
+          currentMonth++;
+          if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+        }
         return;
       }
     } else {
-      // Find first day of this Hebrew month, step back 1 day
-      const firstHeb = calendarData.days.find(d => d.hebrewYear === hebY && d.hebrewMonth === hebM);
-      if (firstHeb) {
-        const firstDate = new Date(firstHeb.date + 'T12:00:00');
+      // Find first visible day of this Hebrew month, step back 1 day
+      const firstEntry = calendarData.days.find(d => d.hebrewYear === hebY && d.hebrewMonth === hebM);
+      if (firstEntry) {
+        const firstDate = new Date(firstEntry.date + 'T12:00:00');
         firstDate.setDate(firstDate.getDate() - 1);
         currentYear  = firstDate.getFullYear();
         currentMonth = firstDate.getMonth() + 1;
+        // If still in same Gregorian month, the Hebrew month starts before midpoint — go one more back
+        if (currentYear === origYear && currentMonth === origMonth) {
+          currentMonth--;
+          if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+        }
         return;
       }
     }

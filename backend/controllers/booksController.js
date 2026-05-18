@@ -4,6 +4,8 @@ const path = require('path');
 
 const BOOKS_DIR = path.resolve(__dirname, '../../data/books');
 
+const SUPPORTED_EXTS = ['.pdf', '.docx', '.pptx'];
+
 function ensureDir() {
   if (!fs.existsSync(BOOKS_DIR)) fs.mkdirSync(BOOKS_DIR, { recursive: true });
 }
@@ -11,7 +13,7 @@ function ensureDir() {
 function listBooks() {
   ensureDir();
   return fs.readdirSync(BOOKS_DIR)
-    .filter(f => f.toLowerCase().endsWith('.pdf'))
+    .filter(f => SUPPORTED_EXTS.includes(path.extname(f).toLowerCase()))
     .map(f => {
       const stat = fs.statSync(path.join(BOOKS_DIR, f));
       return { name: f, size: stat.size, uploadedAt: stat.birthtime.toISOString() };
@@ -21,7 +23,9 @@ function listBooks() {
 
 function deleteBook(name) {
   const safeName = path.basename(name);
-  if (!safeName.toLowerCase().endsWith('.pdf')) throw new Error('שם קובץ לא חוקי');
+  if (!SUPPORTED_EXTS.includes(path.extname(safeName).toLowerCase())) {
+    throw new Error('שם קובץ לא חוקי');
+  }
   const filePath = path.join(BOOKS_DIR, safeName);
   if (!fs.existsSync(filePath)) throw new Error('הספר לא נמצא');
   fs.unlinkSync(filePath);
@@ -29,7 +33,6 @@ function deleteBook(name) {
 
 async function extractPdfText(filePath, maxChars) {
   try {
-    // Use lib path to avoid pdf-parse's debug test runner
     const pdfParse = require('pdf-parse/lib/pdf-parse');
     const buf  = fs.readFileSync(filePath);
     const data = await pdfParse(buf);
@@ -39,17 +42,42 @@ async function extractPdfText(filePath, maxChars) {
   }
 }
 
-async function getBooksContext(maxCharsPerBook = 2500) {
+async function extractOfficeText(filePath, maxChars) {
+  try {
+    const officeParser = require('officeparser');
+    const text = await officeParser.parseOfficeAsync(filePath);
+    return (text || '').slice(0, maxChars);
+  } catch {
+    return '';
+  }
+}
+
+async function extractBookText(filePath, maxChars) {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === '.pdf') return extractPdfText(filePath, maxChars);
+  if (ext === '.docx' || ext === '.pptx') return extractOfficeText(filePath, maxChars);
+  return '';
+}
+
+// selectedBooks: array of filenames to include, or null/empty = all books
+async function getBooksContext(maxCharsPerBook = 2500, selectedBooks = null) {
   ensureDir();
-  const books = listBooks().slice(0, 5); // cap at 5 to keep prompt manageable
+  let books = listBooks();
+
+  if (selectedBooks && selectedBooks.length > 0) {
+    const selected = new Set(selectedBooks);
+    books = books.filter(b => selected.has(b.name));
+  }
+
+  books = books.slice(0, 5); // cap at 5 to keep prompt manageable
   if (!books.length) return '';
 
   const parts = [];
   for (const book of books) {
-    const text = await extractPdfText(path.join(BOOKS_DIR, book.name), maxCharsPerBook);
+    const text = await extractBookText(path.join(BOOKS_DIR, book.name), maxCharsPerBook);
     if (text.trim()) parts.push(`[ספר: ${book.name}]\n${text.trim()}`);
   }
   return parts.join('\n\n---\n\n');
 }
 
-module.exports = { listBooks, deleteBook, getBooksContext, BOOKS_DIR };
+module.exports = { listBooks, deleteBook, getBooksContext, BOOKS_DIR, SUPPORTED_EXTS };

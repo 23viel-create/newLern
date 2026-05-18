@@ -1093,6 +1093,7 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
   border-bottom: 1px solid var(--color-border);
 }
 .book-item:last-child { border-bottom: none; }
-.book-item__icon { font-size: 1.2rem; flex-shrink: 0; }
-.book-item__name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.book-item__select { flex-shrink: 0; width: 1rem; height: 1rem; cursor: pointer; accent-color: var(--color-primary); }
+.book-item__icon { font-size: 1.2rem; flex-shrink: 0; cursor: pointer; }
+.book-item__name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text); }
 .book-item__size { font-size: 0.78rem; color: var(--color-text-muted); white-space: nowrap; }

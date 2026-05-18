@@ -165,8 +165,8 @@ const Api = {
     apiFetch('/summaries/history/restore', { method: 'POST', body: { nodePath, versionIndex } }),
 
   // ── מסייע AI ─────────────────────────────────────────────────────────────
-  aiAsk: (context, userMessage, extra) =>
-    apiFetchPlain('/ai/ask', { method: 'POST', body: { context, userMessage, extra } }),
+  aiAsk: (context, userMessage, extra, selectedBooks) =>
+    apiFetchPlain('/ai/ask', { method: 'POST', body: { context, userMessage, extra, selectedBooks } }),
   aiSuggestQuestions: (summaryContent, summaryTitle, existingQuestions, type) =>
     apiFetchPlain('/ai/suggest-questions', { method: 'POST', body: { summaryContent, summaryTitle, existingQuestions, type } }),
   aiScheduleAdvice: (heavyDays, totalTasks) =>

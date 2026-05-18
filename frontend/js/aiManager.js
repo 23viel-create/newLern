@@ -172,7 +172,8 @@ const AiManager = (() => {
         title: extra?.title || node?.title || node?.path,
         content: extra?.content || document.getElementById('editorContent')?.innerText?.slice(0, 3000) || '',
       };
-      const res = await Api.aiAsk(context, message, fullExtra);
+      const selectedBooks = typeof BooksManager !== 'undefined' ? BooksManager.getSelectedBooks() : [];
+      const res = await Api.aiAsk(context, message, fullExtra, selectedBooks);
       _removeLastSystemMessage();
       _appendMessage('ai', res.answer || 'אין תגובה');
     } catch (err) {
@@ -281,8 +282,21 @@ const AiManager = (() => {
   async function _refreshBattery() {
     try {
       const status = await Api.aiKeyStatus();
+      const healthyCount = Array.isArray(status) ? status.filter(k => k.healthy).length : 0;
       const cnt = el.keyCount();
-      if (cnt) cnt.textContent = Array.isArray(status) ? status.length : 0;
+      if (cnt) cnt.textContent = healthyCount;
+
+      // Block chat when no healthy keys remain
+      const sendBtn = el.sendBtn();
+      const input   = el.chatInput();
+      if (!_offline && Array.isArray(status) && status.length > 0 && healthyCount === 0) {
+        if (sendBtn) sendBtn.disabled = true;
+        if (input)   input.disabled   = true;
+        _appendMessage('error', 'שגיאה: לא נשארו מפתחות API תקינים או פעילים במערכת. אנא הזן מפתח תקין במסך ההגדרות.');
+      } else if (!_offline) {
+        if (sendBtn) sendBtn.disabled = false;
+        if (input)   input.disabled   = false;
+      }
 
       const battery = el.keyBattery();
       if (!battery || !Array.isArray(status)) return;

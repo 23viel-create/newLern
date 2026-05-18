@@ -3,7 +3,7 @@ const express = require('express');
 const multer  = require('multer');
 const path    = require('path');
 const fs      = require('fs');
-const { listBooks, deleteBook, BOOKS_DIR } = require('../controllers/booksController');
+const { listBooks, deleteBook, BOOKS_DIR, SUPPORTED_EXTS } = require('../controllers/booksController');
 
 const router = express.Router();
 
@@ -23,8 +23,8 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   fileFilter: (_req, file, cb) => {
-    if (path.extname(file.originalname).toLowerCase() === '.pdf') cb(null, true);
-    else cb(new Error('רק קבצי PDF מותרים'));
+    if (SUPPORTED_EXTS.includes(path.extname(file.originalname).toLowerCase())) cb(null, true);
+    else cb(new Error('רק קבצי PDF, Word (.docx) ו-PowerPoint (.pptx) מותרים'));
   },
   limits: { fileSize: 50 * 1024 * 1024 },
 });
@@ -40,7 +40,7 @@ router.get('/', (_req, res) => {
 
 // POST /api/books/upload
 router.post('/upload', upload.single('pdf'), (req, res) => {
-  if (!req.file) return res.status(400).json({ success: false, message: 'לא התקבל קובץ PDF' });
+  if (!req.file) return res.status(400).json({ success: false, message: 'לא התקבל קובץ' });
   res.json({ success: true, data: { name: req.file.filename, size: req.file.size } });
 });
 

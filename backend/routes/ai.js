@@ -35,9 +35,9 @@ router.get('/key-status', (_req, res) => {
 // POST /api/ai/ask         — contextual chat
 router.post('/ask', async (req, res) => {
   try {
-    const { context, userMessage, extra } = req.body;
+    const { context, userMessage, extra, selectedBooks } = req.body;
     if (!userMessage) return res.status(400).json({ error: 'userMessage נדרש' });
-    const answer = await ctrl.askContextual({ context: context || 'general', userMessage, extra });
+    const answer = await ctrl.askContextual({ context: context || 'general', userMessage, extra, selectedBooks });
     res.json({ answer });
   } catch (err) {
     res.status(500).json({ error: err.message });

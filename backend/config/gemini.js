@@ -67,6 +67,12 @@ function recordError(key) {
   keyStats[key].errors += 1;
 }
 
+function recordQuotaExhausted(key) {
+  if (!keyStats[key]) keyStats[key] = { chars: 0, errors: 0, lastUsed: 0 };
+  keyStats[key].errors = 99; // mark as permanently exhausted for this session
+  keyStats[key].quotaExhausted = true;
+}
+
 function getKeyStatus() {
   const keys = getApiKeys();
   return keys.map((k, i) => {
@@ -81,4 +87,4 @@ function getKeyStatus() {
   });
 }
 
-module.exports = { getApiKeys, saveApiKeys, getNextKey, recordUsage, recordError, getKeyStatus };
+module.exports = { getApiKeys, saveApiKeys, getNextKey, recordUsage, recordError, recordQuotaExhausted, getKeyStatus };

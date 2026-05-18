@@ -1,4 +1,4 @@
-// ─── מנהל מאגר ספרים (PDF) ───────────────────────────────────────────────────
+// ─── מנהל מאגר ספרים (PDF / Word / PowerPoint) ──────────────────────────────
 const BooksManager = (() => {
   let _bound = false;
 
@@ -10,6 +10,14 @@ const BooksManager = (() => {
       _bound = true;
     }
     await loadBooks();
+  }
+
+  // ─── ספרים שנבחרו לשימוש ב-AI ────────────────────────────────────────────────
+
+  function getSelectedBooks() {
+    return Array.from(
+      document.querySelectorAll('.book-item__select:checked')
+    ).map(cb => cb.dataset.bookName).filter(Boolean);
   }
 
   // ─── אזור גרירה ─────────────────────────────────────────────────────────────
@@ -39,8 +47,9 @@ const BooksManager = (() => {
       dropzone.classList.remove('books-dropzone--over');
       const file = e.dataTransfer.files[0];
       if (!file) return;
-      if (!file.name.toLowerCase().endsWith('.pdf')) {
-        alert('יש לגרור קובץ PDF בלבד');
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (!['pdf', 'docx', 'pptx'].includes(ext)) {
+        alert('יש לגרור קובץ PDF, Word (.docx) או PowerPoint (.pptx) בלבד');
         return;
       }
       _uploadFile(file);
@@ -73,21 +82,32 @@ const BooksManager = (() => {
     try {
       const books = await Api.getBooks();
       if (!books.length) {
-        list.innerHTML = '<p class="placeholder-text">אין ספרים במאגר — העלה קובץ PDF כדי להתחיל</p>';
+        list.innerHTML = '<p class="placeholder-text">אין ספרים במאגר — העלה קובץ PDF, Word או PowerPoint כדי להתחיל</p>';
         return;
       }
-      list.innerHTML = books.map(b => `
+      list.innerHTML = `
+        <p class="hint" style="margin-bottom:0.4rem">סמן ספרים לשימוש כהקשר ל-AI (ריק = כל הספרים)</p>
+        ${books.map(b => `
         <div class="book-item">
-          <span class="book-item__icon" aria-hidden="true">📕</span>
+          <input type="checkbox" class="book-item__select" data-book-name="${escHtml(b.name)}"
+                 id="book_${escHtml(b.name)}" title="בחר ספר זה ל-AI" />
+          <label for="book_${escHtml(b.name)}" class="book-item__icon" aria-hidden="true">${_bookIcon(b.name)}</label>
           <span class="book-item__name">${escHtml(b.name)}</span>
           <span class="book-item__size">${_fmtSize(b.size)}</span>
           <button class="btn btn--xs btn--danger-ghost"
                   onclick="BooksManager.deleteBook('${escHtml(b.name)}')"
                   title="מחק ספר">🗑️</button>
-        </div>`).join('');
+        </div>`).join('')}`;
     } catch (err) {
       list.innerHTML = `<p class="placeholder-text error-text">שגיאה בטעינה: ${escHtml(err.message)}</p>`;
     }
+  }
+
+  function _bookIcon(name) {
+    const ext = name.split('.').pop().toLowerCase();
+    if (ext === 'docx') return '📝';
+    if (ext === 'pptx') return '📊';
+    return '📕';
   }
 
   function _fmtSize(bytes) {
@@ -109,5 +129,5 @@ const BooksManager = (() => {
     }
   }
 
-  return { init, loadBooks, deleteBook };
+  return { init, loadBooks, deleteBook, getSelectedBooks };
 })();

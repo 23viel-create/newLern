@@ -35,9 +35,9 @@
         <!-- לוח שנה (מימין ב-RTL) -->
         <div class="dashboard-calendar card">
           <div class="cal-nav">
-            <button id="calPrevMonth" class="btn btn--ghost btn--sm" title="קודם">❮</button>
+            <button id="calPrevMonth" class="btn btn--ghost btn--sm" title="חודש קודם (עבר)">❯</button>
             <span id="calMonthLabel" class="cal-month-label">טוען...</span>
-            <button id="calNextMonth" class="btn btn--ghost btn--sm" title="הבא">❯</button>
+            <button id="calNextMonth" class="btn btn--ghost btn--sm" title="חודש הבא (עתיד)">❮</button>
             <button id="calTodayBtn"  class="btn btn--secondary btn--sm">היום</button>
           </div>
           <div class="cal-view-tabs">
@@ -234,12 +234,12 @@
       <div class="card books-upload-card">
         <h2>העלאת ספר חדש</h2>
         <div class="books-dropzone" id="booksDropzone" role="button" tabindex="0"
-             aria-label="גרור ושחרר קובץ PDF כאן">
+             aria-label="גרור ושחרר קובץ כאן">
           <span class="books-dropzone__icon" aria-hidden="true">📥</span>
-          <p class="books-dropzone__text">גרור ושחרר קובץ PDF כאן</p>
+          <p class="books-dropzone__text">גרור ושחרר קובץ PDF, Word או PowerPoint כאן</p>
           <p class="hint">או</p>
-          <button class="btn btn--primary" id="booksSelectBtn" type="button">בחר קובץ PDF</button>
-          <input type="file" id="booksFileInput" accept=".pdf" hidden />
+          <button class="btn btn--primary" id="booksSelectBtn" type="button">בחר קובץ</button>
+          <input type="file" id="booksFileInput" accept=".pdf,.docx,.pptx" hidden />
         </div>
         <div id="booksUploadStatus" class="upload-status hidden"></div>
       </div>
