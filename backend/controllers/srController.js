@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS = {
   algorithm: 'powers2',
   customSequence: [1, 7, 30, 90],
   heavyLoadThreshold: 9,
-  strictKodeshMode: false,
+  strictKodeshMode: true,
 };
 
 // ── File I/O ─────────────────────────────────────────────────────────────────

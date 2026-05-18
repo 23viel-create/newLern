@@ -8,7 +8,7 @@
       90
     ],
     "heavyLoadThreshold": 9,
-    "strictKodeshMode": false,
+    "strictKodeshMode": true,
     "calendarDisplayPreference": "combined"
   },
   "tasks": []
