@@ -180,6 +180,10 @@ const Api = {
   aiKeyStatus: () => apiFetchPlain('/ai/key-status', {}),
   aiParseSrProgram: (hebrewText) =>
     apiFetchPlain('/ai/parse-sr-program', { method: 'POST', body: { hebrewText } }),
+  aiSuggestSingleQuestion: (summaryPath, summaryTitle, type) =>
+    apiFetchPlain('/ai/suggest-single-question', { method: 'POST', body: { summaryPath, summaryTitle, type } }),
+  aiGradeAnswer: (question, sampleAnswer, userAnswer, strictness) =>
+    apiFetchPlain('/ai/grade-answer', { method: 'POST', body: { question, sampleAnswer, userAnswer, strictness } }),
 
   // ── מאגר ספרים ───────────────────────────────────────────────────────────
   getBooks:   () => apiFetch('/books'),

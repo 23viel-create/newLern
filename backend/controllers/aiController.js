@@ -277,6 +277,96 @@ async function parseSrProgramFromText(hebrewText) {
   return arr;
 }
 
+// ─── Suggest single question ─────────────────────────────────────────────────
+
+async function suggestSingleQuestion({ summaryPath, summaryTitle, type }) {
+  if (!summaryPath) throw new Error('נתיב הסיכום נדרש');
+
+  let content = '';
+  try {
+    const { getSummaryContent } = require('./filesController');
+    content = getSummaryContent(summaryPath) || '';
+  } catch { /* content stays empty */ }
+
+  const safeTitle   = _sanitize(summaryTitle || summaryPath);
+  const safeContent = _sanitize(content).slice(0, 3000);
+
+  const _parseJson = (raw) => {
+    const s = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+    return JSON.parse(s);
+  };
+
+  if (type === 'mc') {
+    const prompt = `אתה מסייע לימודי. בהינתן סיכום הלמידה הבא, צור שאלת בחירה מרובה אחת עם 4 אפשרויות תשובה.
+החזר JSON בלבד ללא כל טקסט נוסף, בפורמט המדויק:
+{"question":"השאלה כאן","options":["אפשרות 1","אפשרות 2","אפשרות 3","אפשרות 4"],"correct_option_index":0}
+
+כותרת הסיכום: ${safeTitle}
+תוכן הסיכום:
+${safeContent || '(אין תוכן — צור שאלה כללית בנושא)'}`;
+
+    const raw  = await _callGemini(prompt);
+    const json = _parseJson(raw);
+    if (!json.question || !Array.isArray(json.options) || json.options.length < 2) {
+      throw new Error('תשובת ה-AI אינה בפורמט הנכון');
+    }
+    return {
+      question:             json.question,
+      options:              json.options.slice(0, 4),
+      correct_option_index: typeof json.correct_option_index === 'number' ? json.correct_option_index : 0,
+    };
+  } else {
+    const prompt = `אתה מסייע לימודי. בהינתן סיכום הלמידה הבא, צור שאלה פתוחה אחת ותשובה מפורטת לה.
+החזר JSON בלבד ללא כל טקסט נוסף, בפורמט המדויק:
+{"question":"השאלה כאן","answer":"התשובה המפורטת כאן"}
+
+כותרת הסיכום: ${safeTitle}
+תוכן הסיכום:
+${safeContent || '(אין תוכן — צור שאלה כללית בנושא)'}`;
+
+    const raw  = await _callGemini(prompt);
+    const json = _parseJson(raw);
+    if (!json.question) throw new Error('תשובת ה-AI אינה בפורמט הנכון');
+    return { question: json.question, answer: json.answer || '' };
+  }
+}
+
+// ─── Grade open answer ────────────────────────────────────────────────────────
+
+async function gradeAnswer({ question, sampleAnswer, userAnswer, strictness }) {
+  if (!question) throw new Error('שאלה נדרשת');
+  if (!userAnswer || !userAnswer.trim()) throw new Error('יש להזין תשובה לפני הגשה');
+
+  const STRICTNESS_PROMPT = {
+    'קלה':     'הערך בסלחנות. תן ניקוד גבוה גם על הבנה חלקית ועל כל התייחסות ענינית לנושא.',
+    'בינונית': 'הערך בצדק. תן ניקוד גבוה על הבנת הרעיון המרכזי גם אם הניסוח אינו מדויק.',
+    'קפדנית':  'הערך בקפדנות. דרוש דיוק במינוח ובכיסוי מלא של כל חלקי התשובה.',
+  };
+  const strictInstruction = STRICTNESS_PROMPT[strictness] || STRICTNESS_PROMPT['בינונית'];
+
+  const safeQ    = _sanitize(question).slice(0, 500);
+  const safeSamp = _sanitize(sampleAnswer || '').slice(0, 1000);
+  const safeUser = _sanitize(userAnswer).slice(0, 1000);
+
+  const prompt = `אתה בוחן לימודי. הערך את תשובת המשתמש ביחס לשאלה ולתשובה המצופה.
+${strictInstruction}
+
+שאלה: ${safeQ}
+תשובה מצופה: ${safeSamp || '(לא סופקה תשובה מודגמת — הערך לפי הגיון הנושא)'}
+תשובת המשתמש: ${safeUser}
+
+החזר JSON בלבד ללא כל טקסט נוסף, בפורמט המדויק:
+{"score":75,"critique":"ביקורת קצרה בעברית עד 2 משפטים"}
+
+score הוא מספר שלם בין 0 ל-100.`;
+
+  const raw  = await _callGemini(prompt);
+  const s    = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  const json = JSON.parse(s);
+  const score = Math.max(0, Math.min(100, Math.round(Number(json.score) || 0)));
+  return { score, critique: json.critique || '' };
+}
+
 // ─── Keys management ─────────────────────────────────────────────────────────
 
 function getKeys() {
@@ -290,6 +380,8 @@ function updateKeys(keys) {
 module.exports = {
   askContextual,
   suggestQuestions,
+  suggestSingleQuestion,
+  gradeAnswer,
   getScheduleAdvice,
   chatWithArticles,
   generateLearningProgram,

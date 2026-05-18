@@ -81,13 +81,9 @@ const CalendarManager = (() => {
         currentYear  = d.getFullYear();
         currentMonth = d.getMonth() + 1;
       } else {
-        // monthly — navigate by Hebrew month when in Hebrew mode
-        if (_calDisplayPref === 'hebrew') {
-          _shiftHebMonth(-1);
-        } else {
-          currentMonth--;
-          if (currentMonth < 1) { currentMonth = 12; currentYear--; }
-        }
+        // RIGHT arrow (❯, calPrevMonth) = go to past = decrement one Gregorian month
+        currentMonth--;
+        if (currentMonth < 1) { currentMonth = 12; currentYear--; }
       }
       loadCalendar();
     });
@@ -106,12 +102,9 @@ const CalendarManager = (() => {
         currentYear  = d.getFullYear();
         currentMonth = d.getMonth() + 1;
       } else {
-        if (_calDisplayPref === 'hebrew') {
-          _shiftHebMonth(+1);
-        } else {
-          currentMonth++;
-          if (currentMonth > 12) { currentMonth = 1; currentYear++; }
-        }
+        // LEFT arrow (❮, calNextMonth) = go to future = increment one Gregorian month
+        currentMonth++;
+        if (currentMonth > 12) { currentMonth = 1; currentYear++; }
       }
       loadCalendar();
     });
@@ -313,12 +306,34 @@ const CalendarManager = (() => {
     const label = document.getElementById('calMonthLabel');
     if (!label) return;
 
-    const midDay   = calendarData?.days?.find(d => d.hebrewDay === 15) || calendarData?.days?.[14];
-    const hebMonth = midDay ? HEBREW_MONTH_NAMES[midDay.hebrewMonth] : null;
-    const hebYear  = midDay ? _toGematria(midDay.hebrewYear) : null;
-
+    const days = calendarData?.days || [];
     const gregLabel = `${MONTH_NAMES_GREG[currentMonth]} ${currentYear}`;
-    const hebLabel  = hebMonth ? `${hebMonth} ${hebYear}` : '';
+
+    // Collect unique Hebrew months across all days of this Gregorian month
+    const hebMonthsSeen = [];
+    const seenKeys = new Set();
+    for (const d of days) {
+      const key = `${d.hebrewYear}:${d.hebrewMonth}`;
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        hebMonthsSeen.push({ month: d.hebrewMonth, year: d.hebrewYear });
+      }
+    }
+
+    let hebLabel = '';
+    if (hebMonthsSeen.length >= 2) {
+      // Two Hebrew months span this Gregorian month — concatenate names
+      const first  = hebMonthsSeen[0];
+      const second = hebMonthsSeen[hebMonthsSeen.length - 1];
+      const firstName  = HEBREW_MONTH_NAMES[first.month]  || `חודש ${first.month}`;
+      const secondName = HEBREW_MONTH_NAMES[second.month] || `חודש ${second.month}`;
+      // Use the year of the predominant (later) month
+      const hebYear = _toGematria(second.year);
+      hebLabel = `${firstName} - ${secondName} ${hebYear}`;
+    } else if (hebMonthsSeen.length === 1) {
+      const m = hebMonthsSeen[0];
+      hebLabel = `${HEBREW_MONTH_NAMES[m.month] || `חודש ${m.month}`} ${_toGematria(m.year)}`;
+    }
 
     if (_calDisplayPref === 'gregorian') {
       label.innerHTML = `${gregLabel}` +
@@ -377,20 +392,32 @@ const CalendarManager = (() => {
       (day.isShabbat || day.isHoliday) ? 'cal-cell--blocked' : '',
     ].filter(Boolean).join(' ');
 
-    const gregDay = Number(day.date.split('-')[2]);
-    const badge   = day.totalTasks > 0 ? `<span class="cal-badge">${day.totalTasks}</span>` : '';
+    const gregDay     = Number(day.date.split('-')[2]);
+    const badge       = day.totalTasks > 0 ? `<span class="cal-badge">${day.totalTasks}</span>` : '';
+    const isRoshChodesh    = day.hebrewDay === 1;        // first of Hebrew month
+    const isGregMonthStart = gregDay === 1;              // first of Gregorian month
+
+    const hebDayStr = HEB_NUMS[day.hebrewDay] || String(day.hebrewDay);
 
     if (hebPrimary || _calDisplayPref === 'hebrew') {
+      // Hebrew-primary: bold Gregorian "1" on start of Gregorian month
+      const gregSpan = isGregMonthStart
+        ? `<strong class="cal-cell__greg cal-cell__greg--sub cal-cell__greg--monthstart">1</strong>`
+        : `<span class="cal-cell__greg cal-cell__greg--sub">${gregDay}</span>`;
       return `<div class="${classes}" data-date="${day.date}">
         ${badge}
-        <span class="cal-cell__heb cal-cell__heb--primary">${HEB_NUMS[day.hebrewDay] || day.hebrewDay}</span>
-        <span class="cal-cell__greg cal-cell__greg--sub">${gregDay}</span>
+        <span class="cal-cell__heb cal-cell__heb--primary">${hebDayStr}</span>
+        ${gregSpan}
       </div>`;
     }
+    // Gregorian-primary: bold "א׳" on Rosh Chodesh
+    const hebSpan = isRoshChodesh
+      ? `<strong class="cal-cell__heb cal-cell__heb--rosh-chodesh">א׳</strong>`
+      : `<span class="cal-cell__heb">${hebDayStr}</span>`;
     return `<div class="${classes}" data-date="${day.date}">
       ${badge}
       <span class="cal-cell__greg">${gregDay}</span>
-      <span class="cal-cell__heb">${HEB_NUMS[day.hebrewDay] || day.hebrewDay}</span>
+      ${hebSpan}
     </div>`;
   }
 

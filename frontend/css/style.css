@@ -1097,3 +1097,74 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
 .book-item__icon { font-size: 1.2rem; flex-shrink: 0; cursor: pointer; }
 .book-item__name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text); }
 .book-item__size { font-size: 0.78rem; color: var(--color-text-muted); white-space: nowrap; }
+
+/* ══════════════════ Quiz — Phase 11 additions ══════════════════ */
+
+/* AI suggest button in question editor */
+.qf-ai-suggest-btn { font-size: 0.78rem; }
+.qf-ai-status {
+  margin-top: 0.4rem; padding: 0.3rem 0.6rem;
+  background: #fefce8; color: #713f12;
+  border-radius: var(--radius); font-size: 0.82rem;
+}
+
+/* AI grading: submit row */
+.quiz-ai-submit-row {
+  display: flex; align-items: center; gap: 0.5rem; margin-top: 0.4rem;
+}
+.quiz-ai-submit-hint { font-size: 0.75rem; color: var(--color-text-muted); }
+.quiz-ai-loading {
+  margin-top: 0.35rem; font-size: 0.82rem; font-style: italic;
+  color: var(--color-text-muted);
+}
+
+/* AI grading: feedback block */
+.quiz-ai-feedback {
+  display: flex; align-items: flex-start; gap: 0.75rem;
+  padding: 0.6rem 0.75rem; border-radius: var(--radius);
+  background: #eff6ff; border: 1px solid #bfdbfe; margin: 0.5rem 0;
+}
+.quiz-ai-score {
+  font-size: 1.1rem; font-weight: 700; flex-shrink: 0;
+  min-width: 3.5rem; text-align: center;
+  padding: 0.2rem 0.4rem; border-radius: var(--radius);
+}
+.quiz-ai-score--good    { background: #dcfce7; color: #166534; }
+.quiz-ai-score--ok      { background: #fef9c3; color: #713f12; }
+.quiz-ai-score--bad     { background: #fee2e2; color: #991b1b; }
+.quiz-ai-critique       { font-size: 0.85rem; line-height: 1.5; color: var(--color-text); }
+
+/* User answer display in results */
+.quiz-user-answer-display {
+  padding: 0.4rem 0.6rem; background: var(--color-hover);
+  border-radius: var(--radius); margin-top: 0.4rem; margin-bottom: 0.4rem;
+}
+.quiz-user-answer-label { font-size: 0.72rem; font-weight: 600; color: var(--color-text-muted); margin-bottom: 0.2rem; }
+.quiz-user-answer-text  { font-size: 0.85rem; color: var(--color-text); white-space: pre-wrap; }
+
+/* Results breakdown — open question rows */
+.quiz-result-row--open   { flex-direction: column; align-items: flex-start; gap: 0.2rem; }
+.quiz-result-top         { display: flex; align-items: flex-start; gap: 0.5rem; width: 100%; }
+.quiz-result-user-answer {
+  padding: 0.25rem 0.5rem; background: var(--color-hover);
+  border-radius: var(--radius); font-size: 0.8rem; width: 100%;
+}
+.quiz-result-user-label { font-weight: 600; color: var(--color-text-muted); margin-left: 0.3rem; }
+.quiz-result-user-text  { color: var(--color-text); white-space: pre-wrap; }
+.res-icon--partial      { color: #b45309; font-weight: 700; }
+
+/* AI grade strictness selector in quiz config */
+.ai-grade-strictness { margin-top: 0.3rem; }
+
+/* ══════════════════ Calendar — Phase 11 indicators ══════════════════ */
+
+/* Rosh Chodesh — Hebrew month start on Gregorian-primary grid */
+.cal-cell__heb--rosh-chodesh {
+  font-weight: 800; color: var(--color-primary);
+  font-size: 0.68rem; display: block;
+}
+
+/* Gregorian month start on Hebrew-primary grid */
+.cal-cell__greg--monthstart {
+  font-weight: 800; color: var(--color-primary);
+}

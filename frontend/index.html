@@ -708,6 +708,24 @@
           </div>
         </div>
 
+        <div class="form-group">
+          <label class="form-label">בדיקה חכמה:</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="checkbox" id="quizAiGrade" />
+              בדיקה באמצעות עוזר AI
+            </label>
+          </div>
+          <div class="ai-grade-strictness" id="quizStrictnessRow" style="margin-top:0.4rem;display:none">
+            <label class="form-label" for="quizStrictness">רמת קפדנות הבדיקה:</label>
+            <select id="quizStrictness" class="select-field select-field--sm" style="margin-top:0.2rem">
+              <option value="קלה">קלה — סלחנית</option>
+              <option value="בינונית" selected>בינונית</option>
+              <option value="קפדנית">קפדנית — מדויקת</option>
+            </select>
+          </div>
+        </div>
+
         <div class="modal__actions">
           <button id="quizCancelBtn" class="btn btn--secondary">ביטול</button>
           <button id="quizStartBtn"  class="btn btn--primary">התחל בחינה ▶</button>

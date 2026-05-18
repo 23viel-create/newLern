@@ -101,4 +101,27 @@ router.post('/parse-sr-program', async (req, res) => {
   }
 });
 
+// POST /api/ai/suggest-single-question  { summaryPath, summaryTitle, type }
+router.post('/suggest-single-question', async (req, res) => {
+  try {
+    const { summaryPath, summaryTitle, type } = req.body;
+    if (!summaryPath) return res.status(400).json({ error: 'summaryPath נדרש' });
+    const result = await ctrl.suggestSingleQuestion({ summaryPath, summaryTitle, type: type || 'open' });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/ai/grade-answer  { question, sampleAnswer, userAnswer, strictness }
+router.post('/grade-answer', async (req, res) => {
+  try {
+    const { question, sampleAnswer, userAnswer, strictness } = req.body;
+    const result = await ctrl.gradeAnswer({ question, sampleAnswer, userAnswer, strictness });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

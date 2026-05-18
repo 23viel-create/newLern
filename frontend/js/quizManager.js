@@ -12,7 +12,7 @@ const QuizManager = (() => {
   // ─── Quiz state ───────────────────────────────────────────────────────────
   let _quizQs      = [];    // shuffled bundle from server
   let _answers     = [];    // per-question answer tracking
-  let _config      = { layout: 'one', feedback: 'instant' };
+  let _config      = { layout: 'one', feedback: 'instant', aiGrade: false, strictness: 'בינונית' };
   let _curIdx      = 0;
   let _quizTitle   = '';
   let _revealed    = new Set();  // indices whose open answer has been shown
@@ -26,6 +26,16 @@ const QuizManager = (() => {
   }
 
   function _pct(v) { return v == null ? '—' : Math.round(v * 100) + '%'; }
+
+  // Save any typed open-answer textarea to _answers before re-render
+  function _captureOpenAnswers() {
+    document.querySelectorAll('.quiz-open-textarea[data-idx]').forEach(ta => {
+      const idx = parseInt(ta.dataset.idx, 10);
+      if (!isNaN(idx) && _answers[idx]) {
+        _answers[idx].userText = ta.value;
+      }
+    });
+  }
 
   // ═══════════════════════════════════════════════════════════════════════════
   //  QUESTION EDITOR
@@ -144,10 +154,13 @@ const QuizManager = (() => {
         </div>
         <div class="form-row-actions">
           <button id="qfSaveBtn" class="btn btn--primary">שמור שאלה</button>
+          <button id="qfAiSuggestBtn" class="btn btn--ghost btn--sm qf-ai-suggest-btn">🪄 הצעה לשאלה מה-AI</button>
           <button id="qfCancelBtn" class="btn btn--secondary">ביטול</button>
-        </div>`;
+        </div>
+        <div id="qfAiStatus" class="qf-ai-status hidden"></div>`;
       document.getElementById('qfSaveBtn').onclick   = _saveOpenQ;
       document.getElementById('qfCancelBtn').onclick = _hideForm;
+      document.getElementById('qfAiSuggestBtn').onclick = () => _aiSuggestQuestion('open');
       document.getElementById('qfOpenQ').focus();
 
     } else {
@@ -177,14 +190,49 @@ const QuizManager = (() => {
         </div>
         <div class="form-row-actions">
           <button id="qfSaveBtn" class="btn btn--primary">שמור שאלה</button>
+          <button id="qfAiSuggestBtn" class="btn btn--ghost btn--sm qf-ai-suggest-btn">🪄 הצעה לשאלה מה-AI</button>
           <button id="qfCancelBtn" class="btn btn--secondary">ביטול</button>
-        </div>`;
+        </div>
+        <div id="qfAiStatus" class="qf-ai-status hidden"></div>`;
       document.getElementById('qfSaveBtn').onclick   = _saveMcQ;
       document.getElementById('qfCancelBtn').onclick = _hideForm;
+      document.getElementById('qfAiSuggestBtn').onclick = () => _aiSuggestQuestion('mc');
       document.getElementById('qfMcQ').focus();
     }
 
     formEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  async function _aiSuggestQuestion(type) {
+    const btn    = document.getElementById('qfAiSuggestBtn');
+    const status = document.getElementById('qfAiStatus');
+    if (!btn || !status) return;
+    btn.disabled = true;
+    status.textContent = '⏳ ה-AI מייצר שאלה...';
+    status.classList.remove('hidden');
+
+    try {
+      const result = await Api.aiSuggestSingleQuestion(_edPath, _edTitle, type);
+      if (type === 'open') {
+        document.getElementById('qfOpenQ').value = result.question || '';
+        document.getElementById('qfOpenA').value = result.answer  || '';
+      } else {
+        document.getElementById('qfMcQ').value = result.question || '';
+        const opts = result.options || [];
+        for (let i = 0; i < 4; i++) {
+          const el = document.getElementById(`qfOpt${i}`);
+          if (el) el.value = opts[i] || '';
+        }
+        const correctIdx = typeof result.correct_option_index === 'number' ? result.correct_option_index : 0;
+        const radio = document.querySelector(`input[name="qfCorrect"][value="${correctIdx}"]`);
+        if (radio) radio.checked = true;
+      }
+      status.textContent = '✓ הוצאה שאלה מה-AI — ערוך לפי הצורך ולחץ שמור';
+    } catch (err) {
+      status.textContent = `שגיאה: ${err.message}`;
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   function _hideForm() {
@@ -271,6 +319,10 @@ const QuizManager = (() => {
       id: q.id, qtype: q.qtype, summaryPath: q.summaryPath,
       score: null, answered: false,
       selectedOption: null, selfAssess: null,
+      userText: '',          // retained user-typed answer text
+      aiGraded: false,       // has AI graded this answer
+      aiScore: null,         // AI score 0-100
+      aiCritique: '',        // AI critique text
     }));
     _curIdx   = 0;
     _revealed = new Set();
@@ -292,15 +344,28 @@ const QuizManager = (() => {
     document.getElementById('quizConfigInfo').innerHTML =
       `<strong>${total}</strong> שאלות: ${mcs} בחירה מרובה + ${opens} פתוחות`;
 
+    // Show/hide strictness row when AI grade checkbox toggles
+    const aiGradeEl = document.getElementById('quizAiGrade');
+    const strictRow = document.getElementById('quizStrictnessRow');
+    if (aiGradeEl && strictRow) {
+      aiGradeEl.onchange = () => {
+        strictRow.style.display = aiGradeEl.checked ? '' : 'none';
+      };
+    }
+
     document.getElementById('quizStartBtn').onclick = _startTest;
     document.getElementById('quizCancelBtn').onclick = _closeQuiz;
     modal.querySelector('.modal__overlay').onclick = _closeQuiz;
   }
 
   function _startTest() {
+    const aiGradeEl  = document.getElementById('quizAiGrade');
+    const strictEl   = document.getElementById('quizStrictness');
     _config = {
-      layout:   document.querySelector('input[name="quizLayout"]:checked')?.value   || 'one',
-      feedback: document.querySelector('input[name="quizFeedback"]:checked')?.value || 'instant',
+      layout:    document.querySelector('input[name="quizLayout"]:checked')?.value   || 'one',
+      feedback:  document.querySelector('input[name="quizFeedback"]:checked')?.value || 'instant',
+      aiGrade:   aiGradeEl?.checked || false,
+      strictness: strictEl?.value || 'בינונית',
     };
     _curIdx   = 0;
     _revealed = new Set();
@@ -318,6 +383,8 @@ const QuizManager = (() => {
   // ─── One-at-a-time mode ──────────────────────────────────────────────────
 
   function _renderOneQuestion() {
+    _captureOpenAnswers(); // save any typed text before rebuilding
+
     const total   = _quizQs.length;
     const pct     = Math.round((_curIdx / total) * 100);
     document.getElementById('quizProgressFill').style.width  = pct + '%';
@@ -336,9 +403,9 @@ const QuizManager = (() => {
     nextBtn.classList.toggle('hidden', isLast);
     finishBtn.classList.toggle('hidden', !isLast);
 
-    prevBtn.onclick   = () => { _curIdx--; _renderOneQuestion(); };
-    nextBtn.onclick   = () => { _curIdx++; _renderOneQuestion(); };
-    finishBtn.onclick = _finishQuiz;
+    prevBtn.onclick   = () => { _captureOpenAnswers(); _curIdx--; _renderOneQuestion(); };
+    nextBtn.onclick   = () => { _captureOpenAnswers(); _curIdx++; _renderOneQuestion(); };
+    finishBtn.onclick = () => { _captureOpenAnswers(); _finishQuiz(); };
   }
 
   // ─── All-at-once mode ────────────────────────────────────────────────────
@@ -355,7 +422,7 @@ const QuizManager = (() => {
     document.getElementById('quizPrevBtn').classList.add('hidden');
     document.getElementById('quizNextBtn').classList.add('hidden');
     document.getElementById('quizFinishBtn').classList.remove('hidden');
-    document.getElementById('quizFinishBtn').onclick = _finishQuiz;
+    document.getElementById('quizFinishBtn').onclick = () => { _captureOpenAnswers(); _finishQuiz(); };
   }
 
   // ─── Card builder ────────────────────────────────────────────────────────
@@ -401,9 +468,50 @@ const QuizManager = (() => {
   }
 
   function _buildOpenCard(idx, q, ans, typeLabel, srcLabel) {
-    const revealed  = _revealed.has(idx);
-    const scored    = ans.selfAssess != null;
+    const revealed = _revealed.has(idx);
+    const scored   = ans.selfAssess != null || ans.aiGraded;
 
+    if (_config.aiGrade) {
+      // ── AI grading mode ──────────────────────────────────────────────────
+      if (ans.aiGraded) {
+        // Show AI evaluation result
+        const scoreClass = ans.aiScore >= 80 ? 'quiz-ai-score--good' : ans.aiScore >= 50 ? 'quiz-ai-score--ok' : 'quiz-ai-score--bad';
+        return `<div class="quiz-card" data-idx="${idx}">
+          <div class="quiz-card__header"><span class="quiz-type-badge quiz-type-badge--open">${typeLabel}</span>${srcLabel}</div>
+          <p class="quiz-card__question">${_esc(q.question)}</p>
+          <div class="quiz-user-answer-display">
+            <div class="quiz-user-answer-label">תשובתך:</div>
+            <div class="quiz-user-answer-text">${_esc(ans.userText || '(לא הוזנה תשובה)')}</div>
+          </div>
+          <div class="quiz-ai-feedback">
+            <div class="quiz-ai-score ${scoreClass}">${ans.aiScore}/100</div>
+            <div class="quiz-ai-critique">${_esc(ans.aiCritique)}</div>
+          </div>
+          <div class="quiz-answer-block">
+            <div class="quiz-answer-label">תשובה נכונה / הנחיות:</div>
+            <div class="quiz-answer-text">${_esc(q.answer || '(לא הוגדרה תשובה)')}</div>
+          </div>
+        </div>`;
+      }
+      // Waiting for submission
+      return `<div class="quiz-card" data-idx="${idx}">
+        <div class="quiz-card__header"><span class="quiz-type-badge quiz-type-badge--open">${typeLabel}</span>${srcLabel}</div>
+        <p class="quiz-card__question">${_esc(q.question)}</p>
+        <div class="form-group" style="margin-top:0.5rem">
+          <label class="form-label">תשובתך:</label>
+          <textarea class="input-field input-field--full quiz-open-textarea" rows="4"
+            placeholder="כתוב את תשובתך כאן..." data-idx="${idx}"
+            dir="rtl">${_esc(ans.userText || '')}</textarea>
+        </div>
+        <div class="quiz-ai-submit-row">
+          <button class="btn btn--primary btn--sm quiz-ai-submit-btn" data-idx="${idx}">הגש תשובה ⚡</button>
+          <span class="quiz-ai-submit-hint hint">ה-AI יבדוק ויציין את תשובתך</span>
+        </div>
+        <div id="quizAiLoading_${idx}" class="quiz-ai-loading hidden">⏳ ה-AI בודק את תשובתך...</div>
+      </div>`;
+    }
+
+    // ── Manual grading mode ───────────────────────────────────────────────
     const answerBlock = revealed ? `
       <div class="quiz-answer-block">
         <div class="quiz-answer-label">תשובה נכונה / הנחיות:</div>
@@ -425,7 +533,8 @@ const QuizManager = (() => {
       <p class="quiz-card__question">${_esc(q.question)}</p>
       <textarea class="input-field input-field--full quiz-open-textarea" rows="3"
         placeholder="כתוב את תשובתך כאן (אופציונלי)..." data-idx="${idx}"
-        ${scored ? 'disabled' : ''}></textarea>
+        dir="rtl"
+        ${scored ? 'disabled' : ''}>${_esc(ans.userText || '')}</textarea>
       ${!revealed ? `<button class="btn btn--secondary btn--sm quiz-reveal-btn" data-idx="${idx}">הצג תשובה נכונה 👁</button>` : ''}
       ${answerBlock}
     </div>`;
@@ -446,11 +555,25 @@ const QuizManager = (() => {
       btn.onclick = () => _recordMcAnswer(idx, parseInt(btn.dataset.opt, 10));
     });
 
-    // Open: reveal button
+    // Open: live save to state
+    const textarea = container.querySelector(`.quiz-open-textarea[data-idx="${idx}"]`);
+    if (textarea) {
+      textarea.addEventListener('input', () => {
+        if (_answers[idx]) _answers[idx].userText = textarea.value;
+      });
+    }
+
+    // Open: AI submit button
+    const aiSubmitBtn = container.querySelector(`.quiz-ai-submit-btn[data-idx="${idx}"]`);
+    if (aiSubmitBtn) {
+      aiSubmitBtn.onclick = () => _submitAiAnswer(idx);
+    }
+
+    // Open: reveal button (manual mode)
     const revealBtn = container.querySelector(`.quiz-reveal-btn[data-idx="${idx}"]`);
     if (revealBtn) revealBtn.onclick = () => _revealAnswer(idx);
 
-    // Open: self-assess buttons
+    // Open: self-assess buttons (manual mode)
     container.querySelectorAll(`.quiz-assess-btn[data-idx="${idx}"]`).forEach(btn => {
       btn.onclick = () => _recordOpenScore(idx, parseFloat(btn.dataset.score));
     });
@@ -467,7 +590,6 @@ const QuizManager = (() => {
     if (_config.layout === 'one') {
       _renderOneQuestion();
     } else {
-      // Refresh just this card
       const container = document.getElementById('quizQuestionContainer');
       const old = container.querySelector(`.quiz-card[data-idx="${idx}"]`);
       if (old) {
@@ -480,7 +602,55 @@ const QuizManager = (() => {
     }
   }
 
+  async function _submitAiAnswer(idx) {
+    _captureOpenAnswers();
+    const q   = _quizQs[idx];
+    const ans = _answers[idx];
+    const userText = ans.userText || '';
+
+    const btn     = document.querySelector(`.quiz-ai-submit-btn[data-idx="${idx}"]`);
+    const loading = document.getElementById(`quizAiLoading_${idx}`);
+
+    if (btn) btn.disabled = true;
+    if (loading) loading.classList.remove('hidden');
+
+    try {
+      const result = await Api.aiGradeAnswer(
+        q.question,
+        q.answer || '',
+        userText,
+        _config.strictness
+      );
+      ans.aiScore    = result.score;
+      ans.aiCritique = result.critique || '';
+      ans.aiGraded   = true;
+      ans.answered   = true;
+      // Normalize to 0-1 scale
+      ans.score      = result.score / 100;
+    } catch (err) {
+      if (loading) loading.classList.add('hidden');
+      if (btn) btn.disabled = false;
+      alert(`שגיאה בבדיקת ה-AI: ${err.message}`);
+      return;
+    }
+
+    if (_config.layout === 'one') {
+      _renderOneQuestion();
+    } else {
+      const container = document.getElementById('quizQuestionContainer');
+      const old = container.querySelector(`.quiz-card[data-idx="${idx}"]`);
+      if (old) {
+        old.outerHTML = _buildOpenCard(idx, q, ans,
+          'שאלה פתוחה',
+          q.summaryTitle ? `<span class="quiz-q-src">${_esc(q.summaryTitle)}</span>` : '');
+        _attachCardEvents(idx, container);
+      }
+      _updateAllProgress();
+    }
+  }
+
   function _revealAnswer(idx) {
+    _captureOpenAnswers();
     _revealed.add(idx);
     const q   = _quizQs[idx];
     const ans = _answers[idx];
@@ -499,10 +669,10 @@ const QuizManager = (() => {
   }
 
   function _recordOpenScore(idx, score) {
-    const ans        = _answers[idx];
-    ans.score        = score;
-    ans.selfAssess   = score;
-    ans.answered     = true;
+    const ans      = _answers[idx];
+    ans.score      = score;
+    ans.selfAssess = score;
+    ans.answered   = true;
 
     if (_config.layout === 'one') {
       _renderOneQuestion();
@@ -521,9 +691,9 @@ const QuizManager = (() => {
   }
 
   function _updateAllProgress() {
-    const done = _answers.filter(a => a.answered).length;
+    const done  = _answers.filter(a => a.answered).length;
     const total = _quizQs.length;
-    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
     document.getElementById('quizProgressFill').style.width  = pct + '%';
     document.getElementById('quizProgressLabel').textContent = `${done} מתוך ${total} נענו`;
   }
@@ -555,6 +725,7 @@ const QuizManager = (() => {
       <div class="quiz-score-stats">
         <p>ענית על <strong>${answered.length}</strong> מתוך <strong>${total}</strong> שאלות</p>
         <p>ניקוד: <strong>${sumScore.toFixed(1)}</strong> מתוך ${total}</p>
+        ${_config.aiGrade ? '<p class="hint">הניקוד מבוסס על הערכת ה-AI</p>' : ''}
         ${finalPct < 70 ? '<p class="quiz-sr-note">⚠ ציון נמוך — מועד החזרה הבא קוצר אוטומטית</p>' : ''}
       </div>`;
 
@@ -563,7 +734,8 @@ const QuizManager = (() => {
     listEl.innerHTML = `<h4 class="quiz-results-heading">פירוט תשובות</h4>` +
       _quizQs.map((q, i) => {
         const ans = _answers[i];
-        let icon, detail;
+        let icon, detail, userAnswerHtml = '';
+
         if (!ans.answered) {
           icon   = '<span class="res-icon res-icon--skip">—</span>';
           detail = 'לא נענתה';
@@ -571,14 +743,31 @@ const QuizManager = (() => {
           const ok = ans.score === 1;
           icon   = ok ? '<span class="res-icon res-icon--ok">✓</span>' : '<span class="res-icon res-icon--bad">✗</span>';
           detail = ok ? 'נכון' : `לא נכון — נכון: ${_esc(q.options?.[q.correct_option_index] ?? '')}`;
+        } else if (ans.aiGraded) {
+          const sc = ans.aiScore ?? 0;
+          const cls = sc >= 80 ? 'res-icon--ok' : sc >= 50 ? 'res-icon--partial' : 'res-icon--bad';
+          icon   = `<span class="res-icon ${cls}">${sc}/100</span>`;
+          detail = ans.aiCritique ? _esc(ans.aiCritique) : '';
         } else {
           icon   = `<span class="res-icon">${_selfResultLabel(ans.selfAssess)}</span>`;
           detail = '';
         }
-        return `<div class="quiz-result-row">
-          ${icon}
-          <span class="quiz-result-q">${_esc(q.question.slice(0, 80))}${q.question.length > 80 ? '…' : ''}</span>
-          <span class="quiz-result-d">${detail}</span>
+
+        // Show user's typed answer for open questions
+        if (q.qtype === 'open' && ans.userText) {
+          userAnswerHtml = `<div class="quiz-result-user-answer">
+            <span class="quiz-result-user-label">תשובתך:</span>
+            <span class="quiz-result-user-text">${_esc(ans.userText)}</span>
+          </div>`;
+        }
+
+        return `<div class="quiz-result-row ${q.qtype === 'open' ? 'quiz-result-row--open' : ''}">
+          <div class="quiz-result-top">
+            ${icon}
+            <span class="quiz-result-q">${_esc(q.question.slice(0, 80))}${q.question.length > 80 ? '…' : ''}</span>
+          </div>
+          ${userAnswerHtml}
+          ${detail ? `<span class="quiz-result-d">${detail}</span>` : ''}
         </div>`;
       }).join('');
 
@@ -589,7 +778,7 @@ const QuizManager = (() => {
       await Api.submitQuizResult(
         null,
         finalPct / 100,
-        _answers.map((a, i) => ({
+        _answers.map((a) => ({
           id: a.id, qtype: a.qtype, summaryPath: a.summaryPath, score: a.score ?? 0
         }))
       );
