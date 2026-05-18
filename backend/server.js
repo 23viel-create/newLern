@@ -1,3 +1,6 @@
+// Bypass corporate/kosher TLS filters (Rimon, NetSpark) for local Gemini API calls
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -6,8 +9,9 @@ const path = require('path');
 const summariesRouter = require('./routes/summaries');
 const quizzesRouter = require('./routes/quizzes');
 const scheduleRouter = require('./routes/schedule');
-const aiRouter     = require('./routes/ai');
-const backupRouter = require('./routes/backup');
+const aiRouter      = require('./routes/ai');
+const backupRouter  = require('./routes/backup');
+const booksRouter   = require('./routes/books');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,8 +25,9 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 app.use('/api/summaries', summariesRouter);
 app.use('/api/quizzes', quizzesRouter);
 app.use('/api/schedule', scheduleRouter);
-app.use('/api/ai',     aiRouter);
-app.use('/api/backup', backupRouter);
+app.use('/api/ai',      aiRouter);
+app.use('/api/backup',  backupRouter);
+app.use('/api/books',   booksRouter);
 
 // בדיקת תקינות השרת
 app.get('/api/health', (_req, res) => {

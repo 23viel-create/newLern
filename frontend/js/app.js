@@ -19,8 +19,9 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.classList.remove('editor-open');
       WindowManager.showView(view);
       if (view === 'summaries') SummariesManager.init();
+      if (view === 'books')     BooksManager.init();
       if (view === 'dashboard') { CalendarManager.loadCalendar(); AiManager.setContext('calendar'); }
-      if (view === 'settings')  { loadSrSettings(); loadPrograms(); AiManager.refreshBattery(); BackupManager.loadBackupList(); }
+      if (view === 'settings')  { loadSrSettings(); loadAiScope(); loadPrograms(); AiManager.refreshBattery(); BackupManager.loadBackupList(); }
       if (view === 'help')      { /* static — no init needed */ }
     });
   });
@@ -42,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
   WindowManager.showView('dashboard');
   CalendarManager.init();
   _bindSrSettings();
+  _bindAiScope();
   _bindProgramsPanel();
 });
 
@@ -101,6 +103,30 @@ async function loadSrSettings() {
     }
     const toggleEl = document.getElementById('strictKodeshToggle');
     if (toggleEl) toggleEl.checked = !!s.strictKodeshMode;
+  } catch { /* fail silently */ }
+}
+
+// ─── היקף ידע AI ─────────────────────────────────────────────────────────────
+
+function _bindAiScope() {
+  document.getElementById('saveAiScopeBtn').addEventListener('click', async () => {
+    const aiScopePreference = document.getElementById('aiScopeSelect')?.value || 'unlimited';
+    try {
+      await Api.saveScheduleSettings({ aiScopePreference });
+      const msg = document.getElementById('aiScopeSavedMsg');
+      msg.classList.remove('hidden');
+      setTimeout(() => msg.classList.add('hidden'), 2500);
+    } catch (err) {
+      alert(`שגיאה בשמירה: ${err.message}`);
+    }
+  });
+}
+
+async function loadAiScope() {
+  try {
+    const s = await Api.getScheduleSettings();
+    const el = document.getElementById('aiScopeSelect');
+    if (el && s.aiScopePreference) el.value = s.aiScopePreference;
   } catch { /* fail silently */ }
 }
 

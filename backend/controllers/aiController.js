@@ -7,13 +7,38 @@ const { getSettings } = require('./srController');
 
 const ARTICLES_PATH = path.join(__dirname, ARTICLES_DIR);
 
-// ─── Strict Kodesh Mode guardrail ─────────────────────────────────────────────
+// ─── AI scope guardrails ──────────────────────────────────────────────────────
 
 const STRICT_KODESH_GUARDRAIL = `[הוראת מערכת — מצב לימוד ממוקד תורני]
 אתה עוזר לימודי בהגבלה מחמירה. עליך לענות אך ורק על שאלות הנוגעות לטקסט הסיכום שסופק.
 חריג: מותר לך להשתמש בידע הפנימי שלך לצורך מענה על שאלות הנוגעות למקורות קודש — תנ"ך, גמרא, הלכה, מפרשים, מדרש וכדומה.
-אם המשתמש שואל שאלה חיצונית חילונית (כגון: ספורט, תרבות פופולרית, פוליטיקה עולמית, מדע כללי וכדומה) שאינה מופיעה בסיכום ואינה נוגעת למקורות קודש — סרב בנימוס בעברית בלבד, בנוסח:
-"אני מוגבל במצב לימוד ממוקד ואיני יכול לענות על שאלות שאינן קשורות לחומר הסיכום הנוכחי או למקורות קודש. אנא שאל שאלה הנוגעת לחומר הלימוד."`;
+אם המשתמש שואל שאלה חיצונית חילונית שאינה בסיכום ואינה נוגעת למקורות קודש — ענה: "אני מוגבל למצב לימוד ממוקד ואיני יכול לענות על שאלות שאינן קשורות לחומר הלימוד או למקורות קודש."`;
+
+const SCOPE_REPOSITORY_ONLY = `[הוראת מערכת — מאגר ספרים בלבד]
+אתה עוזר לימודי מוגבל. ענה אך ורק על בסיס הטקסטים ממאגר הספרים המקומי המצורפים להלן.
+אם השאלה אינה ניתנת למענה על בסיס הטקסטים הבאים — ענה: "אני מוגבל למאגר הספרים המקומי ואינני יכול לענות על שאלה זו."
+
+{{BOOKS}}`;
+
+const SCOPE_REPOSITORY_KODESH = `[הוראת מערכת — מאגר ספרים ומקורות קודש]
+אתה עוזר לימודי מוגבל. ענה על בסיס הטקסטים ממאגר הספרים המקומי המצורפים להלן.
+חריג: מותר להשתמש בידע פנימי לשאלות הנוגעות למקורות קודש (תנ"ך, גמרא, הלכה, מפרשים, מדרש).
+לשאלות חילוניות שאינן במאגר — ענה: "אני מוגבל למאגר הספרים ולמקורות קודש."
+
+{{BOOKS}}`;
+
+async function _buildScopeGuardrail(scope, strictKodesh) {
+  if (scope === 'repository_only' || scope === 'repository_kodesh') {
+    const { getBooksContext } = require('./booksController');
+    const booksText = await getBooksContext(2000);
+    const template  = scope === 'repository_only' ? SCOPE_REPOSITORY_ONLY : SCOPE_REPOSITORY_KODESH;
+    return template.replace('{{BOOKS}}', booksText || '(אין ספרים במאגר כרגע)') + '\n\n';
+  }
+  if (scope !== 'unlimited' && strictKodesh) {
+    return STRICT_KODESH_GUARDRAIL + '\n\n';
+  }
+  return '';
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -69,8 +94,10 @@ async function askContextual({ context, userMessage, extra }) {
   const safeMsg = _sanitize(userMessage);
   if (!safeMsg) throw new Error('הודעה ריקה');
 
-  const strictMode = (() => { try { return !!getSettings().strictKodeshMode; } catch { return false; } })();
-  const guardrail  = strictMode ? STRICT_KODESH_GUARDRAIL + '\n\n' : '';
+  const settings     = (() => { try { return getSettings(); } catch { return {}; } })();
+  const scope        = settings.aiScopePreference || 'unlimited';
+  const strictKodesh = !!settings.strictKodeshMode;
+  const guardrail    = await _buildScopeGuardrail(scope, strictKodesh);
 
   let systemPart = '';
 

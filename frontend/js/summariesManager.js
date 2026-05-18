@@ -25,9 +25,9 @@ const SummariesManager = (() => {
   // ─── אתחול ──────────────────────────────────────────────────────────────────
 
   async function init() {
-    bindToolbar();
     if (!_eventsAttached) {
-      attachEvents(document.getElementById('summariesTree'));
+      bindToolbar();
+      attachEvents();
       _eventsAttached = true;
     }
     await loadTree();
@@ -193,9 +193,13 @@ const SummariesManager = (() => {
 
   // ─── אירועים ────────────────────────────────────────────────────────────────
 
-  function attachEvents(container) {
-    container.addEventListener('click', async (e) => {
-      const btn = e.target.closest('[data-action]');
+  function attachEvents() {
+    // Delegate on the stable view section so the listener survives tree re-renders
+    // and works regardless of which nav tab the user came from.
+    // Scope to #summariesTree children to avoid intercepting toolbar buttons.
+    const viewSection = document.getElementById('view-summaries');
+    viewSection.addEventListener('click', async (e) => {
+      const btn = e.target.closest('#summariesTree [data-action]');
       if (!btn) return;
       e.stopPropagation();
       await handleAction(btn.dataset.action, btn.dataset.path, btn.dataset.name, btn.dataset.type, btn);

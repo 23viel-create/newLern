@@ -180,4 +180,13 @@ const Api = {
   aiKeyStatus: () => apiFetchPlain('/ai/key-status', {}),
   aiParseSrProgram: (hebrewText) =>
     apiFetchPlain('/ai/parse-sr-program', { method: 'POST', body: { hebrewText } }),
+
+  // ── מאגר ספרים ───────────────────────────────────────────────────────────
+  getBooks:   () => apiFetch('/books'),
+  deleteBook: (name) => apiFetch(`/books/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  uploadBook: (file) => {
+    const fd = new FormData();
+    fd.append('pdf', file);
+    return apiFormFetch('/books/upload', fd);
+  },
 };

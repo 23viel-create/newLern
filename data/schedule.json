@@ -9,6 +9,7 @@
     ],
     "heavyLoadThreshold": 9,
     "strictKodeshMode": true,
+    "aiScopePreference": "repository_kodesh",
     "calendarDisplayPreference": "combined"
   },
   "tasks": []

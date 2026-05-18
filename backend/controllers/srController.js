@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
   customSequence: [1, 7, 30, 90],
   heavyLoadThreshold: 9,
   strictKodeshMode: true,
+  aiScopePreference: 'repository_kodesh',
 };
 
 // ── File I/O ─────────────────────────────────────────────────────────────────

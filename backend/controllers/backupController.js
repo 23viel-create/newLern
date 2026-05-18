@@ -2,7 +2,7 @@ const fs   = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const AdmZip = require('adm-zip');
-const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, PageOrientation } = require('docx');
+const { Document, Packer, Paragraph, TextRun, AlignmentType, PageOrientation } = require('docx');
 const { summariesRoot, getSummaryContent, createFolder } = require('./filesController');
 
 const DATA_ROOT = path.resolve(__dirname, '../../data');
@@ -15,35 +15,66 @@ function _ts() {
 
 // ─── HTML → docx rich paragraphs ─────────────────────────────────────────────
 
+function _extractColor(tagStr) {
+  // Match color from style="color:#RRGGBB" or style="color:rgb(...)"
+  const hex = tagStr.match(/color\s*:\s*#([0-9a-fA-F]{3,6})/);
+  if (hex) {
+    const h = hex[1];
+    return h.length === 3 ? h.split('').map(c => c + c).join('') : h.toUpperCase();
+  }
+  const rgb = tagStr.match(/color\s*:\s*rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
+  if (rgb) {
+    return [rgb[1], rgb[2], rgb[3]]
+      .map(n => parseInt(n, 10).toString(16).padStart(2, '0'))
+      .join('').toUpperCase();
+  }
+  return null;
+}
+
 function _parseInlineHtml(fragment) {
   const runs = [];
-  let bold = false, underline = false, italic = false;
+  let bold = false, underline = false, italic = false, color = null;
 
-  // Split on HTML tags, keeping the delimiters
+  const HE_LANG = { value: 'he-IL', eastAsia: 'he-IL' };
+
   const parts = fragment.split(/(<[^>]+>)/);
   for (const part of parts) {
     if (!part) continue;
     if (part.startsWith('<')) {
       const isClosing = part.startsWith('</');
       const tagName   = part.replace(/<\/?([a-zA-Z][^>\s]*)[\s\S]*>/, '$1').toLowerCase();
-      if (['strong', 'b'].includes(tagName))  bold      = !isClosing;
-      else if (['u', 'ins'].includes(tagName)) underline = !isClosing;
-      else if (['em', 'i'].includes(tagName))  italic    = !isClosing;
-      // all other tags: skip silently
+
+      if (!isClosing) {
+        // Attempt inline color extraction from ANY opening tag
+        const c = _extractColor(part);
+        if (c) color = c;
+      }
+
+      if (['strong', 'b'].includes(tagName)) {
+        bold = !isClosing;
+        if (isClosing) color = null;
+      } else if (['u', 'ins'].includes(tagName)) {
+        underline = !isClosing;
+      } else if (['em', 'i'].includes(tagName)) {
+        italic = !isClosing;
+      } else if (tagName === 'span' || tagName === 'font') {
+        if (isClosing) color = null;
+      }
     } else {
       const text = part
         .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
         .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
       if (!text) continue;
-      const props = { text, size: 24 };
+      const props = { text, size: 24, language: HE_LANG };
       if (bold)      props.bold      = true;
       if (underline) props.underline = {};
       if (italic)    props.italics   = true;
+      if (color)     props.color     = color;
       runs.push(new TextRun(props));
     }
   }
 
-  if (!runs.length) runs.push(new TextRun({ text: '', size: 24 }));
+  if (!runs.length) runs.push(new TextRun({ text: '', size: 24, language: HE_LANG }));
   return runs;
 }
 
@@ -79,9 +110,7 @@ function _htmlToDocxParagraphs(html) {
 
 // ─── DOCX export ─────────────────────────────────────────────────────────────
 
-async function buildDocx(title, htmlContent) {
-  const bodyParagraphs = _htmlToDocxParagraphs(htmlContent);
-
+async function buildDocx(_title, htmlContent) {
   const doc = new Document({
     sections: [{
       properties: {
@@ -90,19 +119,9 @@ async function buildDocx(title, htmlContent) {
           textDirection: 'rl',
         },
       },
-      children: [
-        new Paragraph({
-          children: [new TextRun({ text: title || 'סיכום', bold: true, size: 32 })],
-          heading: HeadingLevel.HEADING_1,
-          alignment: AlignmentType.RIGHT,
-          bidirectional: true,
-        }),
-        new Paragraph({ text: '' }),
-        ...bodyParagraphs,
-      ],
+      children: _htmlToDocxParagraphs(htmlContent),
     }],
   });
-
   return Packer.toBuffer(doc);
 }
 
