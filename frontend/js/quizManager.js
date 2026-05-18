@@ -1,7 +1,7 @@
 // מנהל השאלות, עורך השאלות, ומסך הבחינה
 const QuizManager = (() => {
 
-  // ─── Editor state ─────────────────────────────────────────────────────────
+  // ─── Editor state (modal, from summaries tree) ───────────────────────────
   let _edPath  = null;
   let _edTitle = null;
   let _edData  = { open: [], mc: [] };
@@ -9,13 +9,22 @@ const QuizManager = (() => {
   let _editingId   = null;  // question id being edited, or null for new
   let _editingType = null;  // 'open' | 'mc'
 
+  // ─── Dock panel state (from editor view) ─────────────────────────────────
+  let _ddPath  = null;
+  let _ddTitle = null;
+  let _ddData  = { open: [], mc: [] };
+  let _ddTab   = 'open';
+  let _ddEditingId   = null;
+  let _ddEditingType = null;
+
   // ─── Quiz state ───────────────────────────────────────────────────────────
-  let _quizQs      = [];    // shuffled bundle from server
-  let _answers     = [];    // per-question answer tracking
-  let _config      = { layout: 'one', feedback: 'instant', aiGrade: false, strictness: 'בינונית' };
-  let _curIdx      = 0;
-  let _quizTitle   = '';
-  let _revealed    = new Set();  // indices whose open answer has been shown
+  let _quizQs       = [];    // shuffled bundle from server
+  let _answers      = [];    // per-question answer tracking
+  let _config       = { layout: 'one', feedback: 'instant', aiGrade: false, strictness: 'בינונית' };
+  let _curIdx       = 0;
+  let _quizTitle    = '';
+  let _revealed     = new Set();  // indices whose open answer has been shown
+  let _previousView = 'dashboard'; // view to return to when quiz closes
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -38,7 +47,7 @@ const QuizManager = (() => {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  //  QUESTION EDITOR
+  //  QUESTION EDITOR (modal — from summaries tree)
   // ═══════════════════════════════════════════════════════════════════════════
 
   async function openEditor(summaryPath, summaryTitle) {
@@ -54,6 +63,262 @@ const QuizManager = (() => {
     await _loadEditorQuestions();
     _renderEditorTab();
     _bindEditorEvents();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  //  DOCKED QUESTION EDITOR (inside #view-editor)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  async function openEditorDocked(summaryPath, summaryTitle) {
+    _ddPath  = summaryPath;
+    _ddTitle = summaryTitle;
+    _ddEditingId   = null;
+    _ddEditingType = null;
+    _ddTab   = 'open';
+
+    document.getElementById('qdTitle').textContent = summaryTitle;
+    const panel = document.getElementById('qeDockPanel');
+
+    if (panel.classList.contains('hidden')) {
+      panel.classList.remove('hidden');
+    }
+
+    await _loadDockQuestions();
+    _renderDockTab();
+    _bindDockEvents();
+  }
+
+  async function _loadDockQuestions() {
+    try {
+      _ddData = await Api.getQuizQuestions(_ddPath);
+    } catch (err) {
+      _ddData = { open: [], mc: [] };
+      console.error('שגיאה בטעינת שאלות:', err.message);
+    }
+  }
+
+  function _bindDockEvents() {
+    document.querySelectorAll('[data-qdtab]').forEach(btn => {
+      btn.onclick = () => {
+        _ddTab = btn.dataset.qdtab;
+        document.querySelectorAll('[data-qdtab]').forEach(b =>
+          b.classList.toggle('qe-tab--active', b === btn));
+        _renderDockTab();
+      };
+    });
+
+    document.getElementById('qdCloseBtn').onclick   = _closeDock;
+    document.getElementById('qdAddOpenBtn').onclick  = () => _showDockForm('open', null);
+    document.getElementById('qdAddMcBtn').onclick    = () => _showDockForm('mc',   null);
+  }
+
+  function _closeDock() {
+    document.getElementById('qeDockPanel').classList.add('hidden');
+    document.getElementById('qdForm').classList.add('hidden');
+    document.getElementById('qdForm').innerHTML = '';
+    _ddPath        = null;
+    _ddEditingId   = null;
+    _ddEditingType = null;
+  }
+
+  function _renderDockTab() {
+    document.getElementById('qdOpenCount').textContent = _ddData.open.length;
+    document.getElementById('qdMcCount'  ).textContent = _ddData.mc.length;
+
+    const showOpen = _ddTab === 'open';
+    document.getElementById('qdTabOpen').classList.toggle('hidden', !showOpen);
+    document.getElementById('qdTabMc'  ).classList.toggle('hidden',  showOpen);
+
+    _renderDockList('open');
+    _renderDockList('mc');
+  }
+
+  function _renderDockList(type) {
+    const container = document.getElementById(type === 'open' ? 'qdOpenList' : 'qdMcList');
+    const questions = _ddData[type];
+
+    if (!questions.length) {
+      container.innerHTML = `<p class="placeholder-text">אין שאלות ${type === 'open' ? 'פתוחות' : 'בחירה מרובה'} עדיין</p>`;
+      return;
+    }
+
+    container.innerHTML = questions.map((q, i) => `
+      <div class="qe-item" data-ddid="${_esc(q.id)}" data-ddtype="${type}">
+        <div class="qe-item__body">
+          <span class="qe-item__num">${i + 1}.</span>
+          <span class="qe-item__text">${_esc(q.question)}</span>
+          ${q.success_rate != null ? `<span class="qe-item__rate">${_pct(q.success_rate)}</span>` : ''}
+        </div>
+        <div class="qe-item__actions">
+          <button class="btn btn--xs btn--ghost qd-edit-btn" data-id="${_esc(q.id)}" data-type="${type}">✏️</button>
+          <button class="btn btn--xs btn--danger-ghost qd-del-btn"  data-id="${_esc(q.id)}" data-type="${type}">🗑️</button>
+        </div>
+      </div>`).join('');
+
+    container.querySelectorAll('.qd-edit-btn').forEach(btn => {
+      btn.onclick = () => {
+        const q = questions.find(q => q.id === btn.dataset.id);
+        if (q) _showDockForm(btn.dataset.type, q);
+      };
+    });
+    container.querySelectorAll('.qd-del-btn').forEach(btn => {
+      btn.onclick = () => _deleteDockQ(btn.dataset.type, btn.dataset.id);
+    });
+  }
+
+  function _showDockForm(type, existingQ) {
+    _ddEditingType = type;
+    _ddEditingId   = existingQ?.id || null;
+
+    const formEl = document.getElementById('qdForm');
+    formEl.classList.remove('hidden');
+
+    if (type === 'open') {
+      formEl.innerHTML = `
+        <h4 class="qe-form-title">${existingQ ? 'עריכת' : 'הוספת'} שאלה פתוחה</h4>
+        <div class="form-group">
+          <label class="form-label">שאלה *</label>
+          <textarea id="qdfOpenQ" class="input-field input-field--full" rows="2"
+            placeholder="הזן את השאלה...">${_esc(existingQ?.question || '')}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">תשובה</label>
+          <textarea id="qdfOpenA" class="input-field input-field--full" rows="3"
+            placeholder="הזן תשובה מפורטת...">${_esc(existingQ?.answer || '')}</textarea>
+        </div>
+        <div class="form-row-actions">
+          <button id="qdfSaveBtn" class="btn btn--primary btn--sm">שמור</button>
+          <button id="qdfAiSuggestBtn" class="btn btn--ghost btn--sm qf-ai-suggest-btn">🪄 AI</button>
+          <button id="qdfCancelBtn" class="btn btn--secondary btn--sm">ביטול</button>
+        </div>
+        <div id="qdfAiStatus" class="qf-ai-status hidden"></div>`;
+      document.getElementById('qdfSaveBtn').onclick   = _saveDockOpenQ;
+      document.getElementById('qdfCancelBtn').onclick = _hideDockForm;
+      document.getElementById('qdfAiSuggestBtn').onclick = () => _aiSuggestDockQuestion('open');
+      document.getElementById('qdfOpenQ').focus();
+    } else {
+      const opts    = existingQ?.options || ['', '', '', ''];
+      const correct = existingQ?.correct_option_index ?? 0;
+      const optRows = opts.map((o, i) => `
+        <div class="mc-opt-row">
+          <label class="mc-opt-label">
+            <input type="radio" name="qdfCorrect" value="${i}" ${i === correct ? 'checked' : ''} />
+            <input type="text" class="input-field mc-opt-input" id="qdfOpt${i}"
+              placeholder="אפשרות ${i+1}" value="${_esc(o)}" />
+          </label>
+        </div>`).join('');
+
+      formEl.innerHTML = `
+        <h4 class="qe-form-title">${existingQ ? 'עריכת' : 'הוספת'} שאלת בחירה מרובה</h4>
+        <div class="form-group">
+          <label class="form-label">שאלה *</label>
+          <textarea id="qdfMcQ" class="input-field input-field--full" rows="2"
+            placeholder="הזן את השאלה...">${_esc(existingQ?.question || '')}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">אפשרויות (● = נכון)</label>
+          <div class="mc-opts-form">${optRows}</div>
+        </div>
+        <div class="form-row-actions">
+          <button id="qdfSaveBtn" class="btn btn--primary btn--sm">שמור</button>
+          <button id="qdfAiSuggestBtn" class="btn btn--ghost btn--sm qf-ai-suggest-btn">🪄 AI</button>
+          <button id="qdfCancelBtn" class="btn btn--secondary btn--sm">ביטול</button>
+        </div>
+        <div id="qdfAiStatus" class="qf-ai-status hidden"></div>`;
+      document.getElementById('qdfSaveBtn').onclick   = _saveDockMcQ;
+      document.getElementById('qdfCancelBtn').onclick = _hideDockForm;
+      document.getElementById('qdfAiSuggestBtn').onclick = () => _aiSuggestDockQuestion('mc');
+      document.getElementById('qdfMcQ').focus();
+    }
+    formEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  async function _aiSuggestDockQuestion(type) {
+    const btn    = document.getElementById('qdfAiSuggestBtn');
+    const status = document.getElementById('qdfAiStatus');
+    if (!btn || !status) return;
+    btn.disabled = true;
+    status.textContent = '⏳ ה-AI מייצר שאלה...';
+    status.classList.remove('hidden');
+    try {
+      const result = await Api.aiSuggestSingleQuestion(_ddPath, _ddTitle, type);
+      if (type === 'open') {
+        document.getElementById('qdfOpenQ').value = result.question || '';
+        document.getElementById('qdfOpenA').value = result.answer  || '';
+      } else {
+        document.getElementById('qdfMcQ').value = result.question || '';
+        const opts = result.options || [];
+        for (let i = 0; i < 4; i++) {
+          const el = document.getElementById(`qdfOpt${i}`);
+          if (el) el.value = opts[i] || '';
+        }
+        const correctIdx = typeof result.correct_option_index === 'number' ? result.correct_option_index : 0;
+        const radio = document.querySelector(`input[name="qdfCorrect"][value="${correctIdx}"]`);
+        if (radio) radio.checked = true;
+      }
+      status.textContent = '✓ נוצרה שאלה — ערוך ולחץ שמור';
+    } catch (err) {
+      status.textContent = `שגיאה: ${err.message}`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function _hideDockForm() {
+    document.getElementById('qdForm').classList.add('hidden');
+    document.getElementById('qdForm').innerHTML = '';
+    _ddEditingId   = null;
+    _ddEditingType = null;
+  }
+
+  async function _saveDockOpenQ() {
+    const question = document.getElementById('qdfOpenQ').value.trim();
+    const answer   = document.getElementById('qdfOpenA').value.trim();
+    if (!question) { alert('יש להזין שאלה'); return; }
+    try {
+      if (_ddEditingId) {
+        await Api.updateOpenQuestion(_ddPath, _ddEditingId, question, answer);
+      } else {
+        await Api.addOpenQuestion(_ddPath, question, answer);
+      }
+      await _loadDockQuestions();
+      _renderDockTab();
+      _hideDockForm();
+    } catch (err) { alert(`שגיאה: ${err.message}`); }
+  }
+
+  async function _saveDockMcQ() {
+    const question = document.getElementById('qdfMcQ').value.trim();
+    if (!question) { alert('יש להזין שאלה'); return; }
+    const options = [0,1,2,3].map(i => (document.getElementById(`qdfOpt${i}`)?.value || '').trim()).filter(Boolean);
+    if (options.length < 2) { alert('יש להזין לפחות 2 אפשרויות'); return; }
+    const correctRaw = document.querySelector('input[name="qdfCorrect"]:checked')?.value;
+    const correct    = correctRaw != null ? parseInt(correctRaw, 10) : 0;
+    const corrAdj    = Math.min(correct, options.length - 1);
+    try {
+      if (_ddEditingId) {
+        await Api.updateMcQuestion(_ddPath, _ddEditingId, question, options, corrAdj);
+      } else {
+        await Api.addMcQuestion(_ddPath, question, options, corrAdj);
+      }
+      await _loadDockQuestions();
+      _renderDockTab();
+      _hideDockForm();
+    } catch (err) { alert(`שגיאה: ${err.message}`); }
+  }
+
+  async function _deleteDockQ(type, id) {
+    const q = _ddData[type].find(q => q.id === id);
+    if (!q) return;
+    const ok = await WindowManager.confirm(`למחוק את השאלה "${q.question.slice(0,60)}"?`);
+    if (!ok) return;
+    try {
+      if (type === 'open') await Api.deleteOpenQuestion(_ddPath, id);
+      else                 await Api.deleteMcQuestion(_ddPath, id);
+      await _loadDockQuestions();
+      _renderDockTab();
+      _hideDockForm();
+    } catch (err) { alert(`שגיאה: ${err.message}`); }
   }
 
   async function _loadEditorQuestions() {
@@ -302,6 +567,10 @@ const QuizManager = (() => {
 
   async function startQuiz(paths, title) {
     _quizTitle = title;
+    // Capture the current view before navigating to quiz
+    const activeView = document.querySelector('.view.active');
+    _previousView = activeView?.id?.replace('view-', '') || 'dashboard';
+
     let bundle;
     try {
       bundle = await Api.getQuizBundle(paths);
@@ -319,20 +588,20 @@ const QuizManager = (() => {
       id: q.id, qtype: q.qtype, summaryPath: q.summaryPath,
       score: null, answered: false,
       selectedOption: null, selfAssess: null,
-      userText: '',          // retained user-typed answer text
-      aiGraded: false,       // has AI graded this answer
-      aiScore: null,         // AI score 0-100
-      aiCritique: '',        // AI critique text
+      userText: '',
+      aiGraded: false,
+      aiScore: null,
+      aiCritique: '',
     }));
     _curIdx   = 0;
     _revealed = new Set();
 
+    WindowManager.showView('quiz');
     _showQuizConfig();
   }
 
   function _showQuizConfig() {
-    const modal = document.getElementById('quizModal');
-    modal.classList.remove('hidden');
+    document.getElementById('quizFullTitle').textContent = `בחינה: ${_quizTitle}`;
     document.getElementById('quizConfig').classList.remove('hidden');
     document.getElementById('quizTestArea').classList.add('hidden');
     document.getElementById('quizResults').classList.add('hidden');
@@ -340,11 +609,10 @@ const QuizManager = (() => {
     const total = _quizQs.length;
     const opens = _quizQs.filter(q => q.qtype === 'open').length;
     const mcs   = total - opens;
-    document.getElementById('quizConfigTitle').textContent = `בחינה: ${_quizTitle}`;
+    document.getElementById('quizConfigTitle').textContent = `הגדרות בחינה`;
     document.getElementById('quizConfigInfo').innerHTML =
       `<strong>${total}</strong> שאלות: ${mcs} בחירה מרובה + ${opens} פתוחות`;
 
-    // Show/hide strictness row when AI grade checkbox toggles
     const aiGradeEl = document.getElementById('quizAiGrade');
     const strictRow = document.getElementById('quizStrictnessRow');
     if (aiGradeEl && strictRow) {
@@ -353,9 +621,9 @@ const QuizManager = (() => {
       };
     }
 
-    document.getElementById('quizStartBtn').onclick = _startTest;
+    document.getElementById('quizStartBtn').onclick  = _startTest;
     document.getElementById('quizCancelBtn').onclick = _closeQuiz;
-    modal.querySelector('.modal__overlay').onclick = _closeQuiz;
+    document.getElementById('quizBackBtn').onclick   = _closeQuiz;
   }
 
   function _startTest() {
@@ -772,6 +1040,7 @@ const QuizManager = (() => {
       }).join('');
 
     document.getElementById('quizCloseResultsBtn').onclick = _closeQuiz;
+    document.getElementById('quizBackBtn').onclick = _closeQuiz;
 
     // Submit to backend
     try {
@@ -788,10 +1057,10 @@ const QuizManager = (() => {
   }
 
   function _closeQuiz() {
-    document.getElementById('quizModal').classList.add('hidden');
+    WindowManager.showView(_previousView || 'dashboard');
   }
 
   // ─── Public ───────────────────────────────────────────────────────────────
 
-  return { openEditor, startQuiz };
+  return { openEditor, openEditorDocked, startQuiz };
 })();

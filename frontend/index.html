@@ -224,6 +224,144 @@
         </aside>
 
       </div>
+
+      <!-- ══ פאנל עורך שאלות עוגן תחתון ══ -->
+      <div id="qeDockPanel" class="qe-dock-panel hidden" aria-label="עורך שאלות">
+
+        <div class="qe-dock-header">
+          <h3 class="qe-dock-title">📝 שאלות: <span id="qdTitle"></span></h3>
+          <button id="qdCloseBtn" class="btn btn--ghost btn--sm">✕ סגור</button>
+        </div>
+
+        <div class="qe-dock-body">
+          <!-- Tabs -->
+          <div class="qe-tabs">
+            <button class="qe-tab qe-tab--active" data-qdtab="open">
+              שאלות פתוחות (<span id="qdOpenCount">0</span>)
+            </button>
+            <button class="qe-tab" data-qdtab="mc">
+              בחירה מרובה (<span id="qdMcCount">0</span>)
+            </button>
+          </div>
+
+          <div class="qe-dock-content">
+            <!-- Open questions -->
+            <div id="qdTabOpen" class="qe-tab-content">
+              <div id="qdOpenList" class="qe-list"></div>
+              <button id="qdAddOpenBtn" class="btn btn--primary btn--sm qe-add-btn">
+                + הוסף שאלה פתוחה
+              </button>
+            </div>
+
+            <!-- MC questions -->
+            <div id="qdTabMc" class="qe-tab-content hidden">
+              <div id="qdMcList" class="qe-list"></div>
+              <button id="qdAddMcBtn" class="btn btn--primary btn--sm qe-add-btn">
+                + הוסף שאלת בחירה מרובה
+              </button>
+            </div>
+
+            <!-- Dynamic form -->
+            <div id="qdForm" class="qe-form hidden"></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── מסך בחינה מלא ── -->
+    <section id="view-quiz" class="view hidden quiz-fullscreen-view">
+      <div class="quiz-fullscreen-header">
+        <button id="quizBackBtn" class="btn btn--secondary btn--sm">← חזור</button>
+        <h2 id="quizFullTitle" class="quiz-fullscreen-title">בחינה</h2>
+      </div>
+
+      <div class="quiz-fullscreen-body">
+        <!-- שלב 1: הגדרות -->
+        <div id="quizConfig" class="quiz-step">
+          <h2 id="quizConfigTitle">הגדרות בחינה</h2>
+          <p id="quizConfigInfo" class="quiz-config-info"></p>
+
+          <div class="form-group">
+            <label class="form-label">פורמט תצוגה:</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="radio" name="quizLayout" value="one" checked />
+                שאלה אחת בכל פעם
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="quizLayout" value="all" />
+                כל השאלות בדף אחד
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">משוב:</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="radio" name="quizFeedback" value="instant" checked />
+                מיידי — אחרי כל שאלה
+              </label>
+              <label class="radio-label">
+                <input type="radio" name="quizFeedback" value="end" />
+                בסוף הבחינה בלבד
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">בדיקה חכמה:</label>
+            <div class="radio-group">
+              <label class="radio-label">
+                <input type="checkbox" id="quizAiGrade" />
+                בדיקה באמצעות עוזר AI
+              </label>
+            </div>
+            <div class="ai-grade-strictness" id="quizStrictnessRow" style="margin-top:0.4rem;display:none">
+              <label class="form-label" for="quizStrictness">רמת קפדנות הבדיקה:</label>
+              <select id="quizStrictness" class="select-field select-field--sm" style="margin-top:0.2rem">
+                <option value="קלה">קלה — סלחנית</option>
+                <option value="בינונית" selected>בינונית</option>
+                <option value="קפדנית">קפדנית — מדויקת</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="modal__actions">
+            <button id="quizCancelBtn" class="btn btn--secondary">ביטול</button>
+            <button id="quizStartBtn"  class="btn btn--primary">התחל בחינה ▶</button>
+          </div>
+        </div>
+
+        <!-- שלב 2: שאלות -->
+        <div id="quizTestArea" class="quiz-step hidden">
+          <div class="quiz-progress-wrap">
+            <div class="quiz-progress-bar">
+              <div id="quizProgressFill" class="quiz-progress-fill"></div>
+            </div>
+            <span id="quizProgressLabel" class="quiz-progress-label"></span>
+          </div>
+
+          <div id="quizQuestionContainer" class="quiz-question-container"></div>
+
+          <div class="quiz-nav-actions">
+            <button id="quizPrevBtn"   class="btn btn--ghost btn--sm hidden">❮ הקודם</button>
+            <button id="quizNextBtn"   class="btn btn--primary btn--sm">הבא ❯</button>
+            <button id="quizFinishBtn" class="btn btn--success btn--sm hidden">סיים בחינה ✓</button>
+          </div>
+        </div>
+
+        <!-- שלב 3: תוצאות -->
+        <div id="quizResults" class="quiz-step hidden">
+          <h2 class="quiz-results-title">תוצאות הבחינה</h2>
+          <div id="quizScoreDisplay" class="quiz-score-display"></div>
+          <div id="quizResultsList"  class="quiz-results-list"></div>
+          <div class="modal__actions">
+            <button id="quizCloseResultsBtn" class="btn btn--primary">סגור</button>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- ── מאגר ספרים ── -->
@@ -665,100 +803,6 @@
 
       <!-- Dynamic add/edit form (filled by JS) -->
       <div id="qeForm" class="qe-form hidden"></div>
-
-    </div>
-  </div>
-
-  <!-- ══════════════════ מודל מסך בחינה ══════════════════ -->
-  <div id="quizModal" class="modal hidden"
-       role="dialog" aria-modal="true" aria-labelledby="quizConfigTitle">
-    <div class="modal__overlay"></div>
-    <div class="modal__box modal__box--quiz">
-
-      <!-- ── שלב 1: הגדרות ── -->
-      <div id="quizConfig" class="quiz-step">
-        <h2 id="quizConfigTitle">הגדרות בחינה</h2>
-        <p id="quizConfigInfo" class="quiz-config-info"></p>
-
-        <div class="form-group">
-          <label class="form-label">פורמט תצוגה:</label>
-          <div class="radio-group">
-            <label class="radio-label">
-              <input type="radio" name="quizLayout" value="one" checked />
-              שאלה אחת בכל פעם
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="quizLayout" value="all" />
-              כל השאלות בדף אחד
-            </label>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">משוב:</label>
-          <div class="radio-group">
-            <label class="radio-label">
-              <input type="radio" name="quizFeedback" value="instant" checked />
-              מיידי — אחרי כל שאלה
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="quizFeedback" value="end" />
-              בסוף הבחינה בלבד
-            </label>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">בדיקה חכמה:</label>
-          <div class="radio-group">
-            <label class="radio-label">
-              <input type="checkbox" id="quizAiGrade" />
-              בדיקה באמצעות עוזר AI
-            </label>
-          </div>
-          <div class="ai-grade-strictness" id="quizStrictnessRow" style="margin-top:0.4rem;display:none">
-            <label class="form-label" for="quizStrictness">רמת קפדנות הבדיקה:</label>
-            <select id="quizStrictness" class="select-field select-field--sm" style="margin-top:0.2rem">
-              <option value="קלה">קלה — סלחנית</option>
-              <option value="בינונית" selected>בינונית</option>
-              <option value="קפדנית">קפדנית — מדויקת</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="modal__actions">
-          <button id="quizCancelBtn" class="btn btn--secondary">ביטול</button>
-          <button id="quizStartBtn"  class="btn btn--primary">התחל בחינה ▶</button>
-        </div>
-      </div>
-
-      <!-- ── שלב 2: שאלות ── -->
-      <div id="quizTestArea" class="quiz-step hidden">
-        <div class="quiz-progress-wrap">
-          <div class="quiz-progress-bar">
-            <div id="quizProgressFill" class="quiz-progress-fill"></div>
-          </div>
-          <span id="quizProgressLabel" class="quiz-progress-label"></span>
-        </div>
-
-        <div id="quizQuestionContainer" class="quiz-question-container"></div>
-
-        <div class="quiz-nav-actions">
-          <button id="quizPrevBtn"   class="btn btn--ghost btn--sm hidden">❮ הקודם</button>
-          <button id="quizNextBtn"   class="btn btn--primary btn--sm">הבא ❯</button>
-          <button id="quizFinishBtn" class="btn btn--success btn--sm hidden">סיים בחינה ✓</button>
-        </div>
-      </div>
-
-      <!-- ── שלב 3: תוצאות ── -->
-      <div id="quizResults" class="quiz-step hidden">
-        <h2 class="quiz-results-title">תוצאות הבחינה</h2>
-        <div id="quizScoreDisplay" class="quiz-score-display"></div>
-        <div id="quizResultsList"  class="quiz-results-list"></div>
-        <div class="modal__actions">
-          <button id="quizCloseResultsBtn" class="btn btn--primary">סגור</button>
-        </div>
-      </div>
 
     </div>
   </div>

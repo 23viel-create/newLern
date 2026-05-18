@@ -1,6 +1,57 @@
 // מנהל לוח השנה הדו-לשוני ולוח בקרה
 const CalendarManager = (() => {
 
+  // ── Parashat Hashavua lookup (Israel cycle, 5785–5787) ────────────────────
+  // Key = ISO date of Shabbat; value = parasha display name.
+  // Special non-regular Shabbatot (Chol HaMoed etc.) use descriptive label.
+  const _PARASHA_BY_DATE = {
+    // ── 5785 (2024–2025) ──
+    '2024-10-26':'בראשית',   '2024-11-02':'נח',          '2024-11-09':'לך לך',
+    '2024-11-16':'וירא',     '2024-11-23':'חיי שרה',      '2024-11-30':'תולדות',
+    '2024-12-07':'ויצא',     '2024-12-14':'וישלח',        '2024-12-21':'וישב',
+    '2024-12-28':'מקץ',      '2025-01-04':'ויגש',         '2025-01-11':'ויחי',
+    '2025-01-18':'שמות',     '2025-01-25':'וארא',         '2025-02-01':'בא',
+    '2025-02-08':'בשלח',     '2025-02-15':'יתרו',         '2025-02-22':'משפטים',
+    '2025-03-01':'תרומה',    '2025-03-08':'תצוה',         '2025-03-15':'כי תשא',
+    '2025-03-22':'ויקהל-פקודי','2025-03-29':'ויקרא',      '2025-04-05':'צו',
+    '2025-04-12':'שמיני',    // Shabbat HaGadol — regular parasha
+    // Apr 19 = 7th day Pesach (special, no regular parasha)
+    '2025-04-26':'תזריע-מצורע','2025-05-03':'אחרי מות-קדושים','2025-05-10':'אמור',
+    '2025-05-17':'בהר',      '2025-05-24':'בחוקותי',      '2025-05-31':'במדבר',
+    '2025-06-07':'נשא',      '2025-06-14':'בהעלותך',      '2025-06-21':'שלח לך',
+    '2025-06-28':'קורח',     '2025-07-05':'חוקת',         '2025-07-12':'בלק',
+    '2025-07-19':'פינחס',    '2025-07-26':'מטות-מסעי',    '2025-08-02':'דברים',
+    '2025-08-09':'ואתחנן',   '2025-08-16':'עקב',          '2025-08-23':'ראה',
+    '2025-08-30':'שופטים',   '2025-09-06':'כי תצא',       '2025-09-13':'כי תבוא',
+    '2025-09-20':'ניצבים-וילך',
+
+    // ── 5786 (2025–2026) ──
+    '2025-10-18':'בראשית',   '2025-10-25':'נח',           '2025-11-01':'לך לך',
+    '2025-11-08':'וירא',     '2025-11-15':'חיי שרה',      '2025-11-22':'תולדות',
+    '2025-11-29':'ויצא',     '2025-12-06':'וישלח',        '2025-12-13':'וישב',
+    '2025-12-20':'מקץ',      '2025-12-27':'ויגש',         '2026-01-03':'ויחי',
+    '2026-01-10':'שמות',     '2026-01-17':'וארא',         '2026-01-24':'בא',
+    '2026-01-31':'בשלח',     '2026-02-07':'יתרו',         '2026-02-14':'משפטים',
+    '2026-02-21':'תרומה',    '2026-02-28':'תצוה',         '2026-03-07':'כי תשא',
+    '2026-03-14':'ויקהל-פקודי','2026-03-21':'ויקרא',      '2026-03-28':'צו',
+    '2026-04-04':'חוה"מ פסח', // Shabbat Chol HaMoed Pesach
+    '2026-04-11':'שמיני',    '2026-04-18':'תזריע-מצורע',  '2026-04-25':'אחרי מות-קדושים',
+    '2026-05-02':'אמור',     '2026-05-09':'בהר-בחוקותי',  '2026-05-16':'במדבר',
+    '2026-05-23':'נשא',      '2026-05-30':'בהעלותך',      '2026-06-06':'שלח לך',
+    '2026-06-13':'קורח',     '2026-06-20':'חוקת',         '2026-06-27':'בלק',
+    '2026-07-04':'פינחס',    '2026-07-11':'מטות-מסעי',    '2026-07-18':'דברים',
+    '2026-07-25':'ואתחנן',   '2026-08-01':'עקב',          '2026-08-08':'ראה',
+    '2026-08-15':'שופטים',   '2026-08-22':'כי תצא',       '2026-08-29':'כי תבוא',
+    '2026-09-05':'ניצבים',   '2026-09-12':'וילך',         // Shabbat Shuvah
+    '2026-09-26':'חוה"מ סוכות', // Shabbat Chol HaMoed Sukkot
+
+    // ── 5787 (2026–2027) ──
+    '2026-10-10':'בראשית',   '2026-10-17':'נח',           '2026-10-24':'לך לך',
+    '2026-10-31':'וירא',     '2026-11-07':'חיי שרה',      '2026-11-14':'תולדות',
+    '2026-11-21':'ויצא',     '2026-11-28':'וישלח',        '2026-12-05':'וישב',
+    '2026-12-12':'מקץ',      '2026-12-19':'ויגש',         '2026-12-26':'ויחי',
+  };
+
   const MONTH_NAMES_GREG = [
     '', 'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
     'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר',
@@ -241,9 +292,12 @@ const CalendarManager = (() => {
   // ── Hebrew month grid ─────────────────────────────────────────────────────
 
   async function _renderHebrewMonthGrid() {
-    const mid    = calendarData.days[Math.floor(calendarData.days.length / 2)];
-    const hebY   = mid.hebrewYear;
-    const hebM   = mid.hebrewMonth;
+    // Use selectedDate's Hebrew month as the reference (fixes mid-month skipping).
+    // Fallback to array midpoint only if selectedDate isn't in the data.
+    let refDay = calendarData.days.find(d => d.date === selectedDate);
+    if (!refDay) refDay = calendarData.days[Math.floor(calendarData.days.length / 2)];
+    const hebY   = refDay.hebrewYear;
+    const hebM   = refDay.hebrewMonth;
 
     let allDays = [...calendarData.days];
 
@@ -398,6 +452,10 @@ const CalendarManager = (() => {
     const isGregMonthStart = gregDay === 1;              // first of Gregorian month
 
     const hebDayStr = HEB_NUMS[day.hebrewDay] || String(day.hebrewDay);
+    const parasha   = day.isShabbat ? (_PARASHA_BY_DATE[day.date] || '') : '';
+    const parashaHtml = parasha
+      ? `<span class="cal-cell__parasha" title="פרשת ${parasha}">פ׳ ${parasha}</span>`
+      : '';
 
     if (hebPrimary || _calDisplayPref === 'hebrew') {
       // Hebrew-primary: bold Gregorian "1" on start of Gregorian month
@@ -408,6 +466,7 @@ const CalendarManager = (() => {
         ${badge}
         <span class="cal-cell__heb cal-cell__heb--primary">${hebDayStr}</span>
         ${gregSpan}
+        ${parashaHtml}
       </div>`;
     }
     // Gregorian-primary: bold "א׳" on Rosh Chodesh
@@ -418,6 +477,7 @@ const CalendarManager = (() => {
       ${badge}
       <span class="cal-cell__greg">${gregDay}</span>
       ${hebSpan}
+      ${parashaHtml}
     </div>`;
   }
 

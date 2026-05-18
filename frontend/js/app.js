@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const node = EditorManager.getCurrentNode();
     if (!node) return;
     AiManager.setContext('quiz');
-    QuizManager.openEditor(node.path, node.title || node.path);
+    QuizManager.openEditorDocked(node.path, node.title || node.path);
   });
   document.getElementById('editorQuizBtn').addEventListener('click', () => {
     const node = EditorManager.getCurrentNode();
