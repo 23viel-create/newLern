@@ -1162,6 +1162,39 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
 /* AI grade strictness selector in quiz config */
 .ai-grade-strictness { margin-top: 0.3rem; }
 
+/* Quiz quota row */
+.quiz-quota-row        { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.quiz-quota-all-label  { font-size: 0.9rem; display: flex; align-items: center; gap: 0.3rem; }
+
+/* Result card layout (Phase 23) */
+.quiz-result-card {
+  border: 1px solid var(--color-border); border-radius: var(--radius);
+  padding: 0.8rem 1rem; margin-bottom: 0.75rem; background: var(--color-surface);
+}
+.quiz-result-card__hdr {
+  display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; flex-wrap: wrap;
+}
+.quiz-result-card__hdr .res-icon { margin-right: auto; }
+
+/* MCQ explanation row */
+.quiz-mcq-explain-row  { margin-top: 0.5rem; }
+.quiz-mcq-explanation  {
+  margin-top: 0.4rem; padding: 0.5rem 0.7rem;
+  background: #f0f9ff; border-radius: var(--radius);
+  font-size: 0.85rem; line-height: 1.6; white-space: pre-wrap;
+}
+
+/* Manual grade input row */
+.quiz-manual-grade-row {
+  display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;
+}
+
+/* Pending score placeholder */
+.quiz-score-pending {
+  padding: 1rem; border: 1px dashed var(--color-border); border-radius: var(--radius);
+  background: var(--color-hover);
+}
+
 /* ══════════════════ Calendar — Phase 11 indicators ══════════════════ */
 
 /* Rosh Chodesh — Hebrew month start on Gregorian-primary grid */

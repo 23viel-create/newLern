@@ -634,12 +634,41 @@ const QuizManager = (() => {
     document.getElementById('quizStartBtn').onclick  = _startTest;
     document.getElementById('quizCancelBtn').onclick = _closeQuiz;
     document.getElementById('quizBackBtn').onclick   = _closeQuiz;
+
+    // ── Quota input + "All" checkbox ──────────────────────────────────────
+    const quotaInput = document.getElementById('quizQuotaInput');
+    const quotaAllCb = document.getElementById('quizQuotaAll');
+    const totalQs    = _quizQs.length;
+    if (quotaInput && quotaAllCb) {
+      const _syncAll = () => {
+        if (quotaAllCb.checked) {
+          quotaInput.value    = totalQs;
+          quotaInput.disabled = true;
+        } else {
+          quotaInput.disabled = false;
+        }
+      };
+      quotaAllCb.onchange = _syncAll;
+      quotaInput.addEventListener('keydown', (e) => {
+        // Allow: digits, backspace, delete, arrows, tab, ctrl/cmd combos
+        if (e.key.length === 1 && !/[0-9]/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey)
+          e.preventDefault();
+      });
+      quotaInput.addEventListener('blur', () => {
+        let v = parseInt(quotaInput.value, 10);
+        if (isNaN(v) || v < 0) v = 0;
+        if (v > totalQs)       v = totalQs;
+        quotaInput.value = v;
+      });
+      _syncAll();
+    }
   }
 
   function _startTest() {
     const aiGradeEl  = document.getElementById('quizAiGrade');
     const strictEl   = document.getElementById('quizStrictness');
-    const quotaVal   = document.getElementById('quizQuotaSelect')?.value || 'all';
+    const quotaAllCb = document.getElementById('quizQuotaAll');
+    const quotaInput = document.getElementById('quizQuotaInput');
     _config = {
       layout:    document.querySelector('input[name="quizLayout"]:checked')?.value   || 'one',
       feedback:  document.querySelector('input[name="quizFeedback"]:checked')?.value || 'instant',
@@ -647,12 +676,15 @@ const QuizManager = (() => {
       strictness: strictEl?.value || 'בינונית',
     };
 
+    // Quota: "All" checkbox overrides numeric input
+    const useAll     = !quotaAllCb || quotaAllCb.checked;
+    const quotaLimit = useAll
+      ? _quizQs.length
+      : Math.max(0, parseInt(quotaInput?.value || '0', 10) || _quizQs.length);
+
     // Shuffle all questions (Fisher-Yates), then apply quota slice
     let shuffled = _shuffle(_quizQs);
-    if (quotaVal !== 'all') {
-      const limit = parseInt(quotaVal, 10);
-      if (!isNaN(limit) && limit > 0) shuffled = shuffled.slice(0, limit);
-    }
+    if (quotaLimit > 0 && quotaLimit < shuffled.length) shuffled = shuffled.slice(0, quotaLimit);
 
     // Shuffle MC option order per question (keeps correct answer tracking intact)
     _quizQs = shuffled.map(q => {
@@ -801,6 +833,14 @@ const QuizManager = (() => {
         </div>`;
       }
       // Waiting for submission
+      // In "end" feedback mode: collect text silently, batch-grade at _finishQuiz
+      const submitRow = _config.feedback !== 'end'
+        ? `<div class="quiz-ai-submit-row">
+             <button class="btn btn--primary btn--sm quiz-ai-submit-btn" data-idx="${idx}">הגש תשובה ⚡</button>
+             <span class="quiz-ai-submit-hint hint">ה-AI יבדוק ויציין את תשובתך</span>
+           </div>
+           <div id="quizAiLoading_${idx}" class="quiz-ai-loading hidden">⏳ ה-AI בודק את תשובתך...</div>`
+        : `<p class="hint" style="font-size:0.8rem;margin-top:0.4rem">✦ תשובתך תיבדק על ידי ה-AI בסיום הבחינה</p>`;
       return `<div class="quiz-card" data-idx="${idx}">
         <div class="quiz-card__header"><span class="quiz-type-badge quiz-type-badge--open">${typeLabel}</span>${srcLabel}</div>
         <p class="quiz-card__question">${_esc(q.question)}</p>
@@ -810,11 +850,7 @@ const QuizManager = (() => {
             placeholder="כתוב את תשובתך כאן..." data-idx="${idx}"
             dir="rtl">${_esc(ans.userText || '')}</textarea>
         </div>
-        <div class="quiz-ai-submit-row">
-          <button class="btn btn--primary btn--sm quiz-ai-submit-btn" data-idx="${idx}">הגש תשובה ⚡</button>
-          <span class="quiz-ai-submit-hint hint">ה-AI יבדוק ויציין את תשובתך</span>
-        </div>
-        <div id="quizAiLoading_${idx}" class="quiz-ai-loading hidden">⏳ ה-AI בודק את תשובתך...</div>
+        ${submitRow}
       </div>`;
     }
 
@@ -1010,144 +1046,269 @@ const QuizManager = (() => {
   async function _finishQuiz() {
     _captureOpenAnswers();
     document.getElementById('quizTestArea').classList.add('hidden');
+    document.getElementById('quizResults').classList.remove('hidden');
 
-    // ── Deferred bulk AI grading ──────────────────────────────────────────
-    // If AI mode is on, grade every ungraded open question that has a user answer
-    const pendingGrades = _config.aiGrade
+    // ── Deferred bulk AI grading (handles "end" feedback mode) ───────────
+    const pendingAI = _config.aiGrade
       ? _answers.map((ans, i) => ({ ans, i, q: _quizQs[i] }))
           .filter(({ ans, q }) => q.qtype === 'open' && !ans.aiGraded && ans.userText?.trim())
       : [];
 
-    if (pendingGrades.length > 0) {
-      const scoreEl = document.getElementById('quizScoreDisplay');
-      scoreEl.innerHTML = `<p class="hint" style="text-align:center;padding:1rem">
-        ⏳ ה-AI מדרג ${pendingGrades.length} תשובות — אנא המתן...</p>`;
-      document.getElementById('quizResults').classList.remove('hidden');
-
-      await Promise.all(pendingGrades.map(async ({ ans, i, q }) => {
+    if (pendingAI.length > 0) {
+      document.getElementById('quizScoreDisplay').innerHTML =
+        `<p class="hint" style="text-align:center;padding:1rem">
+           ⏳ ה-AI בודק ${pendingAI.length} תשובות — אנא המתן...</p>`;
+      await Promise.all(pendingAI.map(async ({ ans, q }) => {
         try {
-          const result = await Api.aiGradeAnswer(q.question, q.answer || '', ans.userText, _config.strictness);
-          ans.aiScore    = result.score;
-          ans.aiCritique = result.critique || '';
-          ans.aiGraded   = true;
-          ans.answered   = true;
-          ans.score      = result.score / 100;
+          const res = await Api.aiGradeAnswer(q.question, q.answer || '', ans.userText, _config.strictness);
+          ans.aiScore = res.score; ans.aiCritique = res.critique || '';
+          ans.aiGraded = true; ans.answered = true; ans.score = res.score / 100;
         } catch {
-          ans.aiScore    = 0;
-          ans.aiCritique = 'שגיאה בבדיקת ה-AI';
-          ans.aiGraded   = true;
-          ans.answered   = true;
-          ans.score      = 0;
+          ans.aiScore = 0; ans.aiCritique = 'שגיאה בבדיקת ה-AI';
+          ans.aiGraded = true; ans.answered = true; ans.score = 0;
         }
       }));
-    } else {
-      document.getElementById('quizResults').classList.remove('hidden');
     }
 
-    // For end-feedback MC: compute scores now
+    // Compute MC scores (end-feedback mode: score may still be null)
     _answers.forEach((ans, idx) => {
       const q = _quizQs[idx];
-      if (q.qtype === 'mc' && ans.answered && ans.score == null) {
+      if (q.qtype === 'mc' && ans.answered && ans.score == null)
         ans.score = ans.selectedOption === q.correct_option_index ? 1 : 0;
-      }
     });
 
+    // ── Results breakdown — card layout ───────────────────────────────────
+    const listEl = document.getElementById('quizResultsList');
+    listEl.innerHTML = `<h4 class="quiz-results-heading">פירוט תשובות</h4>` +
+      _quizQs.map((_, i) => _buildResultCard(i)).join('');
+    _bindResultCardEvents(listEl);
+
+    // ── Score display ──────────────────────────────────────────────────────
+    const hasUngradedOpen = !_config.aiGrade &&
+      _quizQs.some((q, i) => q.qtype === 'open' && !_answers[i].answered);
+    if (hasUngradedOpen) _renderPendingScore();
+    else                  _renderFinalScore();
+
+    document.getElementById('quizCloseResultsBtn').onclick = _closeQuiz;
+    document.getElementById('quizBackBtn').onclick          = _closeQuiz;
+
+    // Submit to backend (best-effort)
+    try {
+      await Api.submitQuizResult(null, 0,
+        _answers.map(a => ({ id: a.id, qtype: a.qtype, summaryPath: a.summaryPath, score: a.score ?? 0 })));
+    } catch (err) { console.error('שגיאה בשמירת תוצאות:', err.message); }
+  }
+
+  // ─── Result card builders ─────────────────────────────────────────────────
+
+  function _buildResultCard(i) {
+    const q = _quizQs[i];
+    return q.qtype === 'mc'
+      ? _buildMcResultCard(i, q, _answers[i])
+      : _buildOpenResultCard(i, q, _answers[i]);
+  }
+
+  function _buildMcResultCard(i, q, ans) {
+    const ok = ans.answered && ans.score === 1;
+    const icon = !ans.answered
+      ? '<span class="res-icon res-icon--skip">—</span>'
+      : ok
+        ? '<span class="res-icon res-icon--ok">✓</span>'
+        : '<span class="res-icon res-icon--bad">✗</span>';
+    const src = q.summaryTitle ? `<span class="quiz-q-src">${_esc(q.summaryTitle)}</span>` : '';
+
+    const opts = (q.options || []).map((opt, oi) => {
+      let cls = 'quiz-option';
+      if (ans.selectedOption === oi) cls += ok ? ' quiz-option--correct' : ' quiz-option--wrong';
+      if (oi === q.correct_option_index && !ok) cls += ' quiz-option--correct';
+      const letter = ['א', 'ב', 'ג', 'ד'][oi] || (oi + 1);
+      return `<button class="${cls}" disabled>${letter}. ${_esc(opt)}</button>`;
+    }).join('');
+
+    const appealWrap = (!ok && ans.answered)
+      ? `<div class="quiz-appeal-wrap" id="appeal_wrap_${i}">
+           <span class="quiz-appeal-score-log" id="appeal_log_${i}"></span>
+           <button class="btn btn--xs btn--ghost quiz-appeal-btn" data-qi="${i}" data-type="mc">ערער על הציון</button>
+         </div>` : '';
+
+    return `<div class="quiz-result-card quiz-result-card--mc" id="result_card_${i}">
+      <div class="quiz-result-card__hdr">
+        <span class="quiz-type-badge">בחירה מרובה</span>${src}${icon}
+      </div>
+      <p class="quiz-card__question">${_esc(q.question)}</p>
+      <div class="quiz-options">${opts}</div>
+      <div class="quiz-mcq-explain-row" id="mcq_explain_${i}">
+        <button class="btn btn--xs btn--ghost quiz-mcq-explain-btn" data-qi="${i}">🤖 הסבר</button>
+      </div>
+      ${appealWrap}
+    </div>`;
+  }
+
+  function _buildOpenResultCard(i, q, ans) {
+    const src = q.summaryTitle ? `<span class="quiz-q-src">${_esc(q.summaryTitle)}</span>` : '';
+
+    if (ans.aiGraded) {
+      const sc  = ans.aiScore ?? 0;
+      const cls = sc >= 80 ? 'res-icon--ok' : sc >= 50 ? 'res-icon--partial' : 'res-icon--bad';
+      return `<div class="quiz-result-card quiz-result-card--open" id="result_card_${i}">
+        <div class="quiz-result-card__hdr">
+          <span class="quiz-type-badge quiz-type-badge--open">שאלה פתוחה</span>${src}
+          <span class="res-icon ${cls}">${sc}/100</span>
+        </div>
+        <p class="quiz-card__question">${_esc(q.question)}</p>
+        <div class="quiz-user-answer-display">
+          <div class="quiz-user-answer-label">תשובתך:</div>
+          <div class="quiz-user-answer-text">${_esc(ans.userText || '(לא הוזנה)')}</div>
+        </div>
+        <div class="quiz-ai-feedback">
+          <div class="quiz-ai-score quiz-ai-score--${sc >= 80 ? 'good' : sc >= 50 ? 'ok' : 'bad'}">${sc}/100</div>
+          <div class="quiz-ai-critique" id="critique_${i}">${_esc(ans.aiCritique)}</div>
+        </div>
+        <div class="quiz-answer-block">
+          <div class="quiz-answer-label">תשובה נכונה:</div>
+          <div class="quiz-answer-text">${_esc(q.answer || '(לא הוגדרה)')}</div>
+        </div>
+        <div class="quiz-appeal-wrap" id="appeal_wrap_${i}">
+          <span class="quiz-appeal-score-log" id="appeal_log_${i}"></span>
+          <button class="btn btn--xs btn--ghost quiz-appeal-btn" data-qi="${i}" data-type="open">ערער על הציון</button>
+        </div>
+      </div>`;
+    }
+
+    // Manual mode
+    const gradeBlock = ans.answered
+      ? `<div class="quiz-self-result ${_selfResultClass(ans.selfAssess)}">${_selfResultLabel(ans.selfAssess)}</div>`
+      : `<div class="quiz-manual-grade-row" id="manual_grade_row_${i}">
+           <label class="form-label" style="margin-left:0.4rem">ציון ידני (0–100):</label>
+           <input type="number" min="0" max="100" class="manual-grade-input input-field"
+             id="manual_grade_${i}" data-qi="${i}"
+             style="width:72px;direction:ltr;text-align:center" placeholder="0" />
+           <button class="btn btn--xs btn--primary manual-grade-confirm-btn" data-qi="${i}">אשר ציון</button>
+         </div>`;
+
+    const scoreIcon = ans.answered
+      ? `<span class="res-icon ${_selfResultClass(ans.selfAssess)}">${_selfResultLabel(ans.selfAssess)}</span>`
+      : '<span class="res-icon res-icon--skip">—</span>';
+
+    return `<div class="quiz-result-card quiz-result-card--open" id="result_card_${i}">
+      <div class="quiz-result-card__hdr">
+        <span class="quiz-type-badge quiz-type-badge--open">שאלה פתוחה</span>${src}${scoreIcon}
+      </div>
+      <p class="quiz-card__question">${_esc(q.question)}</p>
+      ${ans.userText ? `<div class="quiz-user-answer-display">
+        <div class="quiz-user-answer-label">תשובתך:</div>
+        <div class="quiz-user-answer-text">${_esc(ans.userText)}</div>
+      </div>` : ''}
+      <div class="quiz-answer-block">
+        <div class="quiz-answer-label">תשובה נכונה:</div>
+        <div class="quiz-answer-text">${_esc(q.answer || '(לא הוגדרה)')}</div>
+      </div>
+      ${gradeBlock}
+    </div>`;
+  }
+
+  // ─── Result card events ───────────────────────────────────────────────────
+
+  function _bindResultCardEvents(container) {
+    container.querySelectorAll('.quiz-appeal-btn').forEach(btn => {
+      btn.addEventListener('click', () => _openAppeal(parseInt(btn.dataset.qi, 10), btn.dataset.type));
+    });
+    container.querySelectorAll('.quiz-mcq-explain-btn').forEach(btn => {
+      btn.addEventListener('click', () => _loadMcqExplanation(parseInt(btn.dataset.qi, 10)));
+    });
+    container.querySelectorAll('.manual-grade-confirm-btn').forEach(btn => {
+      btn.addEventListener('click', () => _confirmManualGrade(parseInt(btn.dataset.qi, 10)));
+    });
+  }
+
+  // ─── Score renderers ──────────────────────────────────────────────────────
+
+  function _renderFinalScore() {
     const answered = _answers.filter(a => a.answered);
     const total    = _quizQs.length;
     const sumScore = answered.reduce((s, a) => s + (a.score ?? 0), 0);
-    const finalPct = total > 0 ? Math.round((sumScore / total) * 100) : 0;
-
-    // Score display
-    const scoreEl2 = document.getElementById('quizScoreDisplay');
-    const scoreClass = finalPct >= 80 ? 'score--great' : finalPct >= 60 ? 'score--ok' : 'score--poor';
-    scoreEl2.innerHTML = `
-      <div class="quiz-score-circle ${scoreClass}">${finalPct}%</div>
+    const pct      = total > 0 ? Math.round((sumScore / total) * 100) : 0;
+    const cls      = pct >= 80 ? 'score--great' : pct >= 60 ? 'score--ok' : 'score--poor';
+    document.getElementById('quizScoreDisplay').innerHTML = `
+      <div class="quiz-score-circle ${cls}">${pct}%</div>
       <div class="quiz-score-stats">
         <p>ענית על <strong>${answered.length}</strong> מתוך <strong>${total}</strong> שאלות</p>
         <p>ניקוד: <strong>${sumScore.toFixed(1)}</strong> מתוך ${total}</p>
         ${_config.aiGrade ? '<p class="hint">הניקוד מבוסס על הערכת ה-AI</p>' : ''}
-        ${finalPct < 70 ? '<p class="quiz-sr-note">⚠ ציון נמוך — מועד החזרה הבא קוצר אוטומטית</p>' : ''}
+        ${pct < 70 ? '<p class="quiz-sr-note">⚠ ציון נמוך — מועד החזרה הבא קוצר אוטומטית</p>' : ''}
       </div>`;
+  }
 
-    // Per-question breakdown — comprehensive view
-    const listEl = document.getElementById('quizResultsList');
-    listEl.innerHTML = `<h4 class="quiz-results-heading">פירוט תשובות</h4>` +
-      _quizQs.map((q, i) => {
-        const ans = _answers[i];
-        let icon, detail = '', extraHtml = '';
+  function _renderPendingScore() {
+    document.getElementById('quizScoreDisplay').innerHTML = `
+      <div class="quiz-score-pending">
+        <p class="hint" style="text-align:center">⏳ ממתין לציונים ידניים לשאלות הפתוחות</p>
+        <p class="hint" style="text-align:center;font-size:0.8rem">הזן ציון (0–100) לכל שאלה פתוחה כדי לחשב את הציון הסופי</p>
+      </div>`;
+  }
 
-        if (!ans.answered) {
-          icon   = '<span class="res-icon res-icon--skip">—</span>';
-          detail = 'לא נענתה';
-        } else if (q.qtype === 'mc') {
-          const ok = ans.score === 1;
-          icon   = ok ? '<span class="res-icon res-icon--ok">✓</span>' : '<span class="res-icon res-icon--bad">✗</span>';
-          detail = ok ? 'נכון' : `לא נכון — נכון: ${_esc(q.options?.[q.correct_option_index] ?? '')}`;
-        } else if (ans.aiGraded) {
-          const sc  = ans.aiScore ?? 0;
-          const cls = sc >= 80 ? 'res-icon--ok' : sc >= 50 ? 'res-icon--partial' : 'res-icon--bad';
-          icon  = `<span class="res-icon ${cls}">${sc}/100</span>`;
-          // Full open-question breakdown: question + sample answer + user answer + critique + appeal
-          extraHtml = `
-            <div class="quiz-result-open-block">
-              <div class="quiz-result-open-row"><strong>שאלה:</strong> ${_esc(q.question)}</div>
-              <div class="quiz-result-open-row quiz-result-open-row--sample"><strong>תשובה מצופה:</strong> ${_esc(q.answer || '(לא הוגדרה)')}</div>
-              <div class="quiz-result-open-row quiz-result-open-row--user"><strong>תשובתך:</strong> ${_esc(ans.userText || '(לא הוזנה)')}</div>
-              <div class="quiz-result-open-row quiz-result-open-row--critique"><strong>הערת ה-AI:</strong> ${_esc(ans.aiCritique)}</div>
-              <div class="quiz-appeal-wrap" id="appeal_wrap_${i}">
-                <span class="quiz-appeal-score-log" id="appeal_log_${i}"></span>
-                <button class="btn btn--xs btn--ghost quiz-appeal-btn" data-qi="${i}">ערער על הציון</button>
-              </div>
-            </div>`;
-        } else {
-          icon   = `<span class="res-icon">${_selfResultLabel(ans.selfAssess)}</span>`;
-          if (q.qtype === 'open' && ans.userText) {
-            extraHtml = `<div class="quiz-result-open-block">
-              <div class="quiz-result-open-row quiz-result-open-row--user"><strong>תשובתך:</strong> ${_esc(ans.userText)}</div>
-              <div class="quiz-result-open-row quiz-result-open-row--sample"><strong>תשובה מצופה:</strong> ${_esc(q.answer || '(לא הוגדרה)')}</div>
-            </div>`;
-          }
-        }
+  // ─── Manual grade confirm ─────────────────────────────────────────────────
 
-        return `<div class="quiz-result-row ${q.qtype === 'open' ? 'quiz-result-row--open' : ''}">
-          <div class="quiz-result-top">
-            ${icon}
-            <span class="quiz-result-q">${_esc(q.question.slice(0, 80))}${q.question.length > 80 ? '…' : ''}</span>
-          </div>
-          ${extraHtml}
-          ${detail ? `<div class="quiz-result-d">${detail}</div>` : ''}
-        </div>`;
-      }).join('');
+  function _confirmManualGrade(qi) {
+    const input = document.getElementById(`manual_grade_${qi}`);
+    if (!input) return;
+    let v = parseInt(input.value, 10);
+    if (isNaN(v) || v < 0) v = 0;
+    if (v > 100) v = 100;
+    const ans = _answers[qi];
+    ans.score      = v / 100;
+    ans.selfAssess = v / 100;
+    ans.answered   = true;
 
-    // Bind appeal buttons
-    listEl.querySelectorAll('.quiz-appeal-btn').forEach(btn => {
-      btn.addEventListener('click', () => _openAppeal(parseInt(btn.dataset.qi, 10)));
-    });
+    const card = document.getElementById(`result_card_${qi}`);
+    if (card) {
+      const skipIcon = card.querySelector('.res-icon--skip');
+      if (skipIcon) {
+        const sc = v >= 80 ? 'res-icon--ok' : v >= 50 ? 'res-icon--partial' : 'res-icon--bad';
+        skipIcon.className   = `res-icon ${sc}`;
+        skipIcon.textContent = `${v}/100`;
+      }
+    }
+    const row = document.getElementById(`manual_grade_row_${qi}`);
+    if (row) {
+      const sc = v >= 80 ? 'quiz-self-result--good' : v >= 50 ? 'quiz-self-result--partial' : 'quiz-self-result--bad';
+      row.outerHTML = `<div class="quiz-self-result ${sc}">ציון: ${v}/100</div>`;
+    }
 
-    document.getElementById('quizCloseResultsBtn').onclick = _closeQuiz;
-    document.getElementById('quizBackBtn').onclick = _closeQuiz;
+    const stillPending = _quizQs.some((q, i) => q.qtype === 'open' && !_answers[i].answered);
+    if (!stillPending) _renderFinalScore();
+  }
 
-    // Submit to backend
+  // ─── MCQ lazy explanation ─────────────────────────────────────────────────
+
+  async function _loadMcqExplanation(qi) {
+    const wrapEl = document.getElementById(`mcq_explain_${qi}`);
+    if (!wrapEl) return;
+    const q   = _quizQs[qi];
+    const btn = wrapEl.querySelector('.quiz-mcq-explain-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ טוען הסבר...'; }
     try {
-      await Api.submitQuizResult(
-        null,
-        finalPct / 100,
-        _answers.map((a) => ({ id: a.id, qtype: a.qtype, summaryPath: a.summaryPath, score: a.score ?? 0 }))
-      );
+      const optsText   = (q.options || []).map((o, i) => `${['א','ב','ג','ד'][i]||i+1}. ${o}`).join('\n');
+      const correctTxt = q.options?.[q.correct_option_index] || '';
+      const prompt     = `שאלה: ${q.question}\nאפשרויות:\n${optsText}\nהתשובה הנכונה: ${correctTxt}\nהסבר בקצרה מדוע זוהי התשובה הנכונה ומדוע האחרות שגויות. ענה בעברית בלבד.`;
+      const answer     = await Api.aiAsk('general', prompt, null, null);
+      wrapEl.innerHTML = `<div class="quiz-mcq-explanation">${_esc(answer)}</div>`;
     } catch (err) {
-      console.error('שגיאה בשמירת תוצאות:', err.message);
+      if (btn) { btn.disabled = false; btn.textContent = '🤖 הסבר'; }
+      wrapEl.insertAdjacentHTML('beforeend',
+        `<span class="hint error-text"> שגיאה: ${_esc(err.message)}</span>`);
     }
   }
 
-  // ─── Appeal system ────────────────────────────────────────────────────────
+  // ─── Appeal system (open + MCQ) ───────────────────────────────────────────
 
-  function _openAppeal(qi) {
+  function _openAppeal(qi, type) {
     const wrapEl = document.getElementById(`appeal_wrap_${qi}`);
-    if (!wrapEl) return;
-    // Only show textarea if not already open
-    if (wrapEl.querySelector('.quiz-appeal-textarea')) return;
+    if (!wrapEl || wrapEl.querySelector('.quiz-appeal-textarea')) return;
     const ans = _answers[qi];
     const q   = _quizQs[qi];
+    const qtype = type || q.qtype;
+
     wrapEl.insertAdjacentHTML('beforeend', `
       <div class="quiz-appeal-form">
         <textarea class="quiz-appeal-textarea input-field" dir="rtl" rows="3"
@@ -1155,39 +1316,62 @@ const QuizManager = (() => {
         <button class="btn btn--xs btn--primary quiz-appeal-submit-btn" data-qi="${qi}">שלח ערעור</button>
         <span class="quiz-appeal-loading hidden" id="appeal_loading_${qi}">⏳ שולח ערעור...</span>
       </div>`);
+
     wrapEl.querySelector('.quiz-appeal-submit-btn').addEventListener('click', async () => {
-      const argument = wrapEl.querySelector('.quiz-appeal-textarea')?.value?.trim();
+      const argument  = wrapEl.querySelector('.quiz-appeal-textarea')?.value?.trim();
       if (!argument) { alert('יש להזין נימוק לערעור'); return; }
-      const submitBtn  = wrapEl.querySelector('.quiz-appeal-submit-btn');
-      const loadingEl  = document.getElementById(`appeal_loading_${qi}`);
+      const submitBtn = wrapEl.querySelector('.quiz-appeal-submit-btn');
+      const loadingEl = document.getElementById(`appeal_loading_${qi}`);
       submitBtn.disabled = true;
       loadingEl?.classList.remove('hidden');
       try {
-        const result = await Api.aiAppealGrade({
-          question:       q.question,
-          sampleAnswer:   q.answer || '',
-          userAnswer:     ans.userText || '',
-          originalCritique: ans.aiCritique || '',
-          originalScore:  ans.aiScore ?? 0,
-          appealArgument: argument,
-        });
-        const prevScore = ans.aiScore ?? 0;
-        ans.aiScore    = result.newScore;
-        ans.aiCritique = result.newCritique;
-        ans.score      = result.newScore / 100;
+        let params;
+        if (qtype === 'mc') {
+          const selectedTxt = q.options?.[ans.selectedOption] || '(לא נבחרה)';
+          const correctTxt  = q.options?.[q.correct_option_index] || '';
+          params = {
+            question:         q.question,
+            sampleAnswer:     correctTxt,
+            userAnswer:       selectedTxt,
+            originalCritique: `בחרת ב-"${selectedTxt}", התשובה הנכונה היא "${correctTxt}"`,
+            originalScore:    0,
+            appealArgument:   argument,
+          };
+        } else {
+          params = {
+            question:         q.question,
+            sampleAnswer:     q.answer || '',
+            userAnswer:       ans.userText || '',
+            originalCritique: ans.aiCritique || '',
+            originalScore:    ans.aiScore ?? 0,
+            appealArgument:   argument,
+          };
+        }
+        const result     = await Api.aiAppealGrade(params);
+        const prevScore  = qtype === 'mc' ? 0 : (ans.aiScore ?? 0);
+
+        if (qtype === 'mc') {
+          ans.score = result.newScore / 100;
+        } else {
+          ans.aiScore    = result.newScore;
+          ans.aiCritique = result.newCritique;
+          ans.score      = result.newScore / 100;
+          const critiqueEl = document.getElementById(`critique_${qi}`);
+          if (critiqueEl) critiqueEl.textContent = result.newCritique;
+        }
+
         const logEl = document.getElementById(`appeal_log_${qi}`);
         if (logEl) {
           logEl.textContent = `ציון מקורי: ${prevScore}/100 ← ציון לאחר ערעור: ${result.newScore}/100`;
-          logEl.className = 'quiz-appeal-score-log quiz-appeal-score-log--updated';
+          logEl.className   = 'quiz-appeal-score-log quiz-appeal-score-log--updated';
         }
-        const iconEl = wrapEl.closest('.quiz-result-row')?.querySelector('.res-icon');
+        const card    = document.getElementById(`result_card_${qi}`);
+        const iconEl  = card?.querySelector('.quiz-result-card__hdr .res-icon');
         if (iconEl) {
           const sc = result.newScore;
-          iconEl.className = `res-icon ${sc >= 80 ? 'res-icon--ok' : sc >= 50 ? 'res-icon--partial' : 'res-icon--bad'}`;
+          iconEl.className   = `res-icon ${sc >= 80 ? 'res-icon--ok' : sc >= 50 ? 'res-icon--partial' : 'res-icon--bad'}`;
           iconEl.textContent = `${sc}/100`;
         }
-        const critiqueEl = wrapEl.previousElementSibling?.querySelector?.('.quiz-result-open-row--critique');
-        if (critiqueEl) critiqueEl.innerHTML = `<strong>הערת ה-AI (לאחר ערעור):</strong> ${_esc(result.newCritique)}`;
         wrapEl.querySelector('.quiz-appeal-form')?.remove();
         wrapEl.querySelector('.quiz-appeal-btn')?.remove();
       } catch (err) {

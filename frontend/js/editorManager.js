@@ -212,6 +212,27 @@ const EditorManager = (() => {
       WindowManager.showView('summaries');
     });
 
+    // סנכרן עם Word — ידני (קרא document.doc → עדכן עורך)
+    document.getElementById('syncWithWordBtn')?.addEventListener('click', async () => {
+      if (!currentNode) return;
+      const btn = document.getElementById('syncWithWordBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ מסנכרן...';
+      try {
+        await Api.wordSyncManual(currentNode.path);
+        const html = await Api.getContent(currentNode.path);
+        document.getElementById('editorContent').innerHTML = html || '';
+        isDirty = false;
+        setSaveStatus('saved');
+        btn.textContent = '✓ סונכרן';
+        setTimeout(() => { btn.textContent = '🔄 סנכרן עם Word'; btn.disabled = false; }, 2500);
+      } catch (err) {
+        alert(`שגיאה בסנכרון עם Word: ${err.message}`);
+        btn.textContent = '🔄 סנכרן עם Word';
+        btn.disabled = false;
+      }
+    });
+
     // פתח ב-Word
     document.getElementById('openInWordBtn').addEventListener('click', async () => {
       if (!currentNode) return;

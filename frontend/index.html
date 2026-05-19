@@ -133,6 +133,7 @@
           <button id="bulkImportBtn"   class="btn btn--secondary btn--sm">📥 ייבוא בתפזורת</button>
           <button id="exportDocxBtn"  class="btn btn--ghost btn--sm" title="ייצוא ל-Word">📄 Word</button>
           <button id="openInWordBtn" class="btn btn--ghost btn--sm" title="פתח ב-Word המקומי">📂 פתח ב-Word</button>
+          <button id="syncWithWordBtn" class="btn btn--ghost btn--sm" title="קרא שינויים שנשמרו ב-Word וטען לעורך">🔄 סנכרן עם Word</button>
           <button id="historyBtn"     class="btn btn--ghost btn--sm" title="היסטוריית גרסאות">🕐 גרסאות</button>
           <button id="splitScreenBtn" class="btn btn--ghost btn--sm" title="מסך מפוצל">⇔ מפוצל</button>
         </div>
@@ -359,15 +360,16 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="quizQuotaSelect">מספר שאלות למבחן:</label>
-            <select id="quizQuotaSelect" class="select-field select-field--sm" style="width:auto;min-width:120px">
-              <option value="all">הכל</option>
-              <option value="5">5</option>
-              <option value="10">10</option>
-              <option value="15">15</option>
-              <option value="20">20</option>
-              <option value="30">30</option>
-            </select>
+            <label class="form-label">מספר שאלות למבחן:</label>
+            <div class="quiz-quota-row">
+              <input type="number" id="quizQuotaInput" class="input-field"
+                min="0" placeholder="0"
+                style="width:72px;text-align:center;direction:ltr" />
+              <label class="radio-label quiz-quota-all-label">
+                <input type="checkbox" id="quizQuotaAll" checked />
+                הכל
+              </label>
+            </div>
           </div>
 
           <div class="modal__actions">

@@ -3,7 +3,7 @@ const multer  = require('multer');
 const router  = express.Router();
 
 const {
-  buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache,
+  buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, syncWordFile,
 } = require('../controllers/backupController');
 const {
   getSummaryContent, getSummaryHistory, restoreHistoryVersion,
@@ -119,6 +119,19 @@ router.get('/word-sync', (req, res) => {
     res.json({ ok: true, ...info });
   } catch (err) {
     res.status(404).json({ error: err.message });
+  }
+});
+
+// POST /api/backup/sync-word  { nodePath }
+// Manual on-demand sync: read document.doc, sanitize, overwrite content.txt
+router.post('/sync-word', (req, res) => {
+  try {
+    const { nodePath } = req.body;
+    if (!nodePath) return res.status(400).json({ error: 'נדרש nodePath' });
+    const result = syncWordFile(nodePath);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

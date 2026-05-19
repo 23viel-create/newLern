@@ -402,9 +402,22 @@ function _pollForWordChanges() {
   }
 }
 
-function watchWordFiles() {
-  if (!fs.existsSync(summariesRoot)) return;
-  setInterval(_pollForWordChanges, 3000);
+// ─── Manual on-demand Word sync ───────────────────────────────────────────────
+// Replaces background polling. Called by POST /api/backup/sync-word.
+
+function syncWordFile(nodePath) {
+  const docPath = path.join(summariesRoot, nodePath, 'document.doc');
+  if (!fs.existsSync(docPath)) {
+    throw new Error('קובץ document.doc לא נמצא — פתח את הסיכום ב-Word תחילה');
+  }
+  const raw = fs.readFileSync(docPath, { encoding: 'utf-8', flag: 'r' });
+  if (!raw.includes('urn:schemas-microsoft-com:office:word')) {
+    throw new Error('הקובץ אינו קובץ Word HTML תקין');
+  }
+  const body = _extractWordHtmlBody(raw);
+  if (!body) throw new Error('לא ניתן לחלץ תוכן מהקובץ');
+  setSummaryContent(nodePath, body);
+  return { ok: true };
 }
 
-module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, watchWordFiles };
+module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, syncWordFile };
