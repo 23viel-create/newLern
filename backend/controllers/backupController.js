@@ -17,27 +17,47 @@ function _ts() {
 function _preprocessHtmlForWord(raw) {
   if (!raw) return '<p></p>';
 
-  // 1. Flatten <div> wrappers → <p> so Word doesn't treat them as textboxes
+  // 1. Flatten <div> wrappers → <p> so Word doesn't create floating text boxes
   let html = raw
     .replace(/<div([^>]*)>/gi, '<p$1>')
     .replace(/<\/div>/gi, '</p>');
 
-  // 2. Convert markdown-style dash lists: <p>- text</p> or <p>• text</p>
+  // 2. Strip inline CSS properties that cause Word to render shapes/frames
+  const BLOCKED_PROPS = /^(width|height|position|margin|padding|float|clear|display|overflow|z-index|top|left|right|bottom)$/i;
+  html = html.replace(/style="([^"]*)"/gi, (_m, styleStr) => {
+    const clean = styleStr
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => {
+        const prop = s.split(':')[0].trim();
+        return prop && !BLOCKED_PROPS.test(prop);
+      })
+      .join('; ');
+    return clean ? `style="${clean}"` : '';
+  });
+
+  // 3. Convert markdown-style dash/bullet paragraphs to <li>
   html = html.replace(
     /<p[^>]*>\s*[-–•]\s*([\s\S]*?)<\/p>/gi,
-    '<li style="list-style-type:disc;direction:rtl;text-align:right;mso-list:l0 level1 lfo1">$1</li>',
+    '<li>$1</li>',
   );
 
-  // 3. Wrap consecutive <li> runs in <ul>
+  // 4. Wrap consecutive <li> runs in <ul>
   html = html.replace(
     /(<li[^>]*>[\s\S]*?<\/li>\s*)+/gi,
-    (block) => `<ul style="direction:rtl;margin:4pt 0 4pt 1.2em">${block}</ul>`,
+    (block) => `<ul>${block}</ul>`,
   );
 
-  // 4. Ensure every <li> without explicit RTL style gets one
+  // 5. Rewrite all <ul> with explicit RTL solid-bullet style (prevents Word numbering)
   html = html.replace(
-    /<li(?![^>]*list-style-type)/gi,
-    '<li style="list-style-type:disc;direction:rtl;text-align:right"',
+    /<ul[^>]*>/gi,
+    '<ul style="direction:rtl;margin:4pt 0 4pt 1.2em;list-style-type:disc">',
+  );
+
+  // 6. Rewrite all <li> with explicit solid bullet + RTL for Word
+  html = html.replace(
+    /<li[^>]*>/gi,
+    '<li style="list-style-type:disc;direction:rtl;text-align:right;mso-list:l0 level1 lfo1">',
   );
 
   return html;
@@ -299,23 +319,55 @@ function readWordCache(title, nodePath) {
   return { filePath, size: stat.size, mtime: stat.mtimeMs, newerThanContent: false };
 }
 
-// ─── Two-way sync: watch Word files for user edits ───────────────────────────
-// Word uses atomic safe-writes (temp file → rename), which often bypasses
-// inode-level fs.watch hooks. We use a hybrid approach:
-//  1. fs.watch on the summaries ROOT directory (directory-level, survives renames)
-//  2. A 4-second polling interval as a safety net for atomic saves that slip through
+// ─── Word HTML sanitizer (import: .doc → app) ────────────────────────────────
 
 function _extractWordHtmlBody(raw) {
-  const m = raw.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  return m ? m[1].trim() : '';
+  // 1. Strip <head> block (contains <style> tags and Word XML metadata)
+  let html = raw
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '') // IE/Word conditional comments
+    .replace(/<!--[\s\S]*?-->/g, '');
+
+  // 2. Extract <body> inner content
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  let body = bodyMatch ? bodyMatch[1] : html;
+
+  // 3. Strip all XML namespace tags (o:p, w:*, m:*, v:*, x:* etc.)
+  body = body.replace(/<\/?(o|w|m|v|x):[^>\s/]*[^>]*\/?>/gi, '');
+
+  // 4. Strip xmlns namespace declarations on surviving tags
+  body = body.replace(/\s+xmlns(?::[a-z0-9]+)?="[^"]*"/gi, '');
+
+  // 5. Strip class="Mso*" attributes (MS Office class names)
+  body = body.replace(/\s+class="Mso[^"]*"/gi, '');
+  body = body.replace(/\s+class='Mso[^']*'/gi, '');
+
+  // 6. Strip mso-* directives from inline style attributes (keep valid CSS props)
+  body = body.replace(/style="([^"]*)"/gi, (_m, s) => {
+    const clean = s.split(';')
+      .map(p => p.trim())
+      .filter(p => p && !/^(mso-|tab-stops|text-autospace|punctuation-wrap)/i.test(p))
+      .join('; ');
+    return clean ? `style="${clean}"` : '';
+  });
+
+  // 7. Collapse empty spans and blank paragraphs that Word injects
+  body = body.replace(/<span[^>]*>\s*<\/span>/gi, '');
+  body = body.replace(/<p[^>]*>(\s*&nbsp;\s*|\s*)<\/p>/gi, '');
+
+  return body.trim();
 }
 
-const _watchDebounce = new Map(); // absPath → timeout id
+// ─── Two-way sync: pure mtime-polling (resilient against Word atomic saves) ──
+// Word's atomic save (delete old file + write new) instantly kills fs.watch
+// file descriptors. An mtime-cache poll every 3 s is the only reliable approach.
+
+const _docMtimeCache = new Map(); // absPath → last-known mtimeMs
 
 function _syncWordFile(absPath) {
   if (!fs.existsSync(absPath)) return;
   try {
-    // Open with a fresh file descriptor each time to avoid stale handles
     const raw = fs.readFileSync(absPath, { encoding: 'utf-8', flag: 'r' });
     if (!raw.includes('urn:schemas-microsoft-com:office:word')) return;
     const body = _extractWordHtmlBody(raw);
@@ -324,54 +376,47 @@ function _syncWordFile(absPath) {
     const contentPath = path.join(summariesRoot, nodeRelPath, 'content.txt');
     const docMtime    = fs.statSync(absPath).mtimeMs;
     const cntMtime    = fs.existsSync(contentPath) ? fs.statSync(contentPath).mtimeMs : 0;
-    // Only update if the .doc is meaningfully newer than content.txt (2s grace)
     if (docMtime <= cntMtime + 2000) return;
     setSummaryContent(nodeRelPath, body);
   } catch { /* ignore errors from locked/partial reads */ }
 }
 
-function _scheduleSyncDoc(absPath) {
-  if (_watchDebounce.has(absPath)) clearTimeout(_watchDebounce.get(absPath));
-  _watchDebounce.set(absPath, setTimeout(() => {
-    _watchDebounce.delete(absPath);
-    _syncWordFile(absPath);
-  }, 900)); // 900ms — enough for Word to finish its atomic swap
-}
-
-function _pollWordDir(dir) {
+function _walkDocFiles(dir, results) {
   try {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name.startsWith('~$')) continue; // skip Word lock/temp files
       const abs = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        _pollWordDir(abs);
+        _walkDocFiles(abs, results);
       } else if (entry.name === 'document.doc') {
-        // Only schedule sync if it's not already debounce-queued
-        if (!_watchDebounce.has(abs)) _syncWordFile(abs);
+        results.push(abs);
       }
     }
   } catch {}
 }
 
+function _pollForWordChanges() {
+  const docs = [];
+  _walkDocFiles(summariesRoot, docs);
+  for (const absPath of docs) {
+    try {
+      const newMtime = fs.statSync(absPath).mtimeMs;
+      const cached   = _docMtimeCache.get(absPath);
+      if (cached === undefined) {
+        _docMtimeCache.set(absPath, newMtime); // seed on first discovery
+        continue;
+      }
+      if (newMtime > cached + 1000) {
+        _docMtimeCache.set(absPath, newMtime);
+        _syncWordFile(absPath);
+      }
+    } catch {}
+  }
+}
+
 function watchWordFiles() {
   if (!fs.existsSync(summariesRoot)) return;
-
-  // 1. fs.watch on the root directory — catches inotify events (change + rename)
-  try {
-    fs.watch(summariesRoot, { recursive: true }, (eventType, filename) => {
-      if (!filename) return;
-      const normalized = filename.replace(/\\/g, '/');
-      // Accept the file itself OR a temp-file rename that implies document.doc changed
-      const docName = normalized.endsWith('document.doc')
-        ? normalized
-        : normalized.includes('/') ? path.dirname(normalized) + '/document.doc' : null;
-      if (!docName) return;
-      const absPath = path.join(summariesRoot, docName);
-      _scheduleSyncDoc(absPath);
-    });
-  } catch { /* fs.watch unavailable on this platform */ }
-
-  // 2. Polling fallback every 4 seconds — catches atomic saves that bypass inotify
-  setInterval(() => _pollWordDir(summariesRoot), 4000);
+  setInterval(_pollForWordChanges, 3000);
 }
 
 module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, watchWordFiles };

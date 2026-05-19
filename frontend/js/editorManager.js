@@ -44,6 +44,26 @@ const EditorManager = (() => {
     el.textContent = { saving: 'שומר...', saved: 'נשמר ✓', error: 'שגיאה בשמירה!' }[state] || '';
   }
 
+  function _sanitizePastedHtml(html) {
+    const ALLOWED = /^(p|b|i|u|ul|ol|li|br|strong|em)$/i;
+    let s = html
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '');
+    s = s.replace(/<(\/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*?)>/g, (_, slash, tag, attrs) => {
+      const t = tag.toLowerCase();
+      if (!ALLOWED.test(t)) return '';
+      if (slash) return `</${t}>`;
+      const href = attrs.match(/\bhref="([^"]*)"/i);
+      const src  = attrs.match(/\bsrc="([^"]*)"/i);
+      let kept = '';
+      if (href) kept += ` href="${href[1]}"`;
+      if (src)  kept += ` src="${src[1]}"`;
+      return `<${t}${kept}>`;
+    });
+    return s.trim();
+  }
+
   // ─── פתיחת עורך ──────────────────────────────────────────────────────────────
 
   async function open(node, list) {
@@ -138,6 +158,24 @@ const EditorManager = (() => {
     editor.addEventListener('focus', () => editor.classList.remove('is-empty'));
     editor.addEventListener('blur',  () => {
       editor.classList.toggle('is-empty', !editor.textContent.trim() && !editor.innerHTML.trim());
+    });
+
+    // Paste interceptor — strip Word/Office HTML bloat before insertion
+    editor.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const html  = e.clipboardData.getData('text/html');
+      const plain = e.clipboardData.getData('text/plain');
+      let clean;
+      if (html) {
+        clean = _sanitizePastedHtml(html);
+      } else {
+        clean = plain
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/\n/g, '<br>');
+      }
+      if (clean) document.execCommand('insertHTML', false, clean);
     });
 
     // סרגל עיצוב — כפתורי פורמט
