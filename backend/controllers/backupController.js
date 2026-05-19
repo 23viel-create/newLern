@@ -13,11 +13,38 @@ function _ts() {
 }
 
 // ─── Word HTML export (.doc — MS-Word-compatible HTML) ───────────────────────
-// Word opens HTML files with .doc extension natively, preserving RTL and all
-// rich formatting. This approach avoids the docx library's lossy RTL rendering.
+
+function _preprocessHtmlForWord(raw) {
+  if (!raw) return '<p></p>';
+
+  // 1. Flatten <div> wrappers → <p> so Word doesn't treat them as textboxes
+  let html = raw
+    .replace(/<div([^>]*)>/gi, '<p$1>')
+    .replace(/<\/div>/gi, '</p>');
+
+  // 2. Convert markdown-style dash lists: <p>- text</p> or <p>• text</p>
+  html = html.replace(
+    /<p[^>]*>\s*[-–•]\s*([\s\S]*?)<\/p>/gi,
+    '<li style="list-style-type:disc;direction:rtl;text-align:right;mso-list:l0 level1 lfo1">$1</li>',
+  );
+
+  // 3. Wrap consecutive <li> runs in <ul>
+  html = html.replace(
+    /(<li[^>]*>[\s\S]*?<\/li>\s*)+/gi,
+    (block) => `<ul style="direction:rtl;margin:4pt 0 4pt 1.2em">${block}</ul>`,
+  );
+
+  // 4. Ensure every <li> without explicit RTL style gets one
+  html = html.replace(
+    /<li(?![^>]*list-style-type)/gi,
+    '<li style="list-style-type:disc;direction:rtl;text-align:right"',
+  );
+
+  return html;
+}
 
 function buildDocx(_title, htmlContent) {
-  const body = htmlContent || '<p></p>';
+  const body = _preprocessHtmlForWord(htmlContent);
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
      xmlns:w="urn:schemas-microsoft-com:office:word"
      xmlns="http://www.w3.org/TR/REC-html40">
@@ -30,8 +57,8 @@ function buildDocx(_title, htmlContent) {
     body  { direction: rtl; font-family: Arial, sans-serif; font-size: 12pt; }
     p     { margin: 0 0 6pt 0; direction: rtl; }
     h1, h2, h3 { margin: 8pt 0 4pt 0; direction: rtl; }
-    ul, ol { margin: 4pt 0 4pt 1.5em; direction: rtl; }
-    li     { margin-bottom: 2pt; }
+    ul, ol { margin: 4pt 0 4pt 1.5em; direction: rtl; padding-right: 1.2em; }
+    li     { margin-bottom: 2pt; list-style-type: disc; direction: rtl; text-align: right; }
     strong { font-weight: bold; }
     em     { font-style: italic; }
     u      { text-decoration: underline; }
@@ -273,49 +300,78 @@ function readWordCache(title, nodePath) {
 }
 
 // ─── Two-way sync: watch Word files for user edits ───────────────────────────
-// When the user saves a .doc (Word HTML) file that we generated, extract the
-// HTML body and update content.txt so the app reflects the edits immediately.
+// Word uses atomic safe-writes (temp file → rename), which often bypasses
+// inode-level fs.watch hooks. We use a hybrid approach:
+//  1. fs.watch on the summaries ROOT directory (directory-level, survives renames)
+//  2. A 4-second polling interval as a safety net for atomic saves that slip through
 
 function _extractWordHtmlBody(raw) {
   const m = raw.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   return m ? m[1].trim() : '';
 }
 
-const _watchDebounce = new Map(); // filePath → timeout id
+const _watchDebounce = new Map(); // absPath → timeout id
+
+function _syncWordFile(absPath) {
+  if (!fs.existsSync(absPath)) return;
+  try {
+    // Open with a fresh file descriptor each time to avoid stale handles
+    const raw = fs.readFileSync(absPath, { encoding: 'utf-8', flag: 'r' });
+    if (!raw.includes('urn:schemas-microsoft-com:office:word')) return;
+    const body = _extractWordHtmlBody(raw);
+    if (!body) return;
+    const nodeRelPath = path.relative(summariesRoot, path.dirname(absPath));
+    const contentPath = path.join(summariesRoot, nodeRelPath, 'content.txt');
+    const docMtime    = fs.statSync(absPath).mtimeMs;
+    const cntMtime    = fs.existsSync(contentPath) ? fs.statSync(contentPath).mtimeMs : 0;
+    // Only update if the .doc is meaningfully newer than content.txt (2s grace)
+    if (docMtime <= cntMtime + 2000) return;
+    setSummaryContent(nodeRelPath, body);
+  } catch { /* ignore errors from locked/partial reads */ }
+}
+
+function _scheduleSyncDoc(absPath) {
+  if (_watchDebounce.has(absPath)) clearTimeout(_watchDebounce.get(absPath));
+  _watchDebounce.set(absPath, setTimeout(() => {
+    _watchDebounce.delete(absPath);
+    _syncWordFile(absPath);
+  }, 900)); // 900ms — enough for Word to finish its atomic swap
+}
+
+function _pollWordDir(dir) {
+  try {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        _pollWordDir(abs);
+      } else if (entry.name === 'document.doc') {
+        // Only schedule sync if it's not already debounce-queued
+        if (!_watchDebounce.has(abs)) _syncWordFile(abs);
+      }
+    }
+  } catch {}
+}
 
 function watchWordFiles() {
   if (!fs.existsSync(summariesRoot)) return;
 
+  // 1. fs.watch on the root directory — catches inotify events (change + rename)
   try {
     fs.watch(summariesRoot, { recursive: true }, (eventType, filename) => {
       if (!filename) return;
       const normalized = filename.replace(/\\/g, '/');
-      if (!normalized.endsWith('document.doc')) return;
-      if (eventType !== 'change' && eventType !== 'rename') return;
-
-      const absPath = path.join(summariesRoot, normalized);
-      // Debounce per file — Word fires multiple events on a single save
-      if (_watchDebounce.has(absPath)) clearTimeout(_watchDebounce.get(absPath));
-      _watchDebounce.set(absPath, setTimeout(() => {
-        _watchDebounce.delete(absPath);
-        if (!fs.existsSync(absPath)) return;
-        try {
-          const raw = fs.readFileSync(absPath, 'utf-8');
-          // Verify it's our Word HTML format to avoid processing unrelated files
-          if (!raw.includes('urn:schemas-microsoft-com:office:word')) return;
-          const body = _extractWordHtmlBody(raw);
-          if (!body) return;
-          const nodeRelPath = path.relative(summariesRoot, path.dirname(absPath));
-          const contentPath = path.join(summariesRoot, nodeRelPath, 'content.txt');
-          // Guard: do not write if content.txt is already in sync (mtime within 3s)
-          const docMtime = fs.statSync(absPath).mtimeMs;
-          const cntMtime = fs.existsSync(contentPath) ? fs.statSync(contentPath).mtimeMs : 0;
-          if (Math.abs(docMtime - cntMtime) < 3000) return;
-          setSummaryContent(nodeRelPath, body);
-        } catch { /* ignore watcher errors */ }
-      }, 800));
+      // Accept the file itself OR a temp-file rename that implies document.doc changed
+      const docName = normalized.endsWith('document.doc')
+        ? normalized
+        : normalized.includes('/') ? path.dirname(normalized) + '/document.doc' : null;
+      if (!docName) return;
+      const absPath = path.join(summariesRoot, docName);
+      _scheduleSyncDoc(absPath);
     });
-  } catch { /* fs.watch not supported on this platform — skip */ }
+  } catch { /* fs.watch unavailable on this platform */ }
+
+  // 2. Polling fallback every 4 seconds — catches atomic saves that bypass inotify
+  setInterval(() => _pollWordDir(summariesRoot), 4000);
 }
 
 module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, watchWordFiles };

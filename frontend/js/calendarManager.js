@@ -848,9 +848,13 @@ const CalendarManager = (() => {
         });
       });
 
-      // ── Learned yesterday (−1 day cascade) ──
+      // ── "סיימתי עד לכאן היום" — cascade −1 day with irreversible-action warning ──
       panel.querySelectorAll('.task-yesterday-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
+          const confirmed = await WindowManager.confirm(
+            'האם אתה בטוח? כל המשימות הבאות שקשורות לרצף לימוד זה יידחו למחר, וימשיכו ישירות לאחר הלימוד הנוכחי שסיימת. פעולה זו אינה הפיכה.'
+          );
+          if (!confirmed) return;
           try {
             btn.disabled = true;
             await Api.learnYesterday(btn.dataset.id);
@@ -879,7 +883,7 @@ const CalendarManager = (() => {
          <button class="btn btn--xs btn--ghost task-undo-btn" data-id="${_esc(task.id)}" title="בטל השלמה">↩</button>`
       : `<button class="btn btn--xs btn--primary task-done-btn" data-id="${_esc(task.id)}">סיימתי ✓</button>
          <button class="btn btn--xs btn--ghost task-postpone-btn" data-id="${_esc(task.id)}" title="דחה יום קדימה">דחה ←</button>
-         <button class="btn btn--xs btn--ghost task-yesterday-btn" data-id="${_esc(task.id)}" title="ביצעתי את זה אתמול — הזז לאתמול">ביצעתי</button>`;
+         <button class="btn btn--xs btn--ghost task-yesterday-btn" data-id="${_esc(task.id)}" title="סיימתי עד לכאן היום — כל המשימות הבאות ידחו">סיימתי עד לכאן היום</button>`;
 
     return `
       <div class="task-item ${done ? 'task-item--done' : ''}">

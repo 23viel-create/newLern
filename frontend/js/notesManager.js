@@ -141,6 +141,29 @@ const NotesManager = (() => {
     });
   }
 
+  // ── Bi-directional direction detection for checklist items ────────────────
+
+  function _applyCheckItemDir(itemEl) {
+    const span = itemEl.querySelector('span') || itemEl;
+    const text  = span.textContent || '';
+    const hasHebrew = /[֐-׾]/.test(text);
+    if (hasHebrew) {
+      itemEl.style.direction   = 'rtl';
+      itemEl.style.textAlign   = 'right';
+      itemEl.style.flexDirection = 'row-reverse';
+    } else if (text.trim()) {
+      itemEl.style.direction   = 'ltr';
+      itemEl.style.textAlign   = 'left';
+      itemEl.style.flexDirection = 'row';
+    }
+  }
+
+  function _bindBodyDirDetection(bodyEl) {
+    bodyEl.addEventListener('input', () => {
+      bodyEl.querySelectorAll('.note-check-item').forEach(_applyCheckItemDir);
+    });
+  }
+
   // ── Note editor modal ─────────────────────────────────────────────────────
 
   function _openNoteEditor(note, onSaved) {
@@ -190,6 +213,7 @@ const NotesManager = (() => {
       newItem.innerHTML = '<input type="checkbox"> <span contenteditable="true"></span>';
       checkItem.after(newItem);
       const span = newItem.querySelector('span');
+      _applyCheckItemDir(newItem); // initial direction (defaults to RTL until user types)
       const range = document.createRange();
       range.setStart(span, 0);
       range.collapse(true);
@@ -199,6 +223,11 @@ const NotesManager = (() => {
     if (body._checklistHandler) body.removeEventListener('keydown', body._checklistHandler);
     body._checklistHandler = _onKeyDown;
     body.addEventListener('keydown', _onKeyDown);
+
+    // Bi-directional direction detection for checklist items
+    _bindBodyDirDetection(body);
+    // Apply to any pre-existing items from saved richBody
+    body.querySelectorAll('.note-check-item').forEach(_applyCheckItemDir);
 
     // Save
     const saveBtn = document.getElementById('noteEditorSaveBtn');
@@ -315,9 +344,11 @@ const NotesManager = (() => {
     if (!_fullViewBound) {
       _fullViewBound = true;
       document.getElementById('notesFullAddBtn')?.addEventListener('click', () => {
+        // Use _loadAllAndRender so the freshly-created note is fetched from the
+        // server before re-rendering (prevents new notes from being invisible).
         _openNoteEditor(
           { id: null, title: '', richBody: '', isPinned: false, targetDate: null, dateCreated: null },
-          () => _renderFullView(),
+          _loadAllAndRender,
         );
       });
       document.getElementById('notesFullSearch')?.addEventListener('input', (e) => {
