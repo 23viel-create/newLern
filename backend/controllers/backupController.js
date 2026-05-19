@@ -36,29 +36,17 @@ function _preprocessHtmlForWord(raw) {
     return clean ? `style="${clean}"` : '';
   });
 
-  // 3. Convert markdown-style dash/bullet paragraphs to <li>
+  // 3. Convert all list items to literal dash paragraphs — bypasses Word's
+  //    list engine entirely, guaranteeing no auto-numbering and clean two-way sync.
   html = html.replace(
-    /<p[^>]*>\s*[-–•]\s*([\s\S]*?)<\/p>/gi,
-    '<li>$1</li>',
+    /<li[^>]*>([\s\S]*?)<\/li>/gis,
+    '<p style="margin-top:0;margin-bottom:0;margin-right:20px;direction:rtl;text-align:right">- $1</p>',
   );
 
-  // 4. Wrap consecutive <li> runs in <ul>
-  html = html.replace(
-    /(<li[^>]*>[\s\S]*?<\/li>\s*)+/gi,
-    (block) => `<ul>${block}</ul>`,
-  );
-
-  // 5. Rewrite all <ul> with explicit RTL solid-bullet style (prevents Word numbering)
-  html = html.replace(
-    /<ul[^>]*>/gi,
-    '<ul style="direction:rtl;margin:4pt 0 4pt 1.2em;list-style-type:disc">',
-  );
-
-  // 6. Rewrite all <li> with explicit solid bullet + RTL for Word
-  html = html.replace(
-    /<li[^>]*>/gi,
-    '<li style="list-style-type:disc;direction:rtl;text-align:right;mso-list:l0 level1 lfo1">',
-  );
+  // 4. Strip <ul>, </ul>, <ol>, </ol> wrappers — now empty after li conversion
+  html = html
+    .replace(/<\/?ul[^>]*>/gi, '')
+    .replace(/<\/?ol[^>]*>/gi, '');
 
   return html;
 }
