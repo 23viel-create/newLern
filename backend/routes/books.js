@@ -7,13 +7,18 @@ const { listBooks, deleteBook, saveBookMeta, BOOKS_DIR, SUPPORTED_EXTS } = requi
 
 const router = express.Router();
 
+// Multer passes originalname as latin1-decoded bytes; re-encode to get the true UTF-8 string.
+function _fixName(raw) {
+  return Buffer.from(raw, 'latin1').toString('utf8');
+}
+
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     if (!fs.existsSync(BOOKS_DIR)) fs.mkdirSync(BOOKS_DIR, { recursive: true });
     cb(null, BOOKS_DIR);
   },
   filename: (_req, file, cb) => {
-    const safeName = path.basename(file.originalname)
+    const safeName = path.basename(_fixName(file.originalname))
       .replace(/[^a-zA-Z0-9א-ת._\- ]/g, '_')
       .slice(0, 120);
     cb(null, safeName);
@@ -23,7 +28,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   fileFilter: (_req, file, cb) => {
-    if (SUPPORTED_EXTS.includes(path.extname(file.originalname).toLowerCase())) cb(null, true);
+    if (SUPPORTED_EXTS.includes(path.extname(_fixName(file.originalname)).toLowerCase())) cb(null, true);
     else cb(new Error('רק קבצי PDF, Word (.docx) ו-PowerPoint (.pptx) מותרים'));
   },
   limits: { fileSize: 50 * 1024 * 1024 },
@@ -41,9 +46,9 @@ router.get('/', (_req, res) => {
 // POST /api/books/upload
 router.post('/upload', upload.single('pdf'), (req, res) => {
   if (!req.file) return res.status(400).json({ success: false, message: 'לא התקבל קובץ' });
-  // Store original Hebrew file name in sidecar metadata
-  saveBookMeta(req.file.filename, req.file.originalname);
-  res.json({ success: true, data: { name: req.file.filename, displayName: req.file.originalname, size: req.file.size } });
+  const cleanName = _fixName(req.file.originalname);
+  saveBookMeta(req.file.filename, cleanName);
+  res.json({ success: true, data: { name: req.file.filename, displayName: cleanName, size: req.file.size } });
 });
 
 // GET /api/books/stream/:name  — serve file for inline viewer
