@@ -12,5 +12,18 @@
     "aiScopePreference": "repository_kodesh",
     "calendarDisplayPreference": "combined"
   },
-  "tasks": []
+  "tasks": [
+    {
+      "id": "1779180547219-1-ogsip",
+      "summaryPath": "אירועים",
+      "title": "בדיקת אירוע",
+      "type": "event",
+      "dueDate": "2026-05-20",
+      "completed": false,
+      "completedAt": null,
+      "reviewNumber": 0,
+      "scheduledFrom": "2026-05-19",
+      "programId": "event"
+    }
+  ]
 }

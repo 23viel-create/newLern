@@ -226,17 +226,24 @@ function getPrograms() {
   return schedule.programs.slice().sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
 }
 
-function createProgram(name, sequence) {
+function createProgram(name, sequence, periodic, intervalDays) {
   if (!name || typeof name !== 'string' || !name.trim()) throw new Error('שם תוכנית נדרש');
-  if (!Array.isArray(sequence) || !sequence.length || sequence.some(n => !Number.isInteger(n) || n < 1)) {
-    throw new Error('רצף חייב להיות מערך של מספרים שלמים חיוביים');
+  if (periodic) {
+    const n = parseInt(intervalDays, 10);
+    if (!Number.isInteger(n) || n < 1) throw new Error('מרווח בימים חייב להיות מספר שלם חיובי');
+  } else {
+    if (!Array.isArray(sequence) || !sequence.length || sequence.some(n => !Number.isInteger(n) || n < 1)) {
+      throw new Error('רצף חייב להיות מערך של מספרים שלמים חיוביים');
+    }
   }
   const schedule = readSchedule();
   _ensureDefaultPrograms(schedule);
   const program = {
     id: `prog-${Date.now()}`,
     name: name.trim(),
-    sequence,
+    sequence: periodic ? [] : sequence,
+    periodic: !!periodic,
+    intervalDays: periodic ? parseInt(intervalDays, 10) : undefined,
     usageCount: 0,
     createdAt: new Date().toISOString(),
   };
@@ -272,6 +279,72 @@ function completeTask(taskId) {
   return task;
 }
 
+function uncompleteTask(taskId) {
+  const schedule = readSchedule();
+  const task = schedule.tasks.find(t => t.id === taskId);
+  if (!task) throw new Error('משימה לא נמצאה');
+  task.completed   = false;
+  task.completedAt = null;
+  writeSchedule(schedule);
+  return task;
+}
+
+// Shift all remaining tasks in the same learning sequence forward/backward by `days`
+function _shiftSequence(schedule, anchorTask, fromDate, days) {
+  const seqKey = anchorTask.bookName || anchorTask.summaryPath;
+  schedule.tasks
+    .filter(t => (t.bookName || t.summaryPath) === seqKey && t.dueDate >= fromDate)
+    .forEach(t => { t.dueDate = addDaysToStr(t.dueDate, days); });
+}
+
+function postponeTask(taskId) {
+  const schedule = readSchedule();
+  const task = schedule.tasks.find(t => t.id === taskId);
+  if (!task) throw new Error('משימה לא נמצאה');
+  _shiftSequence(schedule, task, task.dueDate, 1);
+  writeSchedule(schedule);
+  return task;
+}
+
+function learnYesterday(taskId) {
+  const schedule = readSchedule();
+  const task = schedule.tasks.find(t => t.id === taskId);
+  if (!task) throw new Error('משימה לא נמצאה');
+  const originalDate = task.dueDate;
+  const yesterday    = addDaysToStr(todayStr(), -1);
+  task.completed   = true;
+  task.completedAt = new Date().toISOString();
+  task.dueDate     = yesterday;
+  // Pull subsequent tasks back by 1
+  const seqKey = task.bookName || task.summaryPath;
+  schedule.tasks
+    .filter(t => t.id !== taskId && (t.bookName || t.summaryPath) === seqKey && t.dueDate > originalDate)
+    .forEach(t => { t.dueDate = addDaysToStr(t.dueDate, -1); });
+  writeSchedule(schedule);
+  return task;
+}
+
+function addCustomEvent(dateStr, title) {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) throw new Error('תאריך לא תקין');
+  if (!title || !String(title).trim()) throw new Error('כותרת נדרשת');
+  const schedule = readSchedule();
+  const event = {
+    id:            genId(),
+    summaryPath:   'אירועים',
+    title:         String(title).trim(),
+    type:          'event',
+    dueDate:       dateStr,
+    completed:     false,
+    completedAt:   null,
+    reviewNumber:  0,
+    scheduledFrom: todayStr(),
+    programId:     'event',
+  };
+  schedule.tasks.push(event);
+  writeSchedule(schedule);
+  return event;
+}
+
 function planSummary(summaryPath, title, programId) {
   const schedule = readSchedule();
   _ensureDefaultPrograms(schedule);
@@ -283,9 +356,8 @@ function planSummary(summaryPath, title, programId) {
   // Increment usage count
   program.usageCount = (program.usageCount || 0) + 1;
 
-  const intervals = program.sequence || getIntervals(schedule.settings);
-  const today     = todayStr();
-  const newTasks  = [];
+  const today    = todayStr();
+  const newTasks = [];
 
   newTasks.push({
     id: genId(), summaryPath, title,
@@ -295,15 +367,30 @@ function planSummary(summaryPath, title, programId) {
     programId: program.id,
   });
 
-  intervals.forEach((interval, i) => {
-    newTasks.push({
-      id: genId(), summaryPath, title,
-      type: 'review', dueDate: nextWorkDay(today, interval),
-      completed: false, completedAt: null,
-      reviewNumber: i + 1, scheduledFrom: today,
-      programId: program.id,
+  if (program.periodic) {
+    // Infinite periodic: generate 1 year of repeating reviews
+    const interval = program.intervalDays || 7;
+    for (let i = 1; i * interval <= 365; i++) {
+      newTasks.push({
+        id: genId(), summaryPath, title,
+        type: 'review', dueDate: nextWorkDay(today, i * interval),
+        completed: false, completedAt: null,
+        reviewNumber: i, scheduledFrom: today,
+        programId: program.id, periodic: true,
+      });
+    }
+  } else {
+    const intervals = program.sequence || getIntervals(schedule.settings);
+    intervals.forEach((interval, i) => {
+      newTasks.push({
+        id: genId(), summaryPath, title,
+        type: 'review', dueDate: nextWorkDay(today, interval),
+        completed: false, completedAt: null,
+        reviewNumber: i + 1, scheduledFrom: today,
+        programId: program.id,
+      });
     });
-  });
+  }
 
   schedule.tasks.push(...newTasks);
   writeSchedule(schedule);
@@ -365,7 +452,9 @@ function saveSettings(newSettings) {
 }
 
 module.exports = {
-  getTodayTasks, completeTask,
+  getTodayTasks, completeTask, uncompleteTask,
+  postponeTask, learnYesterday,
+  addCustomEvent,
   planSummary,
   getCalendarData,
   getSettings, saveSettings,

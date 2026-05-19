@@ -171,6 +171,11 @@ function _bindExtendParashot() {
 function _bindProgramsPanel() {
   document.getElementById('addProgramBtn').addEventListener('click', _addProgram);
   document.getElementById('aiParseProgramBtn').addEventListener('click', _aiParseProgram);
+  document.getElementById('newProgramPeriodic')?.addEventListener('change', (e) => {
+    const isP = e.target.checked;
+    document.getElementById('newProgramSeqGroup')?.classList.toggle('hidden', isP);
+    document.getElementById('newProgramIntervalGroup')?.classList.toggle('hidden', !isP);
+  });
 }
 
 async function loadPrograms() {
@@ -182,15 +187,20 @@ async function loadPrograms() {
       list.innerHTML = '<p class="placeholder-text">אין תוכניות</p>';
       return;
     }
-    list.innerHTML = programs.map(p => `
+    list.innerHTML = programs.map(p => {
+      const seqInfo = p.periodic
+        ? `<span class="badge badge--warning" style="font-size:0.7rem">∞ כל ${p.intervalDays} ימים</span>`
+        : `<span class="program-item__seq">[${(p.sequence || []).join(', ')}]</span>`;
+      return `
       <div class="program-item">
         <span class="program-item__name">${escHtml(p.name)}</span>
-        <span class="program-item__seq">[${(p.sequence || []).join(', ')}]</span>
+        ${seqInfo}
         <span class="program-item__usage">שימושים: ${p.usageCount || 0}</span>
         ${p.id !== 'default'
           ? `<button class="btn btn--xs btn--danger-ghost" data-prog-id="${escHtml(p.id)}" onclick="deleteProgram(this.dataset.progId)">🗑️</button>`
           : '<span class="badge badge--info" style="font-size:0.7rem">בסיסי</span>'}
-      </div>`).join('');
+      </div>`;
+    }).join('');
   } catch (err) {
     list.innerHTML = `<p class="placeholder-text error-text">שגיאה: ${escHtml(err.message)}</p>`;
   }
@@ -208,17 +218,23 @@ async function deleteProgram(id) {
 }
 
 async function _addProgram() {
-  const name    = document.getElementById('newProgramName').value.trim();
-  const seqRaw  = document.getElementById('newProgramSeq').value;
+  const name     = document.getElementById('newProgramName').value.trim();
+  const periodic = document.getElementById('newProgramPeriodic')?.checked || false;
+  const seqRaw   = document.getElementById('newProgramSeq').value;
+  const intervalDays = parseInt(document.getElementById('newProgramInterval')?.value || '7', 10);
   const sequence = seqRaw.split(',').map(s => parseInt(s.trim(), 10)).filter(n => n > 0);
 
   if (!name) { alert('יש להזין שם לתוכנית'); return; }
-  if (!sequence.length) { alert('יש להזין רצף ימים תקין'); return; }
+  if (periodic) {
+    if (!intervalDays || intervalDays < 1) { alert('יש להזין מרווח בימים תקין'); return; }
+  } else {
+    if (!sequence.length) { alert('יש להזין רצף ימים תקין'); return; }
+  }
 
   const btn = document.getElementById('addProgramBtn');
   btn.disabled = true;
   try {
-    await Api.createProgram(name, sequence);
+    await Api.createProgram(name, sequence, periodic, intervalDays);
     document.getElementById('newProgramName').value  = '';
     document.getElementById('newProgramSeq').value   = '';
     document.getElementById('aiProgramText').value   = '';

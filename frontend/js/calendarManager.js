@@ -569,7 +569,45 @@ const CalendarManager = (() => {
         cell.classList.add('cal-cell--selected');
         _renderTaskPanel(selectedDate);
       });
+      // Double-click → quick event entry
+      cell.addEventListener('dblclick', () => {
+        if (cell.classList.contains('cal-cell--blocked')) return;
+        _openQuickEventModal(cell.dataset.date);
+      });
     });
+  }
+
+  function _openQuickEventModal(dateStr) {
+    const modal = document.getElementById('quickEventModal');
+    if (!modal) return;
+    document.getElementById('quickEventDate').textContent = dateStr;
+    document.getElementById('quickEventInput').value = '';
+    modal.classList.remove('hidden');
+    document.getElementById('quickEventInput').focus();
+
+    // wire confirm once (remove old listeners via clone)
+    const confirmBtn = document.getElementById('quickEventConfirmBtn');
+    const newConfirm = confirmBtn.cloneNode(true);
+    confirmBtn.replaceWith(newConfirm);
+    newConfirm.addEventListener('click', async () => {
+      const title = document.getElementById('quickEventInput').value.trim();
+      if (!title) return;
+      try {
+        newConfirm.disabled = true;
+        await Api.addCalendarEvent(dateStr, title);
+        _monthCache = {};
+        modal.classList.add('hidden');
+        loadCalendar();
+      } catch (err) {
+        newConfirm.disabled = false;
+        alert(`שגיאה: ${err.message}`);
+      }
+    });
+
+    const cancelBtn = document.getElementById('quickEventCancelBtn');
+    const newCancel = cancelBtn.cloneNode(true);
+    cancelBtn.replaceWith(newCancel);
+    newCancel.addEventListener('click', () => modal.classList.add('hidden'));
   }
 
   function _restoreSelection(grid) {
@@ -630,6 +668,7 @@ const CalendarManager = (() => {
 
   function _colorClass(day) {
     if (day.isShabbat || day.isHoliday) return '';
+    const thr = calendarData?.settings?.heavyLoadThreshold ?? 9;
     if (day.isPast || day.isToday) {
       if (day.totalTasks === 0) return '';
       const pct = day.doneTasks / day.totalTasks;
@@ -637,11 +676,14 @@ const CalendarManager = (() => {
       if (pct >= 0.01) return 'cal-cell--partial';
       return 'cal-cell--missed';
     }
-    const n   = day.totalTasks;
-    const thr = calendarData?.settings?.heavyLoadThreshold ?? 9;
-    if (n === 0)   return 'cal-cell--load-0';
-    if (n <= 3)    return 'cal-cell--load-low';
-    if (n < thr)   return 'cal-cell--load-mid';
+    // Future days
+    const n = day.totalTasks;
+    if (n === 0)            return 'cal-cell--load-0';
+    // All future tasks already completed → solid green
+    if (n > 0 && day.doneTasks >= n) return 'cal-cell--done';
+    // Load-based heatmap: 0–50% of threshold = yellow, >50% = brown
+    const half = Math.ceil(thr / 2);
+    if (n <= half) return 'cal-cell--load-low';
     return 'cal-cell--load-high';
   }
 
@@ -756,17 +798,51 @@ const CalendarManager = (() => {
 
       panel.innerHTML = tasks.map(_renderTaskItem).join('');
 
+      // ── Complete ──
       panel.querySelectorAll('.task-done-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
           try {
             btn.disabled = true;
             await Api.completeTask(btn.dataset.id, 3);
-            _monthCache = {}; // clear cache for fresh reload
+            _monthCache = {};
             loadCalendar();
-          } catch (err) {
-            btn.disabled = false;
-            alert(`שגיאה: ${err.message}`);
-          }
+          } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
+        });
+      });
+
+      // ── Undo complete ──
+      panel.querySelectorAll('.task-undo-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            btn.disabled = true;
+            await Api.uncompleteTask(btn.dataset.id);
+            _monthCache = {};
+            loadCalendar();
+          } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
+        });
+      });
+
+      // ── Postpone (+1 day cascade) ──
+      panel.querySelectorAll('.task-postpone-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            btn.disabled = true;
+            await Api.postponeTask(btn.dataset.id);
+            _monthCache = {};
+            loadCalendar();
+          } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
+        });
+      });
+
+      // ── Learned yesterday (−1 day cascade) ──
+      panel.querySelectorAll('.task-yesterday-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          try {
+            btn.disabled = true;
+            await Api.learnYesterday(btn.dataset.id);
+            _monthCache = {};
+            loadCalendar();
+          } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
         });
       });
     } catch (err) {
@@ -776,27 +852,29 @@ const CalendarManager = (() => {
   }
 
   function _renderTaskItem(task) {
-    const TYPE_LABEL = { completion: 'לימוד', review: 'חזרה', quiz: 'חידון', study: 'תרגול' };
+    const TYPE_LABEL = { completion: 'לימוד', review: 'חזרה', quiz: 'חידון', study: 'תרגול', event: 'אירוע', 'learning-plan': 'מסלול' };
     const typeLabel  = TYPE_LABEL[task.type] || task.type;
     const done       = task.completed;
     const revBadge   = task.reviewNumber
       ? `<span class="task-item__num">חזרה ${task.reviewNumber}</span>` : '';
-
     const hebDate    = _getHebDateForStr(task.dueDate);
     const hebBadge   = hebDate ? `<span class="task-item__hebdate">${hebDate}</span>` : '';
+
+    const actions = done
+      ? `<span class="task-item__status">✓ הושלם</span>
+         <button class="btn btn--xs btn--ghost task-undo-btn" data-id="${_esc(task.id)}" title="בטל השלמה">↩</button>`
+      : `<button class="btn btn--xs btn--primary task-done-btn" data-id="${_esc(task.id)}">סיימתי ✓</button>
+         <button class="btn btn--xs btn--ghost task-postpone-btn" data-id="${_esc(task.id)}" title="דחה יום קדימה">דחה ←</button>
+         <button class="btn btn--xs btn--ghost task-yesterday-btn" data-id="${_esc(task.id)}" title="למדתי את זה אתמול">אתמול</button>`;
 
     return `
       <div class="task-item ${done ? 'task-item--done' : ''}">
         <div class="task-item__info">
           <span class="task-item__type">${_esc(typeLabel)}</span>
           <span class="task-item__title">${_esc(task.title || task.summaryPath)}</span>
-          ${revBadge}
-          ${hebBadge}
+          ${revBadge}${hebBadge}
         </div>
-        ${done
-          ? '<span class="task-item__status">✓ הושלם</span>'
-          : `<button class="btn btn--xs btn--primary task-done-btn" data-id="${_esc(task.id)}">סיימתי ✓</button>`
-        }
+        <div class="task-item__actions">${actions}</div>
       </div>`;
   }
 

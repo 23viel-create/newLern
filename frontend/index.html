@@ -404,6 +404,11 @@
           <p class="hint">שוחח עם ספריית המאמרים בנושא תיאוריות למידה, חזרה מרווחת ושיטות לימוד יעיל.</p>
           <button id="acLearningProgramBtn" class="btn btn--secondary btn--full" style="margin-top:0.8rem">✨ צור תוכנית לימוד אישית</button>
           <hr class="settings-divider" />
+          <h3 style="font-size:0.9rem;margin-bottom:0.4rem">⚖️ ייעוץ איזון עומסים</h3>
+          <p class="hint" style="font-size:0.78rem">ה-AI ינתח את לוח הלמידה שלך ויציע הפצה מחדש של ימים עמוסים.</p>
+          <button id="optimizeBtn" class="btn btn--ghost btn--full btn--sm" style="margin-top:0.5rem">🤖 ייעוץ AI להפחתת עומסים</button>
+          <div id="optimizeResult" class="hidden" style="margin-top:0.8rem;font-size:0.82rem"></div>
+          <hr class="settings-divider" />
           <p class="hint" style="font-size:0.8rem">המאמרים מאוחסנים מקומית. ה-AI מבסס תשובותיו אך ורק עליהם.</p>
         </div>
         <div class="active-chat-main card">
@@ -438,6 +443,13 @@
             <label class="form-label" for="syllabusPace">קצב התקדמות</label>
             <input type="text" id="syllabusPace" class="input-field input-field--full"
                    placeholder="לדוגמה: דף אחד, שני פרקים, הלכה אחת, עמוד אחד..." dir="rtl" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="syllabusStartingPoint">נקודת התחלה בספר (אופציונלי)</label>
+            <input type="text" id="syllabusStartingPoint" class="input-field input-field--full"
+                   placeholder="מההתחלה" dir="rtl" />
+            <p class="hint" style="font-size:0.78rem">לדוגמה: פרק ד׳, דף כ׳, הלכה ג׳ — ה-AI יתחיל את המסלול מנקודה זו</p>
           </div>
 
           <div class="form-group">
@@ -658,9 +670,22 @@
                  placeholder="לדוגמה: חזרה שבועית" maxlength="80" dir="rtl" />
         </div>
         <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="newProgramPeriodic" />
+            תוכנית אינסופית (חזרה תקופתית קבועה)
+          </label>
+          <p class="hint" style="font-size:0.78rem;margin-top:0.2rem">תוכנית תקופתית מייצרת חזרות כל N ימים, ללא הגבלה (עד שנה קדימה)</p>
+        </div>
+        <div id="newProgramSeqGroup" class="form-group">
           <label class="form-label" for="newProgramSeq">רצף ימים (מופרד בפסיקים)</label>
           <input type="text" id="newProgramSeq" class="input-field input-field--full"
                  placeholder="לדוגמה: 1, 7, 30, 90" dir="ltr" />
+        </div>
+        <div id="newProgramIntervalGroup" class="form-group hidden">
+          <label class="form-label" for="newProgramInterval">מרווח בימים בין חזרות</label>
+          <input type="number" id="newProgramInterval" class="input-field input-field--narrow"
+                 min="1" max="365" value="7" dir="ltr" />
+          <span class="hint" style="margin-right:0.5rem">ימים</span>
         </div>
         <div class="form-group">
           <label class="form-label">או תאר בעברית חופשית (לניתוח AI)</label>
@@ -999,6 +1024,24 @@
       <div class="modal__actions">
         <button id="planProgramCancelBtn"  class="btn btn--secondary">ביטול</button>
         <button id="planProgramConfirmBtn" class="btn btn--primary">תזמן ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── מודל הוספת אירוע מהיר ── -->
+  <div id="quickEventModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal__overlay"></div>
+    <div class="modal__box">
+      <h2 class="modal__title">📅 הוסף אירוע ליום זה</h2>
+      <p class="hint" style="margin-bottom:0.6rem">תאריך: <strong id="quickEventDate"></strong></p>
+      <div class="form-group">
+        <label class="form-label" for="quickEventInput">כותרת האירוע</label>
+        <input type="text" id="quickEventInput" class="input-field input-field--full"
+               placeholder="לדוגמה: מפגש למידה, בחינה, סיום מסכת..." dir="rtl" maxlength="120" />
+      </div>
+      <div class="modal__actions">
+        <button id="quickEventCancelBtn"  class="btn btn--secondary">ביטול</button>
+        <button id="quickEventConfirmBtn" class="btn btn--primary">הוסף אירוע ✓</button>
       </div>
     </div>
   </div>

@@ -65,6 +65,7 @@ async function generateLearningPlan(req, res) {
       endCondition,   // 'book' | 'date'
       targetDate,     // ISO date string (used when endCondition === 'date')
       startDate,      // ISO date string, defaults to today
+      startingPoint,  // optional chapter/page to start from
       skipShabbat,
       skipHolidays,
     } = req.body;
@@ -76,16 +77,21 @@ async function generateLearningPlan(req, res) {
     const safeBook   = String(bookName).slice(0, 120);
     const safeAuthor = String(authorName || '').slice(0, 80);
     const safePace   = String(pace).slice(0, 120);
+    const safePoint  = startingPoint ? String(startingPoint).slice(0, 120).trim() : '';
 
     // ── Step 1: AI generates syllabus array ──────────────────────────────────
     const endNote = endCondition === 'date' && targetDate
       ? `ועד לתאריך ${targetDate} (הגבל את מספר הפריטים בהתאם)`
       : 'עד סוף הספר (הפק רשימה שלמה)';
 
+    const startNote = safePoint && safePoint !== 'מההתחלה'
+      ? `\nנקודת התחלה: ${safePoint} — הפריט הראשון במערך חייב להתחיל מנקודה זו בדיוק.`
+      : '';
+
     const prompt = `אתה מומחה בתכנון לימוד של ספרות תורנית ואקדמית.
 המשתמש מבקש לתכנן לימוד של הספר: "${safeBook}"${safeAuthor ? ` (מאת ${safeAuthor})` : ''}.
 קצב ההתקדמות: "${safePace}" לכל יום לימוד.
-תנאי סיום: ${endNote}.
+תנאי סיום: ${endNote}.${startNote}
 
 המשימה שלך:
 1. נתח את מבנה הספר (פרקים, דפים, הלכות, חלקים — לפי מה שמתאים לספר זה).
@@ -191,4 +197,48 @@ async function generateLearningPlan(req, res) {
   }
 }
 
-module.exports = { generateLearningPlan };
+// ── AI Load-Balancing Consultant ──────────────────────────────────────────────
+
+async function optimizePlan(req, res) {
+  try {
+    const schedule  = readSchedule();
+    const threshold = schedule.settings.heavyLoadThreshold || 9;
+    const today     = new Date().toISOString().slice(0, 10);
+
+    const future = schedule.tasks.filter(t => !t.completed && t.dueDate >= today);
+    const byDate  = {};
+    for (const t of future) {
+      if (!byDate[t.dueDate]) byDate[t.dueDate] = [];
+      byDate[t.dueDate].push({ id: t.id, title: t.title });
+    }
+
+    const heavyDates = Object.entries(byDate)
+      .filter(([, tasks]) => tasks.length > threshold)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, tasks]) => ({ date, count: tasks.length }));
+
+    if (!heavyDates.length) {
+      return res.json({
+        success: true,
+        data: { recommendation: 'לוח הלמידה שלך מאוזן — אין ימים עמוסים מעבר לסף הקבוע.', heavyDates: [], threshold },
+      });
+    }
+
+    const summaryLines = heavyDates.map(d => `- ${d.date}: ${d.count} משימות`).join('\n');
+    const prompt = `אתה יועץ לוח לימוד מומחה. להלן ימים עמוסים בלוח הלמידה (סף: ${threshold} משימות):
+${summaryLines}
+
+נתח את העומסים והצע תוכנית איזון מפורטת בעברית:
+1. אילו ימים עמוסים ביותר ועל כמה להוריד כל יום.
+2. לאיזה ימים סמוכים (קדימה/אחורה) כדאי להעביר משימות.
+3. הסבר קצר מדוע האיזון ישפר את יעילות הלמידה.
+ענה בעברית בלבד, בצורה ברורה ומפורטת.`;
+
+    const text = await _callGemini(prompt);
+    res.json({ success: true, data: { recommendation: text, heavyDates, threshold } });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+}
+
+module.exports = { generateLearningPlan, optimizePlan };

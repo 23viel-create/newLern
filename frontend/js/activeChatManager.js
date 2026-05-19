@@ -95,14 +95,15 @@ const ActiveChatManager = (() => {
   }
 
   async function _generateSyllabus() {
-    const bookName   = document.getElementById('syllabusBook')?.value.trim();
-    const authorName = document.getElementById('syllabusAuthor')?.value.trim() || '';
-    const pace       = document.getElementById('syllabusPace')?.value.trim();
-    const startDate  = document.getElementById('syllabusStartDate')?.value || '';
-    const endCond    = document.querySelector('input[name="syllabusEnd"]:checked')?.value || 'book';
-    const targetDate = document.getElementById('syllabusTargetDate')?.value || '';
-    const skipShabbat  = document.getElementById('syllabusSkipShabbat')?.checked ?? true;
-    const skipHolidays = document.getElementById('syllabusSkipHolidays')?.checked ?? true;
+    const bookName      = document.getElementById('syllabusBook')?.value.trim();
+    const authorName    = document.getElementById('syllabusAuthor')?.value.trim() || '';
+    const pace          = document.getElementById('syllabusPace')?.value.trim();
+    const startDate     = document.getElementById('syllabusStartDate')?.value || '';
+    const startingPoint = document.getElementById('syllabusStartingPoint')?.value.trim() || '';
+    const endCond       = document.querySelector('input[name="syllabusEnd"]:checked')?.value || 'book';
+    const targetDate    = document.getElementById('syllabusTargetDate')?.value || '';
+    const skipShabbat   = document.getElementById('syllabusSkipShabbat')?.checked ?? true;
+    const skipHolidays  = document.getElementById('syllabusSkipHolidays')?.checked ?? true;
 
     if (!bookName) { alert('יש להזין שם ספר'); return; }
     if (!pace)     { alert('יש להזין קצב התקדמות'); return; }
@@ -121,7 +122,7 @@ const ActiveChatManager = (() => {
       const res = await Api.learningPlanGenerate({
         bookName, authorName, pace, endCondition: endCond,
         targetDate: endCond === 'date' ? targetDate : undefined,
-        startDate, skipShabbat, skipHolidays,
+        startDate, startingPoint: startingPoint || undefined, skipShabbat, skipHolidays,
       });
 
       const { count, firstDate, lastDate, tasks } = res;
@@ -152,6 +153,30 @@ const ActiveChatManager = (() => {
     }
   }
 
+  async function _runOptimize() {
+    const btn    = document.getElementById('optimizeBtn');
+    const result = document.getElementById('optimizeResult');
+    if (!btn || !result) return;
+    btn.disabled = true;
+    result.innerHTML = '<p class="hint">⏳ ה-AI מנתח את לוח הלמידה...</p>';
+    result.classList.remove('hidden');
+    try {
+      const res = await Api.learningPlanOptimize();
+      const { recommendation, heavyDates, threshold } = res;
+      const heavyHtml = heavyDates && heavyDates.length
+        ? `<p class="hint" style="margin-bottom:0.4rem"><strong>ימים עמוסים (מעל ${threshold} משימות):</strong></p>` +
+          heavyDates.map(d => `<div class="hint">📅 ${d.date}: <strong>${d.count}</strong> משימות</div>`).join('')
+        : '';
+      result.innerHTML = `
+        ${heavyHtml}
+        <div class="optimize-recommendation">${escHtml(recommendation).replace(/\n/g,'<br>')}</div>`;
+    } catch (err) {
+      result.innerHTML = `<p class="hint error-text">שגיאה: ${escHtml(err.message)}</p>`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   // ── Init ──────────────────────────────────────────────────────────────────
   function init() {
     if (_bound) return;
@@ -161,6 +186,7 @@ const ActiveChatManager = (() => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') _send();
     });
     document.getElementById('acLearningProgramBtn')?.addEventListener('click', _generateProgram);
+    document.getElementById('optimizeBtn')?.addEventListener('click', _runOptimize);
     _bindTabs();
     _bindSyllabusForm();
   }

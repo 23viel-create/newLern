@@ -438,9 +438,9 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
 .legend-item--done::before    { background: #dcfce7; }
 .legend-item--partial::before { background: #ffedd5; }
 .legend-item--missed::before  { background: #fee2e2; }
-.legend-item--load-low::before  { background: #fefce8; }
-.legend-item--load-mid::before  { background: #c8956c; }
-.legend-item--load-high::before { background: #1e1e1e; }
+.legend-item--load-low::before  { background: #fef08a; }
+.legend-item--load-mid::before  { background: #fef08a; }
+.legend-item--load-high::before { background: #92400e; }
 
 /* ===== Calendar Grid ===== */
 .cal-grid {
@@ -510,9 +510,9 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
 
 /* ── Future day colours ── */
 .cal-cell--load-0    { background: #fff;    color: var(--color-text); }
-.cal-cell--load-low  { background: #fefce8; color: #854d0e; }
-.cal-cell--load-mid  { background: #c8956c; color: #2d1200; }
-.cal-cell--load-high { background: #1e1e1e; color: #f5f5f5; }
+.cal-cell--load-low  { background: #fef08a; color: #713f12; } /* צהוב — עד 50% מהסף */
+.cal-cell--load-mid  { background: #fef08a; color: #713f12; } /* צהוב — (alias) */
+.cal-cell--load-high { background: #92400e; color: #fef3c7; } /* חום — מעל 50% מהסף */
 
 /* ── Special days ── */
 .cal-cell--shabbat { background: #eff6ff; }
@@ -542,6 +542,7 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
 .task-item__title { font-size: 0.82rem; white-space: normal; word-wrap: break-word; overflow: visible; }
 .task-item__num   { font-size: 0.68rem; color: var(--color-text-muted); }
 .task-item__status { font-size: 0.8rem; color: var(--color-success); white-space: nowrap; flex-shrink: 0; }
+.task-item__actions { display: flex; gap: 0.3rem; align-items: center; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
 
 /* ===== Settings ===== */
 .settings-panel { margin-bottom: 1.5rem; }
@@ -1370,3 +1371,20 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
 .syllabus-result__preview { max-height: 220px; overflow-y: auto; }
 .syllabus-day { padding: 0.2rem 0; border-bottom: 1px solid var(--color-border); }
 .syllabus-day:last-child { border-bottom: none; }
+
+/* ── ייעוץ איזון עומסים ──────────────────────────────────────────────────── */
+.optimize-recommendation {
+  background: var(--color-bg); border: 1px solid var(--color-border);
+  border-radius: var(--radius); padding: 0.7rem 0.9rem;
+  font-size: 0.83rem; line-height: 1.7; margin-top: 0.6rem;
+  max-height: 300px; overflow-y: auto;
+}
+
+/* ── badge warning (for periodic programs) ──────────────────────────────── */
+.badge--warning { background: #fef3c7; color: #92400e; }
+
+/* ── quick event modal title ─────────────────────────────────────────────── */
+.modal__title { margin-bottom: 0.5rem; font-size: 1.1rem; }
+
+/* ── task hebdate badge ─────────────────────────────────────────────────── */
+.task-item__hebdate { font-size: 0.68rem; color: var(--color-text-muted); }

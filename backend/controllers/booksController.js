@@ -10,13 +10,34 @@ function ensureDir() {
   if (!fs.existsSync(BOOKS_DIR)) fs.mkdirSync(BOOKS_DIR, { recursive: true });
 }
 
+function _readMeta(filename) {
+  try {
+    const metaPath = path.join(BOOKS_DIR, filename + '.meta.json');
+    if (fs.existsSync(metaPath)) return JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+  } catch {}
+  return {};
+}
+
+function saveBookMeta(filename, originalName) {
+  try {
+    const metaPath = path.join(BOOKS_DIR, filename + '.meta.json');
+    fs.writeFileSync(metaPath, JSON.stringify({ originalName }));
+  } catch {}
+}
+
 function listBooks() {
   ensureDir();
   return fs.readdirSync(BOOKS_DIR)
     .filter(f => SUPPORTED_EXTS.includes(path.extname(f).toLowerCase()))
     .map(f => {
       const stat = fs.statSync(path.join(BOOKS_DIR, f));
-      return { name: f, size: stat.size, uploadedAt: stat.birthtime.toISOString() };
+      const meta = _readMeta(f);
+      return {
+        name:        f,
+        displayName: meta.originalName || f,
+        size:        stat.size,
+        uploadedAt:  stat.birthtime.toISOString(),
+      };
     })
     .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
 }
@@ -80,4 +101,4 @@ async function getBooksContext(maxCharsPerBook = 2500, selectedBooks = null) {
   return parts.join('\n\n---\n\n');
 }
 
-module.exports = { listBooks, deleteBook, getBooksContext, BOOKS_DIR, SUPPORTED_EXTS };
+module.exports = { listBooks, deleteBook, saveBookMeta, getBooksContext, BOOKS_DIR, SUPPORTED_EXTS };

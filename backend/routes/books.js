@@ -3,7 +3,7 @@ const express = require('express');
 const multer  = require('multer');
 const path    = require('path');
 const fs      = require('fs');
-const { listBooks, deleteBook, BOOKS_DIR, SUPPORTED_EXTS } = require('../controllers/booksController');
+const { listBooks, deleteBook, saveBookMeta, BOOKS_DIR, SUPPORTED_EXTS } = require('../controllers/booksController');
 
 const router = express.Router();
 
@@ -41,7 +41,9 @@ router.get('/', (_req, res) => {
 // POST /api/books/upload
 router.post('/upload', upload.single('pdf'), (req, res) => {
   if (!req.file) return res.status(400).json({ success: false, message: 'לא התקבל קובץ' });
-  res.json({ success: true, data: { name: req.file.filename, size: req.file.size } });
+  // Store original Hebrew file name in sidecar metadata
+  saveBookMeta(req.file.filename, req.file.originalname);
+  res.json({ success: true, data: { name: req.file.filename, displayName: req.file.originalname, size: req.file.size } });
 });
 
 // GET /api/books/stream/:name  — serve file for inline viewer

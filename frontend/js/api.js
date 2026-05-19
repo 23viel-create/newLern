@@ -87,6 +87,10 @@ const Api = {
   getSchedule:      ()              => apiFetch('/schedule'),
   getTodayTasks:    ()              => apiFetch('/schedule/today'),
   completeTask:     (id, quality)   => apiFetch(`/schedule/${id}/complete`, { method: 'PATCH', body: { quality } }),
+  uncompleteTask:   (id)            => apiFetch(`/schedule/${id}/uncomplete`, { method: 'PATCH' }),
+  postponeTask:     (id)            => apiFetch(`/schedule/${id}/postpone`, { method: 'POST' }),
+  learnYesterday:   (id)            => apiFetch(`/schedule/${id}/learn-yesterday`, { method: 'POST' }),
+  addCalendarEvent: (dateStr, title)=> apiFetch('/schedule/event', { method: 'POST', body: { dateStr, title } }),
   getCalendarData:  (month)         => apiFetch(`/schedule/calendar?month=${encodeURIComponent(month)}`),
   planSummary:      (summaryPath, title, programId) =>
     apiFetch('/schedule/plan', { method: 'POST', body: { summaryPath, title, programId } }),
@@ -94,9 +98,9 @@ const Api = {
   saveScheduleSettings: (settings)  => apiFetch('/schedule/settings', { method: 'PUT', body: settings }),
 
   // ── תוכניות חזרה ─────────────────────────────────────────────────────────
-  getPrograms:    ()                       => apiFetch('/schedule/programs'),
-  createProgram:  (name, sequence)         => apiFetch('/schedule/programs', { method: 'POST', body: { name, sequence } }),
-  deleteProgram:  (id)                     => apiFetch(`/schedule/programs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  getPrograms:    ()                                            => apiFetch('/schedule/programs'),
+  createProgram:  (name, sequence, periodic, intervalDays)     => apiFetch('/schedule/programs', { method: 'POST', body: { name, sequence, periodic, intervalDays } }),
+  deleteProgram:  (id)                                         => apiFetch(`/schedule/programs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 
   // ── ייבוא קובץ לתיקייה ───────────────────────────────────────────────────
   importFileToFolder: (folderPath, file) => {
@@ -190,6 +194,8 @@ const Api = {
     apiFetch('/calendar/extend-parashot', { method: 'POST' }),
   learningPlanGenerate: (params) =>
     apiFetch('/learning-plans/generate', { method: 'POST', body: params }),
+  learningPlanOptimize: () =>
+    apiFetch('/learning-plans/optimize', { method: 'POST' }),
 
   // ── מאגר ספרים ───────────────────────────────────────────────────────────
   getBooks:      () => apiFetch('/books'),

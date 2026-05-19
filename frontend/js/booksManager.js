@@ -92,7 +92,7 @@ const BooksManager = (() => {
           <input type="checkbox" class="book-item__select" data-book-name="${escHtml(b.name)}"
                  id="book_${escHtml(b.name)}" title="בחר ספר זה ל-AI" />
           <label for="book_${escHtml(b.name)}" class="book-item__icon" aria-hidden="true">${_bookIcon(b.name)}</label>
-          <span class="book-item__name">${escHtml(b.name)}</span>
+          <span class="book-item__name">${escHtml(b.displayName || b.name)}</span>
           <span class="book-item__size">${_fmtSize(b.size)}</span>
           <button class="btn btn--xs btn--ghost"
                   onclick="BooksManager.viewBook('${escHtml(b.name)}')"
