@@ -84,6 +84,8 @@ function _htmlToDocxParagraphs(html) {
 
   // Normalise block boundaries → newline markers; bullet items get a prefix
   const normalised = (html || '')
+    .replace(/<\/h[1-6]>/gi, '\n')
+    .replace(/<h[1-6][^>]*>/gi, '')
     .replace(/<li[^>]*>/gi,  BULLET)
     .replace(/<\/li>/gi,     '\n')
     .replace(/<br\s*\/?>/gi, '\n')
@@ -241,8 +243,24 @@ const WORD_CACHE_DIR = path.join(DATA_ROOT, 'word_cache');
 async function openInWord(nodePath, title, html) {
   fs.mkdirSync(WORD_CACHE_DIR, { recursive: true });
 
-  // Build .docx
-  const content = html !== undefined ? html : getSummaryContent(nodePath);
+  // Dual-mirror: if document.docx exists but content.txt is newer, regenerate from content
+  let content;
+  if (html !== undefined) {
+    content = html;
+  } else {
+    content = getSummaryContent(nodePath);
+    // Check if existing document.docx is stale compared to content.txt
+    const summaryDocxPath = path.join(summariesRoot, nodePath, 'document.docx');
+    const contentTxtPath  = path.join(summariesRoot, nodePath, 'content.txt');
+    if (fs.existsSync(summaryDocxPath) && fs.existsSync(contentTxtPath)) {
+      const docxMtime    = fs.statSync(summaryDocxPath).mtimeMs;
+      const contentMtime = fs.statSync(contentTxtPath).mtimeMs;
+      // If content.txt was modified more than 2 s after document.docx, stale → regenerate
+      if (contentMtime > docxMtime + 2000) {
+        fs.unlinkSync(summaryDocxPath); // remove stale copy so it gets rebuilt below
+      }
+    }
+  }
   const buffer  = await buildDocx(title || nodePath, content);
 
   // Save to summary folder as the canonical document.docx (dual-file architecture)

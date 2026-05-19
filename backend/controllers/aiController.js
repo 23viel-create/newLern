@@ -288,11 +288,24 @@ async function suggestSingleQuestion({ summaryPath, summaryTitle, type }) {
     const summaryDir = path.join(summariesRoot, summaryPath);
     const txtFile  = path.join(summaryDir, 'content.txt');
     const htmlFile = path.join(summaryDir, 'content.html');
+
+    let raw = '';
     if (fs.existsSync(txtFile)) {
-      content = fs.readFileSync(txtFile, 'utf-8');
+      raw = fs.readFileSync(txtFile, 'utf-8');
     } else if (fs.existsSync(htmlFile)) {
-      content = fs.readFileSync(htmlFile, 'utf-8')
-        .replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      raw = fs.readFileSync(htmlFile, 'utf-8');
+    }
+
+    // Strip ALL HTML tags thoroughly (content.txt stores innerHTML which is HTML)
+    if (raw) {
+      content = raw
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
     }
   } catch { /* content stays empty */ }
 
@@ -304,17 +317,19 @@ async function suggestSingleQuestion({ summaryPath, summaryTitle, type }) {
     return JSON.parse(s);
   };
 
-  const GROUNDING = `[הגבלה קפדנית] בסס את השאלה והתשובה אך ורק על הטקסט המצוטט להלן. אל תשתמש בידע כללי חיצוני שאינו מופיע במפורש בטקסט. אם התוכן דל — צור שאלה פשוטה על מה שכתוב, אל תמציא מידע.`;
+  const GROUNDING = `[הגבלה קפדנית] בסס את השאלה והתשובה אך ורק על הטקסט המצוטט תחת CONTEXT להלן. אל תשתמש בידע חיצוני שאינו מופיע במפורש ב-CONTEXT. אם ה-CONTEXT דל — צור שאלה על מה שכתוב, אל תמציא מידע.`;
+
+  const contextBlock = safeContent
+    ? `\n\n=== CONTEXT: תוכן הסיכום ===\n${safeContent}\n=== סוף CONTEXT ===`
+    : '\n\n=== CONTEXT: (אין תוכן — צור שאלה כללית על הכותרת) ===';
 
   if (type === 'mc') {
     const prompt = `${GROUNDING}
-אתה מסייע לימודי. בהינתן סיכום הלמידה הבא, צור שאלת בחירה מרובה אחת עם 4 אפשרויות תשובה — כולן מבוססות אך ורק על הטקסט.
+אתה מסייע לימודי. בהינתן סיכום הלמידה הבא, צור שאלת בחירה מרובה אחת עם 4 אפשרויות תשובה — כולן מבוססות אך ורק על ה-CONTEXT.
 החזר JSON בלבד ללא כל טקסט נוסף, בפורמט המדויק:
 {"question":"השאלה כאן","options":["אפשרות 1","אפשרות 2","אפשרות 3","אפשרות 4"],"correct_option_index":0}
 
-כותרת הסיכום: ${safeTitle}
-תוכן הסיכום:
-${safeContent || '(אין תוכן — צור שאלה כללית בנושא)'}`;
+כותרת הסיכום: ${safeTitle}${contextBlock}`;
 
     const raw  = await _callGemini(prompt);
     const json = _parseJson(raw);
@@ -328,13 +343,11 @@ ${safeContent || '(אין תוכן — צור שאלה כללית בנושא)'}`
     };
   } else {
     const prompt = `${GROUNDING}
-אתה מסייע לימודי. בהינתן סיכום הלמידה הבא, צור שאלה פתוחה אחת ותשובה מפורטת לה — שניהם מבוססים אך ורק על הטקסט.
+אתה מסייע לימודי. בהינתן סיכום הלמידה הבא, צור שאלה פתוחה אחת ותשובה מפורטת לה — שניהם מבוססים אך ורק על ה-CONTEXT.
 החזר JSON בלבד ללא כל טקסט נוסף, בפורמט המדויק:
 {"question":"השאלה כאן","answer":"התשובה המפורטת כאן"}
 
-כותרת הסיכום: ${safeTitle}
-תוכן הסיכום:
-${safeContent || '(אין תוכן — צור שאלה כללית בנושא)'}`;
+כותרת הסיכום: ${safeTitle}${contextBlock}`;
 
     const raw  = await _callGemini(prompt);
     const json = _parseJson(raw);

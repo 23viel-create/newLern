@@ -155,11 +155,24 @@ const CalendarManager = (() => {
   const _HOLIDAY_NAMES = {
     // תשרי — Tishrei
     '7:1':  'ראש השנה',    '7:2':  'ראש השנה',
+    '7:3':  'צום גדליה',
     '7:10': 'יום כיפור',
     '7:15': 'סוכות',       '7:16': 'חוה"מ סוכות',
     '7:17': 'חוה"מ סוכות', '7:18': 'חוה"מ סוכות',
     '7:19': 'חוה"מ סוכות', '7:20': 'חוה"מ סוכות',
     '7:21': 'הושענה רבה',  '7:22': 'שמחת תורה',  '7:23': 'שמחת תורה',
+    // כסלו / טבת — Kislev / Tevet (Chanukah spans 8 days: 25 Kislev – 2/3 Tevet)
+    '9:25': 'חנוכה',  '9:26': 'חנוכה',  '9:27': 'חנוכה',
+    '9:28': 'חנוכה',  '9:29': 'חנוכה',  '9:30': 'חנוכה',
+    '10:1': 'חנוכה',  '10:2': 'חנוכה',  '10:3': 'חנוכה',
+    // טבת — Tevet
+    '10:10': 'עשרה בטבת',
+    // שבט — Shvat
+    '11:15': 'ט"ו בשבט',
+    // אדר / אדר א׳ — Adar (in leap year, Purim is in Adar Bet = month 13)
+    '12:13': 'תענית אסתר', '12:14': 'פורים',       '12:15': 'שושן פורים',
+    // אדר ב׳ — Adar Bet (leap year)
+    '13:13': 'תענית אסתר', '13:14': 'פורים',        '13:15': 'שושן פורים',
     // ניסן — Nisan
     '1:14': 'ערב פסח',
     '1:15': 'פסח',         '1:16': 'חוה"מ פסח',
@@ -168,6 +181,10 @@ const CalendarManager = (() => {
     '1:21': 'פסח',         '1:22': 'פסח',
     // סיוון — Sivan
     '3:6':  'שבועות',      '3:7':  'שבועות',
+    // תמוז — Tammuz
+    '4:17': 'י"ז בתמוז',
+    // אב — Av
+    '5:9':  'תשעה באב',
   };
 
   function _getHolidayName(day) {
@@ -257,6 +274,8 @@ const CalendarManager = (() => {
         // RIGHT arrow (❯, calPrevMonth) = go to past = decrement one Gregorian month
         currentMonth--;
         if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+        // Anchor selectedDate to mid-month so _renderHebrewMonthGrid finds correct ref
+        selectedDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-15`;
       }
       loadCalendar();
     });
@@ -278,6 +297,8 @@ const CalendarManager = (() => {
         // LEFT arrow (❮, calNextMonth) = go to future = increment one Gregorian month
         currentMonth++;
         if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+        // Anchor selectedDate to mid-month so _renderHebrewMonthGrid finds correct ref
+        selectedDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-15`;
       }
       loadCalendar();
     });
