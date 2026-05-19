@@ -1195,6 +1195,25 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
   background: var(--color-hover);
 }
 
+/* Quiz AI grading spinner overlay */
+.quiz-ai-spinner-overlay {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 260px; padding: 2rem; gap: 1.2rem;
+}
+.quiz-ai-spinner {
+  width: 52px; height: 52px;
+  border: 5px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: quiz-spin 0.9s linear infinite;
+}
+@keyframes quiz-spin {
+  to { transform: rotate(360deg); }
+}
+.quiz-ai-spinner-text {
+  font-size: 1rem; color: var(--color-text-muted); text-align: center; line-height: 1.5;
+}
+
 /* ══════════════════ Calendar — Phase 11 indicators ══════════════════ */
 
 /* Rosh Chodesh — Hebrew month start on Gregorian-primary grid */

@@ -1046,7 +1046,9 @@ const QuizManager = (() => {
   async function _finishQuiz() {
     _captureOpenAnswers();
     document.getElementById('quizTestArea').classList.add('hidden');
-    document.getElementById('quizResults').classList.remove('hidden');
+
+    const resultsEl = document.getElementById('quizResults');
+    resultsEl.classList.remove('hidden');
 
     // ── Deferred bulk AI grading (handles "end" feedback mode) ───────────
     const pendingAI = _config.aiGrade
@@ -1055,9 +1057,12 @@ const QuizManager = (() => {
       : [];
 
     if (pendingAI.length > 0) {
-      document.getElementById('quizScoreDisplay').innerHTML =
-        `<p class="hint" style="text-align:center;padding:1rem">
-           ⏳ ה-AI בודק ${pendingAI.length} תשובות — אנא המתן...</p>`;
+      // Wipe stale results and show full-height spinner while AI grades
+      resultsEl.innerHTML = `
+        <div class="quiz-ai-spinner-overlay">
+          <div class="quiz-ai-spinner"></div>
+          <p class="quiz-ai-spinner-text">⏳ ה-AI בודק ${pendingAI.length} תשובות — אנא המתן...</p>
+        </div>`;
       await Promise.all(pendingAI.map(async ({ ans, q }) => {
         try {
           const res = await Api.aiGradeAnswer(q.question, q.answer || '', ans.userText, _config.strictness);
@@ -1068,6 +1073,14 @@ const QuizManager = (() => {
           ans.aiGraded = true; ans.answered = true; ans.score = 0;
         }
       }));
+      // Restore full results structure after grading
+      resultsEl.innerHTML = `
+        <h2 class="quiz-results-title">תוצאות הבחינה</h2>
+        <div id="quizScoreDisplay" class="quiz-score-display"></div>
+        <div id="quizResultsList"  class="quiz-results-list"></div>
+        <div class="modal__actions">
+          <button id="quizCloseResultsBtn" class="btn btn--primary">סגור</button>
+        </div>`;
     }
 
     // Compute MC scores (end-feedback mode: score may still be null)
@@ -1291,7 +1304,8 @@ const QuizManager = (() => {
       const optsText   = (q.options || []).map((o, i) => `${['א','ב','ג','ד'][i]||i+1}. ${o}`).join('\n');
       const correctTxt = q.options?.[q.correct_option_index] || '';
       const prompt     = `שאלה: ${q.question}\nאפשרויות:\n${optsText}\nהתשובה הנכונה: ${correctTxt}\nהסבר בקצרה מדוע זוהי התשובה הנכונה ומדוע האחרות שגויות. ענה בעברית בלבד.`;
-      const answer     = await Api.aiAsk('general', prompt, null, null);
+      const raw        = await Api.aiAsk('general', prompt, null, null);
+      const answer     = (raw && typeof raw === 'object') ? (raw.answer || raw.explanation || JSON.stringify(raw)) : String(raw || '');
       wrapEl.innerHTML = `<div class="quiz-mcq-explanation">${_esc(answer)}</div>`;
     } catch (err) {
       if (btn) { btn.disabled = false; btn.textContent = '🤖 הסבר'; }

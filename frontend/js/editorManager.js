@@ -220,8 +220,11 @@ const EditorManager = (() => {
       btn.textContent = '⏳ מסנכרן...';
       try {
         await Api.wordSyncManual(currentNode.path);
-        const html = await Api.getContent(currentNode.path);
-        document.getElementById('editorContent').innerHTML = html || '';
+        const cacheBustUrl = `/api/summaries/content?path=${encodeURIComponent(currentNode.path)}&_t=${Date.now()}`;
+        const freshRes  = await fetch(cacheBustUrl);
+        const freshData = await freshRes.json();
+        const html = freshData.data || freshData.content || '';
+        document.getElementById('editorContent').innerHTML = html;
         isDirty = false;
         setSaveStatus('saved');
         btn.textContent = '✓ סונכרן';

@@ -171,8 +171,19 @@ const NotesManager = (() => {
     if (!modal) return;
 
     document.getElementById('noteEditorTitle').value   = note.title || '';
-    document.getElementById('noteEditorDate').value    = note.targetDate || _currentDate || '';
     document.getElementById('noteEditorPinned').checked = !!note.isPinned;
+
+    const dateEl   = document.getElementById('noteEditorDate');
+    const noDateCb = document.getElementById('noteEditorNoDate');
+    // "no date" when creating from drawer/full-view (note.targetDate is null and no _currentDate context)
+    const hasDate  = !!(note.targetDate || (note.id && _currentDate));
+    noDateCb.checked  = !hasDate;
+    dateEl.disabled   = !hasDate;
+    dateEl.value      = hasDate ? (note.targetDate || _currentDate || '') : '';
+    noDateCb.onchange = () => {
+      dateEl.disabled = noDateCb.checked;
+      if (noDateCb.checked) dateEl.value = '';
+    };
     const body = document.getElementById('noteEditorBody');
     body.innerHTML = note.richBody || '';
 
@@ -236,7 +247,8 @@ const NotesManager = (() => {
     newSave.addEventListener('click', async () => {
       const title = document.getElementById('noteEditorTitle').value.trim() || 'ללא כותרת';
       const richBody  = body.innerHTML;
-      const targetDate = document.getElementById('noteEditorDate').value || null;
+      const noDateCb2  = document.getElementById('noteEditorNoDate');
+      const targetDate = (noDateCb2 && noDateCb2.checked) ? null : (document.getElementById('noteEditorDate').value || null);
       const isPinned  = document.getElementById('noteEditorPinned').checked;
       try {
         newSave.disabled = true;
