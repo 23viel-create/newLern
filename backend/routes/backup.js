@@ -24,11 +24,11 @@ router.post('/docx', async (req, res) => {
     const buffer  = await buildDocx(title || nodePath, content);
 
     const rawTitle   = (title || nodePath).trim().slice(0, 60) || 'summary';
-    const asciiName  = rawTitle.replace(/[^\x20-\x7E]/g, '_').replace(/["/\\?*:|<>]/g, '_') + '.docx';
-    const encodedName = encodeURIComponent(rawTitle + '.docx');
+    const asciiName  = rawTitle.replace(/[^\x20-\x7E]/g, '_').replace(/["/\\?*:|<>]/g, '_') + '.doc';
+    const encodedName = encodeURIComponent(rawTitle + '.doc');
     res.setHeader('Content-Disposition',
       `attachment; filename="${asciiName}"; filename*=UTF-8''${encodedName}`);
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Type', 'application/msword');
     res.send(buffer);
   } catch (err) {
     res.status(500).json({ error: err.message });

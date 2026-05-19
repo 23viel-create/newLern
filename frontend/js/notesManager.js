@@ -163,7 +163,7 @@ const NotesManager = (() => {
         const cmd = btn.dataset.cmd;
         if (cmd === 'checklist') {
           document.execCommand('insertHTML', false,
-            '<div class="note-check-item"><input type="checkbox"> <span></span></div>');
+            '<div class="note-check-item"><input type="checkbox"> <span contenteditable="true"></span></div>');
         } else if (cmd === 'ul') {
           document.execCommand('insertUnorderedList');
         } else if (cmd === 'ol') {
@@ -174,6 +174,31 @@ const NotesManager = (() => {
         body.focus();
       };
     });
+
+    // Smart checklist: Enter inside a checklist item spawns a new item
+    const _onKeyDown = (e) => {
+      if (e.key !== 'Enter') return;
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const anchor = sel.getRangeAt(0).startContainer;
+      const checkItem = (anchor.nodeType === 3 ? anchor.parentElement : anchor)
+        ?.closest?.('.note-check-item');
+      if (!checkItem) return;
+      e.preventDefault();
+      const newItem = document.createElement('div');
+      newItem.className = 'note-check-item';
+      newItem.innerHTML = '<input type="checkbox"> <span contenteditable="true"></span>';
+      checkItem.after(newItem);
+      const span = newItem.querySelector('span');
+      const range = document.createRange();
+      range.setStart(span, 0);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    };
+    if (body._checklistHandler) body.removeEventListener('keydown', body._checklistHandler);
+    body._checklistHandler = _onKeyDown;
+    body.addEventListener('keydown', _onKeyDown);
 
     // Save
     const saveBtn = document.getElementById('noteEditorSaveBtn');
@@ -277,5 +302,68 @@ const NotesManager = (() => {
     });
   }
 
-  return { init, renderForDate };
+  // ── Full-screen notes view ─────────────────────────────────────────────────
+
+  let _fullViewBound = false;
+  let _fullViewSearch = '';
+  let _fullViewSort   = 'modified';
+
+  async function initFullView() {
+    const container = document.getElementById('notesFullList');
+    if (!container) return;
+
+    if (!_fullViewBound) {
+      _fullViewBound = true;
+      document.getElementById('notesFullAddBtn')?.addEventListener('click', () => {
+        _openNoteEditor(
+          { id: null, title: '', richBody: '', isPinned: false, targetDate: null, dateCreated: null },
+          () => _renderFullView(),
+        );
+      });
+      document.getElementById('notesFullSearch')?.addEventListener('input', (e) => {
+        _fullViewSearch = e.target.value.trim();
+        _renderFullView();
+      });
+      document.getElementById('notesFullSort')?.addEventListener('change', (e) => {
+        _fullViewSort = e.target.value;
+        _renderFullView();
+      });
+    }
+
+    container.innerHTML = '<p class="placeholder-text">טוען פתקיות...</p>';
+    try {
+      _allNotes = await Api.getNotes();
+      _renderFullView();
+    } catch (err) {
+      container.innerHTML = `<p class="placeholder-text error-text">שגיאה: ${_esc(err.message)}</p>`;
+    }
+  }
+
+  function _renderFullView() {
+    const container = document.getElementById('notesFullList');
+    if (!container) return;
+    const q = _fullViewSearch.toLowerCase();
+    const visible = _allNotes.filter(n =>
+      !q || (n.title || '').toLowerCase().includes(q) ||
+             (n.richBody || '').replace(/<[^>]+>/g, '').toLowerCase().includes(q));
+    const sorted = _sortNotes(visible, _fullViewSort);
+    if (!sorted.length) {
+      container.innerHTML = `<p class="placeholder-text">${q ? 'לא נמצאו תוצאות' : 'אין פתקיות — צור פתק חדש'}</p>`;
+      return;
+    }
+    container.innerHTML = `<div class="notes-full-grid">${sorted.map(n => _noteCard(n, false)).join('')}</div>`;
+    container.querySelectorAll('.note-card').forEach(card =>
+      _bindCardEvents(card, () => { _loadAllAndRender(); }),
+    );
+  }
+
+  async function _loadAllAndRender() {
+    try {
+      _allNotes = await Api.getNotes();
+      _renderFullView();
+      if (_drawerOpen) _loadDrawerNotes();
+    } catch {}
+  }
+
+  return { init, renderForDate, initFullView };
 })();

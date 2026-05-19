@@ -45,6 +45,9 @@ app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/index.html'));
 });
 
+const { watchWordFiles } = require('./controllers/backupController');
+
 app.listen(PORT, () => {
+  watchWordFiles();
   console.log(`✅  השרת פועל בכתובת: http://localhost:${PORT}`);
 });

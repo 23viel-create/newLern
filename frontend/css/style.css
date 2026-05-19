@@ -1493,3 +1493,67 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
   transition: background 0.15s;
 }
 .notes-drawer-toggle:hover { background: #f59e0b; }
+
+/* ── Phase 18: Dynamic Legend, Full Notes View, Search Results, Book Folders ── */
+
+/* Full-screen notes view */
+.notes-full-toolbar {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.notes-full-search { flex: 1; min-width: 180px; max-width: 320px; }
+.notes-full-list { min-height: 200px; }
+.notes-full-grid {
+  display: flex; flex-wrap: wrap; gap: 0.8rem; align-content: flex-start;
+}
+.notes-full-grid .note-card { width: 260px; min-height: 120px; flex-shrink: 0; }
+
+/* Advanced search results panel */
+.tree-search-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 200;
+  background: var(--color-bg-card, #fff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.14);
+  min-width: 320px;
+  max-width: 480px;
+  max-height: 340px;
+  overflow-y: auto;
+  direction: rtl;
+}
+.tree-search-results__header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.4rem 0.8rem;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  font-size: 0.8rem; color: var(--color-muted, #64748b);
+  background: #f8fafc; border-radius: 8px 8px 0 0;
+}
+.tree-search-result {
+  display: flex; flex-direction: column; gap: 0.1rem;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.1s;
+}
+.tree-search-result:hover { background: #f0f9ff; }
+.tree-search-result__name { font-size: 0.88rem; font-weight: 600; color: #1e293b; }
+.tree-search-result__path { font-size: 0.75rem; color: #64748b; }
+
+/* Books controls bar */
+.books-controls {
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+.books-controls .input-field { flex: 1; min-width: 160px; max-width: 280px; }
+
+/* Book folder grouping */
+.book-folder-header {
+  font-size: 0.82rem; font-weight: 700; color: #4f46e5;
+  padding: 0.35rem 0.2rem 0.15rem;
+  margin-top: 0.6rem;
+  border-bottom: 1px dashed #c7d2fe;
+}
+.book-item--indented { padding-right: 1.2rem; }

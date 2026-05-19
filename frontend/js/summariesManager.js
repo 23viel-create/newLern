@@ -45,11 +45,23 @@ const SummariesManager = (() => {
       render();
     });
 
-    // חיפוש (מדורג)
+    // חיפוש (מדורג) — live filter
     document.getElementById('treeSearch').addEventListener(
       'input',
       debounce((e) => { searchQuery = e.target.value.trim(); render(); }, 250),
     );
+
+    // כפתור חיפוש מתקדם — מציג תוצאות עם נתיב מלא
+    document.getElementById('treeSearchBtn')?.addEventListener('click', () => {
+      const q = document.getElementById('treeSearch').value.trim();
+      if (q) _showSearchResults(q);
+    });
+    document.getElementById('treeSearch')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const q = document.getElementById('treeSearch').value.trim();
+        if (q) _showSearchResults(q);
+      }
+    });
   }
 
   // ─── טעינה מהשרת ────────────────────────────────────────────────────────────
@@ -352,6 +364,70 @@ const SummariesManager = (() => {
       }
     };
     input.click();
+  }
+
+  // ─── חיפוש מתקדם עם נתיב מלא ──────────────────────────────────────────────
+
+  function _flattenWithPath(nodes, folderLabel) {
+    const out = [];
+    for (const n of nodes) {
+      if (n.type === 'summary') {
+        out.push({ ...n, folderLabel: folderLabel || '' });
+      } else if (n.type === 'folder' && n.children) {
+        const childLabel = folderLabel
+          ? `${folderLabel} / ${n.title || n.name}`
+          : (n.title || n.name);
+        out.push(..._flattenWithPath(n.children, childLabel));
+      }
+    }
+    return out;
+  }
+
+  function _showSearchResults(q) {
+    const panel = document.getElementById('treeSearchResults');
+    if (!panel) return;
+    const lower = q.toLowerCase();
+    const results = _flattenWithPath(treeData, '').filter(n =>
+      (n.title || n.name).toLowerCase().includes(lower),
+    );
+
+    panel.classList.remove('hidden');
+
+    if (!results.length) {
+      panel.innerHTML = `<p class="placeholder-text" style="padding:0.5rem 0.8rem">לא נמצאו תוצאות עבור "${esc(q)}"</p>`;
+      return;
+    }
+
+    panel.innerHTML = `
+      <div class="tree-search-results__header">
+        <span>נמצאו ${results.length} תוצאות</span>
+        <button class="btn btn--xs btn--ghost" id="treeSearchClose">✕ סגור</button>
+      </div>
+      ${results.map(r => `
+        <div class="tree-search-result" data-path="${esc(r.path)}" role="button" tabindex="0">
+          <span class="tree-search-result__name">📄 ${esc(r.title || r.name)}</span>
+          ${r.folderLabel ? `<span class="tree-search-result__path">${esc(r.folderLabel)}</span>` : ''}
+        </div>
+      `).join('')}`;
+
+    panel.querySelector('#treeSearchClose')?.addEventListener('click', () => {
+      panel.classList.add('hidden');
+    });
+
+    panel.querySelectorAll('.tree-search-result').forEach(el => {
+      el.addEventListener('click', () => {
+        const nodePath = el.dataset.path;
+        panel.classList.add('hidden');
+        searchQuery = '';
+        const searchInput = document.getElementById('treeSearch');
+        if (searchInput) searchInput.value = '';
+        render();
+        _revealPath(nodePath);
+        const flatList = flattenSummaries(sortTree(treeData));
+        const node = flatList.find(n => n.path === nodePath);
+        if (node) EditorManager.open(node, flatList);
+      });
+    });
   }
 
   // ─── גילוי מסלול עץ (expand כל תיקיות ההורה + גלילה + הדגשה) ───────────────

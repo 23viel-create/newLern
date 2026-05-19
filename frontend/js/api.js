@@ -204,11 +204,19 @@ const Api = {
 
   // ── מאגר ספרים ───────────────────────────────────────────────────────────
   getBooks:      () => apiFetch('/books'),
-  getBookStreamUrl: (name) => `/api/books/stream/${encodeURIComponent(name)}`,
-  deleteBook:    (name) => apiFetch(`/books/${encodeURIComponent(name)}`, { method: 'DELETE' }),
-  uploadBook: (file) => {
+  getBookStreamUrl: (name) => {
+    const parts = name.split('/');
+    return `/api/books/stream/${parts.map(encodeURIComponent).join('/')}`;
+  },
+  deleteBook:    (name) => {
+    const parts = name.split('/');
+    return apiFetch(`/books/${parts.map(encodeURIComponent).join('/')}`, { method: 'DELETE' });
+  },
+  createBooksFolder: (name, parent) => apiFetch('/books/folder', { method: 'POST', body: { name, parent: parent || '' } }),
+  uploadBook: (file, folder) => {
     const fd = new FormData();
     fd.append('pdf', file);
+    if (folder) fd.append('folder', folder);
     return apiFormFetch('/books/upload', fd);
   },
 };

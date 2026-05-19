@@ -2,8 +2,7 @@ const fs   = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const AdmZip = require('adm-zip');
-const { Document, Packer, Paragraph, TextRun, AlignmentType } = require('docx');
-const { summariesRoot, getSummaryContent, createFolder } = require('./filesController');
+const { summariesRoot, getSummaryContent, setSummaryContent } = require('./filesController');
 
 const DATA_ROOT = path.resolve(__dirname, '../../data');
 
@@ -13,113 +12,44 @@ function _ts() {
   return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 }
 
-// ─── HTML → docx rich paragraphs ─────────────────────────────────────────────
+// ─── Word HTML export (.doc — MS-Word-compatible HTML) ───────────────────────
+// Word opens HTML files with .doc extension natively, preserving RTL and all
+// rich formatting. This approach avoids the docx library's lossy RTL rendering.
 
-function _extractColor(tagStr) {
-  // Match color from style="color:#RRGGBB" or style="color:rgb(...)"
-  const hex = tagStr.match(/color\s*:\s*#([0-9a-fA-F]{3,6})/);
-  if (hex) {
-    const h = hex[1];
-    return h.length === 3 ? h.split('').map(c => c + c).join('') : h.toUpperCase();
-  }
-  const rgb = tagStr.match(/color\s*:\s*rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/);
-  if (rgb) {
-    return [rgb[1], rgb[2], rgb[3]]
-      .map(n => parseInt(n, 10).toString(16).padStart(2, '0'))
-      .join('').toUpperCase();
-  }
-  return null;
-}
-
-function _parseInlineHtml(fragment) {
-  const runs = [];
-  let bold = false, underline = false, italic = false, color = null;
-
-  const HE_LANG = { value: 'he-IL', eastAsia: 'he-IL', bidi: 'he-IL' };
-
-  const parts = fragment.split(/(<[^>]+>)/);
-  for (const part of parts) {
-    if (!part) continue;
-    if (part.startsWith('<')) {
-      const isClosing = part.startsWith('</');
-      const tagName   = part.replace(/<\/?([a-zA-Z][^>\s]*)[\s\S]*>/, '$1').toLowerCase();
-
-      if (!isClosing) {
-        // Attempt inline color extraction from ANY opening tag
-        const c = _extractColor(part);
-        if (c) color = c;
-      }
-
-      if (['strong', 'b'].includes(tagName)) {
-        bold = !isClosing;
-        if (isClosing) color = null;
-      } else if (['u', 'ins'].includes(tagName)) {
-        underline = !isClosing;
-      } else if (['em', 'i'].includes(tagName)) {
-        italic = !isClosing;
-      } else if (tagName === 'span' || tagName === 'font') {
-        if (isClosing) color = null;
-      }
-    } else {
-      const text = part
-        .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
-      if (!text) continue;
-      const props = { text, size: 24, language: HE_LANG };
-      if (bold)      props.bold      = true;
-      if (underline) props.underline = {};
-      if (italic)    props.italics   = true;
-      if (color)     props.color     = color;
-      runs.push(new TextRun(props));
-    }
-  }
-
-  if (!runs.length) runs.push(new TextRun({ text: '', size: 24, language: HE_LANG }));
-  return runs;
-}
-
-function _htmlToDocxParagraphs(html) {
-  const paragraphs = [];
-  const BULLET     = '\x00BULLET\x00';
-
-  // Normalise block boundaries → newline markers; bullet items get a prefix
-  const normalised = (html || '')
-    .replace(/<\/h[1-6]>/gi, '\n')
-    .replace(/<h[1-6][^>]*>/gi, '')
-    .replace(/<li[^>]*>/gi,  BULLET)
-    .replace(/<\/li>/gi,     '\n')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi,      '\n')
-    .replace(/<\/div>/gi,    '\n')
-    .replace(/<p[^>]*>/gi,   '')
-    .replace(/<div[^>]*>/gi, '');
-
-  for (let line of normalised.split('\n')) {
-    const isBullet = line.includes(BULLET);
-    line = line.replace(new RegExp(BULLET, 'g'), '').trim();
-
-    const runs     = _parseInlineHtml(line);
-    const paraProps = { children: runs, alignment: AlignmentType.RIGHT, bidirectional: true };
-    if (isBullet) paraProps.bullet = { level: 0 };
-    paragraphs.push(new Paragraph(paraProps));
-  }
-
-  if (!paragraphs.length) {
-    paragraphs.push(new Paragraph({ text: '', alignment: AlignmentType.RIGHT, bidirectional: true }));
-  }
-  return paragraphs;
-}
-
-// ─── DOCX export ─────────────────────────────────────────────────────────────
-
-async function buildDocx(_title, htmlContent) {
-  const doc = new Document({
-    sections: [{
-      properties: {},
-      children: _htmlToDocxParagraphs(htmlContent),
-    }],
-  });
-  return Packer.toBuffer(doc);
+function buildDocx(_title, htmlContent) {
+  const body = htmlContent || '<p></p>';
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+     xmlns:w="urn:schemas-microsoft-com:office:word"
+     xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="UTF-8">
+  <meta name="ProgId" content="Word.Document">
+  <meta name="Generator" content="Microsoft Word 11">
+  <style>
+    @page { margin: 2cm; mso-page-orientation: portrait; }
+    body  { direction: rtl; font-family: Arial, sans-serif; font-size: 12pt; }
+    p     { margin: 0 0 6pt 0; direction: rtl; }
+    h1, h2, h3 { margin: 8pt 0 4pt 0; direction: rtl; }
+    ul, ol { margin: 4pt 0 4pt 1.5em; direction: rtl; }
+    li     { margin-bottom: 2pt; }
+    strong { font-weight: bold; }
+    em     { font-style: italic; }
+    u      { text-decoration: underline; }
+  </style>
+  <!--[if gte mso 9]><xml>
+    <w:WordDocument>
+      <w:View>Normal</w:View>
+      <w:Zoom>100</w:Zoom>
+      <w:BiDi/>
+      <w:DoNotOptimizeForBrowser/>
+    </w:WordDocument>
+  </xml><![endif]-->
+</head>
+<body dir="rtl">
+${body}
+</body>
+</html>`;
+  return Buffer.from(html, 'utf-8');
 }
 
 // ─── ZIP export ───────────────────────────────────────────────────────────────
@@ -243,14 +173,14 @@ const WORD_CACHE_DIR = path.join(DATA_ROOT, 'word_cache');
 async function openInWord(nodePath, title, html) {
   fs.mkdirSync(WORD_CACHE_DIR, { recursive: true });
 
-  // Dual-mirror: if document.docx exists but content.txt is newer, regenerate from content
+  // Dual-mirror: if document.doc exists but content.txt is newer, regenerate from content
   let content;
   if (html !== undefined) {
     content = html;
   } else {
     content = getSummaryContent(nodePath);
-    // Check if existing document.docx is stale compared to content.txt
-    const summaryDocxPath = path.join(summariesRoot, nodePath, 'document.docx');
+    // Check if existing document.doc is stale compared to content.txt
+    const summaryDocxPath = path.join(summariesRoot, nodePath, 'document.doc');
     const contentTxtPath  = path.join(summariesRoot, nodePath, 'content.txt');
     if (fs.existsSync(summaryDocxPath) && fs.existsSync(contentTxtPath)) {
       const docxMtime    = fs.statSync(summaryDocxPath).mtimeMs;
@@ -266,11 +196,11 @@ async function openInWord(nodePath, title, html) {
   }
   const buffer = await buildDocx(title || nodePath, content);
 
-  // Save to summary folder as the canonical document.docx (dual-file architecture)
+  // Save to summary folder as the canonical document.doc (dual-file architecture)
   const summaryFolderPath = path.join(summariesRoot, nodePath);
   if (fs.existsSync(summaryFolderPath)) {
     try {
-      fs.writeFileSync(path.join(summaryFolderPath, 'document.docx'), buffer);
+      fs.writeFileSync(path.join(summaryFolderPath, 'document.doc'), buffer);
     } catch (e) {
       if (e.code !== 'EBUSY' && e.code !== 'EPERM') throw e;
       // File locked by Word — silently skip the summary-folder copy; word_cache copy below still works
@@ -279,14 +209,14 @@ async function openInWord(nodePath, title, html) {
 
   // Also save a named copy in word_cache for the OS open command
   const safeBase = (title || nodePath).replace(/[^\w֐-׿‏‎ -]/g, '_').slice(0, 60);
-  let filePath   = path.join(WORD_CACHE_DIR, safeBase + '.docx');
+  let filePath   = path.join(WORD_CACHE_DIR, safeBase + '.doc');
 
   // EBUSY retry: if main path is locked, try incrementing filename suffix
   let written = false;
   for (let attempt = 0; attempt <= 5; attempt++) {
     const tryPath = attempt === 0
       ? filePath
-      : path.join(WORD_CACHE_DIR, `${safeBase}_${attempt}.docx`);
+      : path.join(WORD_CACHE_DIR, `${safeBase}_${attempt}.doc`);
     try {
       fs.writeFileSync(tryPath, buffer);
       filePath = tryPath;
@@ -319,9 +249,9 @@ async function openInWord(nodePath, title, html) {
 
 // Read back .docx metadata for Word sync — checks summary folder first (dual-file)
 function readWordCache(title, nodePath) {
-  // Primary: document.docx inside the summary folder
+  // Primary: document.doc inside the summary folder
   if (nodePath) {
-    const summaryDocx   = path.join(summariesRoot, nodePath, 'document.docx');
+    const summaryDocx   = path.join(summariesRoot, nodePath, 'document.doc');
     const contentFile   = path.join(summariesRoot, nodePath, 'content.txt');
     if (fs.existsSync(summaryDocx)) {
       const docxStat     = fs.statSync(summaryDocx);
@@ -336,10 +266,56 @@ function readWordCache(title, nodePath) {
   }
   // Fallback: named file in word_cache
   const safeBase = (title || nodePath).replace(/[^\w֐-׿‏‎ -]/g, '_').slice(0, 60);
-  const filePath = path.join(WORD_CACHE_DIR, safeBase + '.docx');
+  const filePath = path.join(WORD_CACHE_DIR, safeBase + '.doc');
   if (!fs.existsSync(filePath)) throw new Error('קובץ Word לא נמצא — פתח אותו תחילה');
   const stat = fs.statSync(filePath);
   return { filePath, size: stat.size, mtime: stat.mtimeMs, newerThanContent: false };
 }
 
-module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache };
+// ─── Two-way sync: watch Word files for user edits ───────────────────────────
+// When the user saves a .doc (Word HTML) file that we generated, extract the
+// HTML body and update content.txt so the app reflects the edits immediately.
+
+function _extractWordHtmlBody(raw) {
+  const m = raw.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  return m ? m[1].trim() : '';
+}
+
+const _watchDebounce = new Map(); // filePath → timeout id
+
+function watchWordFiles() {
+  if (!fs.existsSync(summariesRoot)) return;
+
+  try {
+    fs.watch(summariesRoot, { recursive: true }, (eventType, filename) => {
+      if (!filename) return;
+      const normalized = filename.replace(/\\/g, '/');
+      if (!normalized.endsWith('document.doc')) return;
+      if (eventType !== 'change' && eventType !== 'rename') return;
+
+      const absPath = path.join(summariesRoot, normalized);
+      // Debounce per file — Word fires multiple events on a single save
+      if (_watchDebounce.has(absPath)) clearTimeout(_watchDebounce.get(absPath));
+      _watchDebounce.set(absPath, setTimeout(() => {
+        _watchDebounce.delete(absPath);
+        if (!fs.existsSync(absPath)) return;
+        try {
+          const raw = fs.readFileSync(absPath, 'utf-8');
+          // Verify it's our Word HTML format to avoid processing unrelated files
+          if (!raw.includes('urn:schemas-microsoft-com:office:word')) return;
+          const body = _extractWordHtmlBody(raw);
+          if (!body) return;
+          const nodeRelPath = path.relative(summariesRoot, path.dirname(absPath));
+          const contentPath = path.join(summariesRoot, nodeRelPath, 'content.txt');
+          // Guard: do not write if content.txt is already in sync (mtime within 3s)
+          const docMtime = fs.statSync(absPath).mtimeMs;
+          const cntMtime = fs.existsSync(contentPath) ? fs.statSync(contentPath).mtimeMs : 0;
+          if (Math.abs(docMtime - cntMtime) < 3000) return;
+          setSummaryContent(nodeRelPath, body);
+        } catch { /* ignore watcher errors */ }
+      }, 800));
+    });
+  } catch { /* fs.watch not supported on this platform — skip */ }
+}
+
+module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, watchWordFiles };

@@ -406,12 +406,24 @@ const CalendarManager = (() => {
 
   // ── Load ──────────────────────────────────────────────────────────────────
 
+  function _updateLegend() {
+    const N    = calendarData?.settings?.heavyLoadThreshold ?? 9;
+    const half = Math.floor(N / 2);
+    const lowEl   = document.getElementById('legendLoadLow');
+    const highEl  = document.getElementById('legendLoadHigh');
+    const blackEl = document.getElementById('legendLoadBlack');
+    if (lowEl)   lowEl.textContent   = `צהוב — 1–${half}`;
+    if (highEl)  highEl.textContent  = `חום — ${half + 1}–${N - 1}`;
+    if (blackEl) blackEl.textContent = `שחור — ${N}+`;
+  }
+
   async function loadCalendar() {
     const grid = document.getElementById('calGrid');
     try {
       calendarData = await _getMonthData(currentYear, currentMonth);
       _calDisplayPref = calendarData?.settings?.calendarDisplayPreference || 'combined';
       _updateDispToggle();
+      _updateLegend();
 
       if (_viewMode === 'monthly') {
         if (_calDisplayPref === 'hebrew') {

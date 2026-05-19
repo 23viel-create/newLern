@@ -13,12 +13,13 @@
   <header class="navbar">
     <div class="navbar__brand">📚 למידה פעילה</div>
     <nav class="navbar__links">
-      <a href="#" data-view="dashboard"  class="nav-link active">מסך ראשי</a>
-      <a href="#" data-view="summaries"  class="nav-link">עיון בקבצים</a>
-      <a href="#" data-view="books"      class="nav-link">📚 מאגר ספרים</a>
+      <a href="#" data-view="dashboard"   class="nav-link active">מסך ראשי</a>
+      <a href="#" data-view="summaries"   class="nav-link">עיון בקבצים</a>
+      <a href="#" data-view="notes-full"  class="nav-link">📝 פתקיות</a>
+      <a href="#" data-view="books"       class="nav-link">📚 מאגר ספרים</a>
       <a href="#" data-view="active-chat" class="nav-link">🧠 למידה פעילה</a>
-      <a href="#" data-view="settings"   class="nav-link">הגדרות</a>
-      <a href="#" data-view="help"       class="nav-link">❓ עזרה</a>
+      <a href="#" data-view="settings"    class="nav-link">הגדרות</a>
+      <a href="#" data-view="help"        class="nav-link">❓ עזרה</a>
     </nav>
     <div class="navbar__status">
       <span id="offlineIndicator" class="badge badge--offline hidden">אין חיבור לאינטרנט</span>
@@ -55,9 +56,9 @@
             <span class="legend-item legend-item--partial">חלקי</span>
             <span class="legend-item legend-item--missed">לא בוצע</span>
             <span class="legend-sep">|</span>
-            <span class="legend-item legend-item--load-low">צהוב — עד 50%</span>
-            <span class="legend-item legend-item--load-high">חום — 50%–100%</span>
-            <span class="legend-item legend-item--load-black">שחור — סף מלא</span>
+            <span class="legend-item legend-item--load-low"   id="legendLoadLow">צהוב — 1–4</span>
+            <span class="legend-item legend-item--load-high"  id="legendLoadHigh">חום — 5–8</span>
+            <span class="legend-item legend-item--load-black" id="legendLoadBlack">שחור — 9+</span>
           </div>
           <div id="calGrid" class="cal-grid">
             <p class="placeholder-text">טוען לוח שנה...</p>
@@ -100,9 +101,11 @@
                 <option value="updatedAt">תאריך עדכון</option>
               </select>
             </div>
-            <div class="search-group">
+            <div class="search-group" style="position:relative">
               <input type="search" id="treeSearch" class="input-field search-field"
                      placeholder="🔍 חיפוש סיכומים..." autocomplete="off" />
+              <button class="btn btn--xs btn--primary" id="treeSearchBtn" title="חפש בכל הסיכומים">🔍 חפש</button>
+              <div id="treeSearchResults" class="tree-search-results hidden"></div>
             </div>
           </div>
         </div>
@@ -502,6 +505,23 @@
     </section>
 
     <!-- ── מאגר ספרים ── -->
+    <!-- ── לוח פתקיות מלא ── -->
+    <section id="view-notes-full" class="view hidden">
+      <div class="page-header">
+        <h1>📝 לוח פתקיות</h1>
+        <div class="notes-full-toolbar">
+          <button class="btn btn--primary" id="notesFullAddBtn">+ פתק חדש</button>
+          <input type="search" id="notesFullSearch" class="input-field notes-full-search"
+                 placeholder="🔍 חפש פתקיות..." dir="rtl" autocomplete="off" />
+          <select id="notesFullSort" class="select-field" style="width:auto">
+            <option value="modified">מיון לפי עריכה</option>
+            <option value="pinned">נעוצים תחילה</option>
+          </select>
+        </div>
+      </div>
+      <div id="notesFullList" class="notes-full-list"></div>
+    </section>
+
     <section id="view-books" class="view hidden">
       <h1>📚 מאגר ספרים</h1>
       <p class="hint">העלה קבצי PDF לשימוש כהקשר למסייע ה-AI. הספרים מאוחסנים מקומית בלבד ואינם נשלחים לאיפשהו.</p>
@@ -521,6 +541,11 @@
 
       <div class="card">
         <h2>ספרים במאגר</h2>
+        <div class="books-controls">
+          <input type="search" id="booksSearch" class="input-field"
+                 placeholder="🔍 חפש ספר או תיקייה..." dir="rtl" autocomplete="off" />
+          <button class="btn btn--ghost btn--sm" id="booksCreateFolderBtn" title="צור תיקייה חדשה">📁 תיקייה חדשה</button>
+        </div>
         <div id="booksList">
           <p class="placeholder-text">טוען...</p>
         </div>

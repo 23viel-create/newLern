@@ -7,6 +7,7 @@ const BooksManager = (() => {
   async function init() {
     if (!_bound) {
       _bindDropzone();
+      _bindBooksControls();
       _bound = true;
     }
     await loadBooks();
@@ -76,34 +77,86 @@ const BooksManager = (() => {
 
   // ─── רשימת ספרים ────────────────────────────────────────────────────────────
 
+  let _allBooks    = [];
+  let _booksSearch = '';
+
+  function _bindBooksControls() {
+    document.getElementById('booksSearch')?.addEventListener('input', (e) => {
+      _booksSearch = e.target.value.trim();
+      _renderBooks();
+    });
+    document.getElementById('booksCreateFolderBtn')?.addEventListener('click', async () => {
+      const name = await WindowManager.promptInput('שם התיקייה החדשה', 'לדוגמה: פוסקים');
+      if (!name) return;
+      try {
+        await Api.createBooksFolder(name);
+        await loadBooks();
+      } catch (err) {
+        alert(`שגיאה ביצירת תיקייה: ${err.message}`);
+      }
+    });
+  }
+
   async function loadBooks() {
     const list = document.getElementById('booksList');
     list.innerHTML = '<p class="placeholder-text">טוען...</p>';
     try {
-      const books = await Api.getBooks();
-      if (!books.length) {
-        list.innerHTML = '<p class="placeholder-text">אין ספרים במאגר — העלה קובץ PDF, Word או PowerPoint כדי להתחיל</p>';
-        return;
-      }
-      list.innerHTML = `
-        <p class="hint" style="margin-bottom:0.4rem">סמן ספרים לשימוש כהקשר ל-AI (ריק = כל הספרים)</p>
-        ${books.map(b => `
-        <div class="book-item">
-          <input type="checkbox" class="book-item__select" data-book-name="${escHtml(b.name)}"
-                 id="book_${escHtml(b.name)}" title="בחר ספר זה ל-AI" />
-          <label for="book_${escHtml(b.name)}" class="book-item__icon" aria-hidden="true">${_bookIcon(b.name)}</label>
-          <span class="book-item__name">${escHtml(b.displayName || b.name)}</span>
-          <span class="book-item__size">${_fmtSize(b.size)}</span>
-          <button class="btn btn--xs btn--ghost"
-                  onclick="BooksManager.viewBook('${escHtml(b.name)}')"
-                  title="הצג ספר">👁️ הצג</button>
-          <button class="btn btn--xs btn--danger-ghost"
-                  onclick="BooksManager.deleteBook('${escHtml(b.name)}')"
-                  title="מחק ספר">🗑️</button>
-        </div>`).join('')}`;
+      _allBooks = await Api.getBooks();
+      _renderBooks();
     } catch (err) {
       list.innerHTML = `<p class="placeholder-text error-text">שגיאה בטעינה: ${escHtml(err.message)}</p>`;
     }
+  }
+
+  function _renderBooks() {
+    const list = document.getElementById('booksList');
+    if (!list) return;
+    const q = _booksSearch.toLowerCase();
+    const visible = q
+      ? _allBooks.filter(b =>
+          (b.displayName || b.name).toLowerCase().includes(q) ||
+          (b.folder || '').toLowerCase().includes(q))
+      : _allBooks;
+
+    if (!visible.length) {
+      list.innerHTML = `<p class="placeholder-text">${q ? 'לא נמצאו ספרים' : 'אין ספרים במאגר — העלה קובץ PDF, Word או PowerPoint כדי להתחיל'}</p>`;
+      return;
+    }
+
+    // Group by folder
+    const groups = new Map();
+    for (const b of visible) {
+      const folder = b.folder || '';
+      if (!groups.has(folder)) groups.set(folder, []);
+      groups.get(folder).push(b);
+    }
+
+    const hint = '<p class="hint" style="margin-bottom:0.4rem">סמן ספרים לשימוש כהקשר ל-AI (ריק = כל הספרים)</p>';
+    let html = hint;
+    for (const [folder, books] of groups) {
+      if (folder) {
+        html += `<div class="book-folder-header">📁 ${escHtml(folder)}</div>`;
+      }
+      html += books.map(b => {
+        const id = `book_${escHtml(b.folder ? b.folder + '/' + b.name : b.name)}`;
+        const fullName = b.folder ? `${b.folder}/${b.name}` : b.name;
+        return `
+        <div class="book-item ${b.folder ? 'book-item--indented' : ''}">
+          <input type="checkbox" class="book-item__select" data-book-name="${escHtml(b.name)}"
+                 id="${escHtml(id)}" title="בחר ספר זה ל-AI" />
+          <label for="${escHtml(id)}" class="book-item__icon" aria-hidden="true">${_bookIcon(b.name)}</label>
+          <span class="book-item__name">${escHtml(b.displayName || b.name)}</span>
+          <span class="book-item__size">${_fmtSize(b.size)}</span>
+          <button class="btn btn--xs btn--ghost"
+                  onclick="BooksManager.viewBook('${escHtml(fullName)}')"
+                  title="הצג ספר">👁️ הצג</button>
+          <button class="btn btn--xs btn--danger-ghost"
+                  onclick="BooksManager.deleteBook('${escHtml(fullName)}')"
+                  title="מחק ספר">🗑️</button>
+        </div>`;
+      }).join('');
+    }
+    list.innerHTML = html;
   }
 
   function _bookIcon(name) {

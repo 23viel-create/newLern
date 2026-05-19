@@ -18,38 +18,86 @@ function _readMeta(filename) {
   return {};
 }
 
-function saveBookMeta(filename, originalName) {
+function saveBookMeta(absFilePath, originalName) {
   try {
-    const metaPath = path.join(BOOKS_DIR, filename + '.meta.json');
-    fs.writeFileSync(metaPath, JSON.stringify({ originalName }));
+    fs.writeFileSync(absFilePath + '.meta.json', JSON.stringify({ originalName }));
   } catch {}
+}
+
+function _readMetaAbs(absFilePath) {
+  try { return JSON.parse(fs.readFileSync(absFilePath + '.meta.json', 'utf-8')); }
+  catch { return {}; }
+}
+
+function _scanDir(absDir, relFolder) {
+  const books = [];
+  try {
+    for (const entry of fs.readdirSync(absDir, { withFileTypes: true })) {
+      const absEntry = path.join(absDir, entry.name);
+      if (entry.isDirectory()) {
+        const subRel = relFolder ? `${relFolder}/${entry.name}` : entry.name;
+        books.push(..._scanDir(absEntry, subRel));
+      } else if (SUPPORTED_EXTS.includes(path.extname(entry.name).toLowerCase())) {
+        const stat = fs.statSync(absEntry);
+        const meta = _readMetaAbs(absEntry);
+        books.push({
+          name:        entry.name,
+          folder:      relFolder,
+          displayName: meta.originalName || entry.name,
+          size:        stat.size,
+          uploadedAt:  stat.birthtime.toISOString(),
+        });
+      }
+    }
+  } catch {}
+  return books;
 }
 
 function listBooks() {
   ensureDir();
-  return fs.readdirSync(BOOKS_DIR)
-    .filter(f => SUPPORTED_EXTS.includes(path.extname(f).toLowerCase()))
-    .map(f => {
-      const stat = fs.statSync(path.join(BOOKS_DIR, f));
-      const meta = _readMeta(f);
-      return {
-        name:        f,
-        displayName: meta.originalName || f,
-        size:        stat.size,
-        uploadedAt:  stat.birthtime.toISOString(),
-      };
-    })
-    .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+  return _scanDir(BOOKS_DIR, '').sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
 }
 
-function deleteBook(name) {
-  const safeName = path.basename(name);
+function listFolders() {
+  ensureDir();
+  const folders = [{ name: 'ראשי', path: '' }];
+  function scan(absDir, relFolder) {
+    try {
+      for (const entry of fs.readdirSync(absDir, { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+          const subRel = relFolder ? `${relFolder}/${entry.name}` : entry.name;
+          folders.push({ name: entry.name, path: subRel });
+          scan(path.join(absDir, entry.name), subRel);
+        }
+      }
+    } catch {}
+  }
+  scan(BOOKS_DIR, '');
+  return folders;
+}
+
+function createBookFolder(relPath) {
+  const safePath = path.normalize(relPath).replace(/^[./\\]+/, '');
+  if (!safePath) throw new Error('שם תיקייה לא חוקי');
+  const absPath = path.join(BOOKS_DIR, safePath);
+  if (!absPath.startsWith(BOOKS_DIR + path.sep) && absPath !== BOOKS_DIR) {
+    throw new Error('נתיב לא חוקי');
+  }
+  fs.mkdirSync(absPath, { recursive: true });
+  return safePath;
+}
+
+function deleteBook(relName) {
+  // relName may be "folder/file.pdf" or just "file.pdf"
+  const safeName = relName.replace(/\\/g, '/').split('/').map(p => path.basename(p)).join('/');
   if (!SUPPORTED_EXTS.includes(path.extname(safeName).toLowerCase())) {
     throw new Error('שם קובץ לא חוקי');
   }
   const filePath = path.join(BOOKS_DIR, safeName);
+  if (!filePath.startsWith(BOOKS_DIR)) throw new Error('נתיב לא חוקי');
   if (!fs.existsSync(filePath)) throw new Error('הספר לא נמצא');
   fs.unlinkSync(filePath);
+  try { fs.unlinkSync(filePath + '.meta.json'); } catch {}
 }
 
 async function extractPdfText(filePath, maxChars) {
@@ -101,4 +149,4 @@ async function getBooksContext(maxCharsPerBook = 2500, selectedBooks = null) {
   return parts.join('\n\n---\n\n');
 }
 
-module.exports = { listBooks, deleteBook, saveBookMeta, getBooksContext, BOOKS_DIR, SUPPORTED_EXTS };
+module.exports = { listBooks, listFolders, createBookFolder, deleteBook, saveBookMeta, getBooksContext, BOOKS_DIR, SUPPORTED_EXTS };
