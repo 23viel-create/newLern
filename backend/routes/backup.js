@@ -131,7 +131,7 @@ router.post('/sync-word', (req, res) => {
     const result = syncWordFile(nodePath);
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 

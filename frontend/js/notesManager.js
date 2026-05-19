@@ -240,19 +240,31 @@ const NotesManager = (() => {
     // Apply to any pre-existing items from saved richBody
     body.querySelectorAll('.note-check-item').forEach(_applyCheckItemDir);
 
-    // Save
+    // Checkbox attribute sync — ensures checked state is serialised into .innerHTML
+    if (body._checkboxHandler) body.removeEventListener('change', body._checkboxHandler);
+    body._checkboxHandler = (e) => {
+      if (e.target.type !== 'checkbox') return;
+      if (e.target.checked) e.target.setAttribute('checked', 'checked');
+      else                   e.target.removeAttribute('checked');
+    };
+    body.addEventListener('change', body._checkboxHandler);
+
+    // Save — re-enable button before cloning to prevent disabled clone carry-over
     const saveBtn = document.getElementById('noteEditorSaveBtn');
+    saveBtn.disabled = false;
     const newSave = saveBtn.cloneNode(true);
     saveBtn.replaceWith(newSave);
     newSave.addEventListener('click', async () => {
-      const title = document.getElementById('noteEditorTitle').value.trim() || 'ללא כותרת';
-      const richBody  = body.innerHTML;
+      const title      = document.getElementById('noteEditorTitle').value.trim() || 'ללא כותרת';
+      const liveBody   = document.getElementById('noteEditorBody');
+      const richBody   = liveBody ? liveBody.innerHTML : '';
       const noDateCb2  = document.getElementById('noteEditorNoDate');
       const targetDate = (noDateCb2 && noDateCb2.checked) ? null : (document.getElementById('noteEditorDate').value || null);
-      const isPinned  = document.getElementById('noteEditorPinned').checked;
+      const isPinned   = document.getElementById('noteEditorPinned').checked;
       try {
         newSave.disabled = true;
         await Api.saveNote({ id: note.id, title, richBody, targetDate, isPinned, dateCreated: note.dateCreated });
+        newSave.disabled = false;
         modal.classList.add('hidden');
         if (onSaved) onSaved();
         else if (_currentDate) renderForDate(_currentDate);

@@ -406,17 +406,32 @@ function _pollForWordChanges() {
 // Replaces background polling. Called by POST /api/backup/sync-word.
 
 function syncWordFile(nodePath) {
-  const docPath = path.join(summariesRoot, nodePath, 'document.doc');
-  if (!fs.existsSync(docPath)) {
-    throw new Error('קובץ document.doc לא נמצא — פתח את הסיכום ב-Word תחילה');
+  const dir      = path.join(summariesRoot, nodePath);
+  const docxPath = path.join(dir, 'document.docx');
+  const docPath  = path.join(dir, 'document.doc');
+
+  let chosenPath = null;
+  if (fs.existsSync(docxPath)) {
+    chosenPath = docxPath;
+    console.log(`Word Sync: Attempting to read -> ${docxPath}`);
+  } else if (fs.existsSync(docPath)) {
+    chosenPath = docPath;
+    console.log(`Word Sync: Attempting to read -> ${docPath}`);
+  } else {
+    console.log(`Word Sync: No Word file found in -> ${dir}`);
+    const notFoundErr = new Error('לא נמצא קובץ Word שמור עבור סיכום זה.');
+    notFoundErr.status = 404;
+    throw notFoundErr;
   }
-  const raw = fs.readFileSync(docPath, { encoding: 'utf-8', flag: 'r' });
+
+  const raw = fs.readFileSync(chosenPath, { encoding: 'utf-8', flag: 'r' });
   if (!raw.includes('urn:schemas-microsoft-com:office:word')) {
     throw new Error('הקובץ אינו קובץ Word HTML תקין');
   }
   const body = _extractWordHtmlBody(raw);
   if (!body) throw new Error('לא ניתן לחלץ תוכן מהקובץ');
   setSummaryContent(nodePath, body);
+  console.log(`Word Sync: Successfully synced ${chosenPath}`);
   return { ok: true };
 }
 
