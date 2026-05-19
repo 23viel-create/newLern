@@ -307,44 +307,85 @@ function readWordCache(title, nodePath) {
   return { filePath, size: stat.size, mtime: stat.mtimeMs, newerThanContent: false };
 }
 
-// ─── Word HTML sanitizer (import: .doc → app) ────────────────────────────────
+// ─── Binary DOCX XML → simple HTML converter ─────────────────────────────────
+// Used when Word saves in native ZIP/DOCX format instead of HTML.
 
-function _extractWordHtmlBody(raw) {
-  // 1. Strip <head> block (contains <style> tags and Word XML metadata)
-  let html = raw
-    .replace(/<head[\s\S]*?<\/head>/gi, '')
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '') // IE/Word conditional comments
-    .replace(/<!--[\s\S]*?-->/g, '');
+function _convertDocxXmlToHtml(xml) {
+  const paras = [];
+  const pRegex = /<w:p[\s>][\s\S]*?<\/w:p>/gi;
+  let pm;
+  while ((pm = pRegex.exec(xml)) !== null) {
+    const texts = [];
+    const tRegex = /<w:t[^>]*>([\s\S]*?)<\/w:t>/gi;
+    let tm;
+    while ((tm = tRegex.exec(pm[0])) !== null) texts.push(tm[1]);
+    const text = texts.join('');
+    if (text.trim()) {
+      const safe = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      paras.push(`<p dir="rtl">${safe}</p>`);
+    }
+  }
+  return paras.join('\n');
+}
 
-  // 2. Extract <body> inner content
-  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  let body = bodyMatch ? bodyMatch[1] : html;
+// ─── Shared Word body sanitizer ───────────────────────────────────────────────
 
-  // 3. Strip all XML namespace tags (o:p, w:*, m:*, v:*, x:* etc.)
-  body = body.replace(/<\/?(o|w|m|v|x):[^>\s/]*[^>]*\/?>/gi, '');
-
-  // 4. Strip xmlns namespace declarations on surviving tags
-  body = body.replace(/\s+xmlns(?::[a-z0-9]+)?="[^"]*"/gi, '');
-
-  // 5. Strip class="Mso*" attributes (MS Office class names)
-  body = body.replace(/\s+class="Mso[^"]*"/gi, '');
-  body = body.replace(/\s+class='Mso[^']*'/gi, '');
-
-  // 6. Strip mso-* directives from inline style attributes (keep valid CSS props)
-  body = body.replace(/style="([^"]*)"/gi, (_m, s) => {
+function _sanitizeWordBody(body) {
+  let b = body;
+  // Strip XML namespace tags (o:p, w:*, m:*, v:*, x:*)
+  b = b.replace(/<\/?(o|w|m|v|x):[^>\s/]*[^>]*\/?>/gi, '');
+  // Strip xmlns declarations
+  b = b.replace(/\s+xmlns(?::[a-z0-9]+)?="[^"]*"/gi, '');
+  // Strip Mso class names
+  b = b.replace(/\s+class="Mso[^"]*"/gi, '');
+  b = b.replace(/\s+class='Mso[^']*'/gi, '');
+  // Strip mso-* inline style directives, keep valid CSS
+  b = b.replace(/style="([^"]*)"/gi, (_m, s) => {
     const clean = s.split(';')
       .map(p => p.trim())
       .filter(p => p && !/^(mso-|tab-stops|text-autospace|punctuation-wrap)/i.test(p))
       .join('; ');
     return clean ? `style="${clean}"` : '';
   });
+  // Collapse empty spans and blank paragraphs Word injects
+  b = b.replace(/<span[^>]*>\s*<\/span>/gi, '');
+  b = b.replace(/<p[^>]*>(\s*&nbsp;\s*|\s*)<\/p>/gi, '');
+  return b.trim();
+}
 
-  // 7. Collapse empty spans and blank paragraphs that Word injects
-  body = body.replace(/<span[^>]*>\s*<\/span>/gi, '');
-  body = body.replace(/<p[^>]*>(\s*&nbsp;\s*|\s*)<\/p>/gi, '');
+// ─── Word HTML sanitizer (import: .doc HTML → app) ───────────────────────────
+// Permissive three-step fallback — no longer rejects on missing schema markers.
 
-  return body.trim();
+function _extractWordHtmlBody(raw) {
+  // Strip metadata blocks
+  let html = raw
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '');
+
+  // Step 1: permissive <body> regex
+  let body;
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  if (bodyMatch) {
+    body = bodyMatch[1];
+  } else {
+    // Step 2: split on <body (catches body tags with complex attributes)
+    const bodyIdx = html.toLowerCase().indexOf('<body');
+    if (bodyIdx !== -1) {
+      const closeTag = html.indexOf('>', bodyIdx);
+      body = closeTag !== -1
+        ? html.slice(closeTag + 1).replace(/<\/body[\s\S]*$/i, '')
+        : html;
+    } else {
+      // Step 3: ultimate fallback — no <body> at all, use entire content
+      console.log('Word Sync: No <body> tag detected — using full content as body');
+      body = html;
+    }
+  }
+
+  return _sanitizeWordBody(body);
 }
 
 // ─── Two-way sync: pure mtime-polling (resilient against Word atomic saves) ──
@@ -424,12 +465,32 @@ function syncWordFile(nodePath) {
     throw notFoundErr;
   }
 
-  const raw = fs.readFileSync(chosenPath, { encoding: 'utf-8', flag: 'r' });
-  if (!raw.includes('urn:schemas-microsoft-com:office:word')) {
-    throw new Error('הקובץ אינו קובץ Word HTML תקין');
+  // Read as Buffer first — detect binary ZIP vs HTML text by magic bytes
+  const buf      = fs.readFileSync(chosenPath);
+  const isBinary = buf[0] === 0x50 && buf[1] === 0x4B; // "PK" ZIP magic
+  console.log(`Word Sync: Format detected — ${isBinary ? 'binary ZIP/DOCX' : 'HTML text'} (${buf.length} bytes)`);
+
+  let body;
+  if (isBinary) {
+    // Native .docx (ZIP): unpack word/document.xml and convert to simple HTML
+    try {
+      const zip      = new AdmZip(buf);
+      const xmlEntry = zip.getEntry('word/document.xml');
+      if (!xmlEntry) throw new Error('word/document.xml חסר בתוך ה-ZIP');
+      const xml = xmlEntry.getData().toString('utf-8');
+      body = _convertDocxXmlToHtml(xml);
+      console.log(`Word Sync: Binary extraction yielded ${body.length} chars`);
+    } catch (zipErr) {
+      throw new Error(`שגיאה בקריאת קובץ Word בינארי: ${zipErr.message}`);
+    }
+  } else {
+    // HTML export from Word: permissive extraction, no schema validation
+    const raw = buf.toString('utf-8');
+    body = _extractWordHtmlBody(raw);
+    console.log(`Word Sync: HTML extraction yielded ${body.length} chars`);
   }
-  const body = _extractWordHtmlBody(raw);
-  if (!body) throw new Error('לא ניתן לחלץ תוכן מהקובץ');
+
+  if (!body.trim()) throw new Error('לא ניתן לחלץ תוכן מהקובץ');
   setSummaryContent(nodePath, body);
   console.log(`Word Sync: Successfully synced ${chosenPath}`);
   return { ok: true };
