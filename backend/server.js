@@ -14,6 +14,7 @@ const backupRouter        = require('./routes/backup');
 const booksRouter         = require('./routes/books');
 const calendarRouter      = require('./routes/calendar');
 const learningPlansRouter = require('./routes/learningPlans');
+const notesRouter         = require('./routes/notes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,6 +33,7 @@ app.use('/api/backup',  backupRouter);
 app.use('/api/books',          booksRouter);
 app.use('/api/calendar',       calendarRouter);
 app.use('/api/learning-plans', learningPlansRouter);
+app.use('/api/notes',          notesRouter);
 
 // בדיקת תקינות השרת
 app.get('/api/health', (_req, res) => {

@@ -197,6 +197,11 @@ const Api = {
   learningPlanOptimize: () =>
     apiFetch('/learning-plans/optimize', { method: 'POST' }),
 
+  // ── פתקיות ───────────────────────────────────────────────────────────────
+  getNotes:     (date)   => apiFetch(date ? `/notes?date=${encodeURIComponent(date)}` : '/notes'),
+  saveNote:     (note)   => apiFetch('/notes', { method: 'POST', body: note }),
+  deleteNote:   (id)     => apiFetch(`/notes/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
   // ── מאגר ספרים ───────────────────────────────────────────────────────────
   getBooks:      () => apiFetch('/books'),
   getBookStreamUrl: (name) => `/api/books/stream/${encodeURIComponent(name)}`,

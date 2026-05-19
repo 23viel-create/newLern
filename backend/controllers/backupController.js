@@ -255,24 +255,49 @@ async function openInWord(nodePath, title, html) {
     if (fs.existsSync(summaryDocxPath) && fs.existsSync(contentTxtPath)) {
       const docxMtime    = fs.statSync(summaryDocxPath).mtimeMs;
       const contentMtime = fs.statSync(contentTxtPath).mtimeMs;
-      // If content.txt was modified more than 2 s after document.docx, stale → regenerate
       if (contentMtime > docxMtime + 2000) {
-        fs.unlinkSync(summaryDocxPath); // remove stale copy so it gets rebuilt below
+        try { fs.unlinkSync(summaryDocxPath); } catch (e) {
+          if (e.code === 'EBUSY' || e.code === 'EPERM') {
+            throw new Error('קובץ הוורד פתוח כעת בתוכנת Word. אנא שמור וסגור אותו כדי לאפשר סנכרון מחדש.');
+          }
+        }
       }
     }
   }
-  const buffer  = await buildDocx(title || nodePath, content);
+  const buffer = await buildDocx(title || nodePath, content);
 
   // Save to summary folder as the canonical document.docx (dual-file architecture)
   const summaryFolderPath = path.join(summariesRoot, nodePath);
   if (fs.existsSync(summaryFolderPath)) {
-    fs.writeFileSync(path.join(summaryFolderPath, 'document.docx'), buffer);
+    try {
+      fs.writeFileSync(path.join(summaryFolderPath, 'document.docx'), buffer);
+    } catch (e) {
+      if (e.code !== 'EBUSY' && e.code !== 'EPERM') throw e;
+      // File locked by Word — silently skip the summary-folder copy; word_cache copy below still works
+    }
   }
 
   // Also save a named copy in word_cache for the OS open command
   const safeBase = (title || nodePath).replace(/[^\w֐-׿‏‎ -]/g, '_').slice(0, 60);
-  const filePath = path.join(WORD_CACHE_DIR, safeBase + '.docx');
-  fs.writeFileSync(filePath, buffer);
+  let filePath   = path.join(WORD_CACHE_DIR, safeBase + '.docx');
+
+  // EBUSY retry: if main path is locked, try incrementing filename suffix
+  let written = false;
+  for (let attempt = 0; attempt <= 5; attempt++) {
+    const tryPath = attempt === 0
+      ? filePath
+      : path.join(WORD_CACHE_DIR, `${safeBase}_${attempt}.docx`);
+    try {
+      fs.writeFileSync(tryPath, buffer);
+      filePath = tryPath;
+      written  = true;
+      break;
+    } catch (e) {
+      if ((e.code === 'EBUSY' || e.code === 'EPERM') && attempt < 5) continue;
+      throw new Error('קובץ הוורד פתוח כעת בתוכנת Word. אנא שמור וסגור אותו כדי לאפשר סנכרון מחדש.');
+    }
+  }
+  if (!written) throw new Error('לא ניתן לשמור קובץ Word — נסה שנית לאחר סגירת Word.');
 
   // Platform open command
   let cmd;

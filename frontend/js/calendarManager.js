@@ -668,23 +668,23 @@ const CalendarManager = (() => {
 
   function _colorClass(day) {
     if (day.isShabbat || day.isHoliday) return '';
-    const thr = calendarData?.settings?.heavyLoadThreshold ?? 9;
+    const N = calendarData?.settings?.heavyLoadThreshold ?? 9;
+    const n = day.totalTasks;
+
     if (day.isPast || day.isToday) {
-      if (day.totalTasks === 0) return '';
-      const pct = day.doneTasks / day.totalTasks;
+      if (n === 0) return '';
+      const pct = day.doneTasks / n;
       if (pct >= 1)    return 'cal-cell--done';
       if (pct >= 0.01) return 'cal-cell--partial';
       return 'cal-cell--missed';
     }
-    // Future days
-    const n = day.totalTasks;
-    if (n === 0)            return 'cal-cell--load-0';
-    // All future tasks already completed → solid green
-    if (n > 0 && day.doneTasks >= n) return 'cal-cell--done';
-    // Load-based heatmap: 0–50% of threshold = yellow, >50% = brown
-    const half = Math.ceil(thr / 2);
-    if (n <= half) return 'cal-cell--load-low';
-    return 'cal-cell--load-high';
+
+    // Future days — strict 4-tier heatmap
+    if (n === 0) return 'cal-cell--load-0';
+    if (day.doneTasks >= n) return 'cal-cell--done';   // all done → green
+    if (n >= N)             return 'cal-cell--load-black'; // ≥ MaxLoad → black
+    if (n > N / 2)          return 'cal-cell--load-high';  // 50%–100% → brown
+    return 'cal-cell--load-low';                           // 1–50% → yellow
   }
 
   // ── Weekly view ───────────────────────────────────────────────────────────
@@ -785,6 +785,8 @@ const CalendarManager = (() => {
     }
 
     dateLabel.textContent = _formatDateLabelFull(dateStr);
+    // Load notes for the selected day
+    if (typeof NotesManager !== 'undefined') NotesManager.renderForDate(dateStr);
     panel.innerHTML = '<p class="placeholder-text">טוען...</p>';
 
     try {
@@ -865,7 +867,7 @@ const CalendarManager = (() => {
          <button class="btn btn--xs btn--ghost task-undo-btn" data-id="${_esc(task.id)}" title="בטל השלמה">↩</button>`
       : `<button class="btn btn--xs btn--primary task-done-btn" data-id="${_esc(task.id)}">סיימתי ✓</button>
          <button class="btn btn--xs btn--ghost task-postpone-btn" data-id="${_esc(task.id)}" title="דחה יום קדימה">דחה ←</button>
-         <button class="btn btn--xs btn--ghost task-yesterday-btn" data-id="${_esc(task.id)}" title="למדתי את זה אתמול">אתמול</button>`;
+         <button class="btn btn--xs btn--ghost task-yesterday-btn" data-id="${_esc(task.id)}" title="ביצעתי את זה אתמול — הזז לאתמול">ביצעתי</button>`;
 
     return `
       <div class="task-item ${done ? 'task-item--done' : ''}">

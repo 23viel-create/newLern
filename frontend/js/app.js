@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   BackupManager.init();
   PlanProgramModal.init();
   SplitScreenManager.init();
+  NotesManager.init();
   loadKeyCount();
 
   // ניווט בין תצוגות

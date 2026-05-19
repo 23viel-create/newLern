@@ -55,22 +55,24 @@
             <span class="legend-item legend-item--partial">חלקי</span>
             <span class="legend-item legend-item--missed">לא בוצע</span>
             <span class="legend-sep">|</span>
-            <span class="legend-item legend-item--load-low">1–3 משימות</span>
-            <span class="legend-item legend-item--load-mid">4–8 משימות</span>
-            <span class="legend-item legend-item--load-high">עומס כבד</span>
+            <span class="legend-item legend-item--load-low">צהוב — עד 50%</span>
+            <span class="legend-item legend-item--load-high">חום — 50%–100%</span>
+            <span class="legend-item legend-item--load-black">שחור — סף מלא</span>
           </div>
           <div id="calGrid" class="cal-grid">
             <p class="placeholder-text">טוען לוח שנה...</p>
           </div>
         </div>
 
-        <!-- פאנל משימות (משמאל ב-RTL) -->
+        <!-- פאנל משימות + פתקיות (משמאל ב-RTL) -->
         <div class="dashboard-tasks card">
           <h3 class="dashboard-tasks__title">משימות</h3>
           <p id="calTaskDate" class="cal-task-header">בחר יום</p>
           <div id="calTaskPanel">
             <p class="placeholder-text">לחץ על יום בלוח לצפייה במשימות</p>
           </div>
+          <!-- פתקיות ליום הנבחר -->
+          <div id="noteDayPanel" class="notes-day-panel"></div>
         </div>
 
       </div>
@@ -1049,6 +1051,60 @@
   <!-- hidden file input for folder import -->
   <input type="file" id="folderImportInput" accept=".docx,audio/*" hidden />
 
+  <!-- ── עורך פתקיות (modal) ── -->
+  <div id="noteEditorModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal__overlay"></div>
+    <div class="modal__box modal__box--note-editor">
+      <h2 class="modal__title">📝 עריכת פתק</h2>
+      <div class="form-group">
+        <label class="form-label" for="noteEditorTitle">כותרת</label>
+        <input type="text" id="noteEditorTitle" class="input-field input-field--full"
+               placeholder="כותרת הפתק..." dir="rtl" maxlength="200" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="noteEditorDate">תאריך קישור (אופציונלי)</label>
+        <input type="date" id="noteEditorDate" class="input-field" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">תוכן הפתק</label>
+        <div id="noteEditorToolbar" class="note-toolbar">
+          <button type="button" class="btn btn--xs btn--ghost" data-cmd="bold" title="מודגש"><strong>B</strong></button>
+          <button type="button" class="btn btn--xs btn--ghost" data-cmd="italic" title="נטוי"><em>I</em></button>
+          <button type="button" class="btn btn--xs btn--ghost" data-cmd="underline" title="קו תחתי"><u>U</u></button>
+          <button type="button" class="btn btn--xs btn--ghost" data-cmd="checklist" title="הוסף תיבת סימון">☑</button>
+          <button type="button" class="btn btn--xs btn--ghost" data-cmd="ul" title="רשימת נקודות">• רשימה</button>
+          <button type="button" class="btn btn--xs btn--ghost" data-cmd="ol" title="רשימה ממוספרת">1. ממוספר</button>
+        </div>
+        <div id="noteEditorBody" class="note-editor-body" contenteditable="true" dir="rtl"
+             placeholder="כתוב כאן את תוכן הפתק..."></div>
+      </div>
+      <label class="checkbox-label" style="margin-bottom:0.8rem">
+        <input type="checkbox" id="noteEditorPinned" />
+        נעץ פתק זה (יופיע ראשון)
+      </label>
+      <div class="modal__actions">
+        <button id="noteEditorCancelBtn" class="btn btn--secondary">ביטול</button>
+        <button id="noteEditorSaveBtn"   class="btn btn--primary">שמור פתק ✓</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── מגירת פתקיות גלובלית ── -->
+  <div id="notesDrawer" class="notes-drawer">
+    <div class="notes-drawer__handle">
+      <button id="notesDrawerClose" class="btn btn--ghost btn--sm">▼ סגור</button>
+      <span class="notes-drawer__title">📌 לוח פתקיות גלובלי</span>
+      <button id="notesDrawerAddBtn" class="btn btn--primary btn--sm">+ פתק חדש</button>
+      <input type="search" id="notesDrawerSearch" class="input-field notes-drawer__search"
+             placeholder="🔍 חיפוש פתקיות..." dir="rtl" autocomplete="off" />
+    </div>
+    <div id="notesDrawerList" class="notes-drawer__list">
+      <p class="placeholder-text">פתח את המגירה לצפייה בפתקיות</p>
+    </div>
+  </div>
+  <!-- כפתור פתיחת מגירת פתקיות (קבוע בתחתית המסך) -->
+  <button id="notesDrawerToggle" class="notes-drawer-toggle" title="לוח פתקיות גלובלי">📌 פתקיות</button>
+
   <script src="js/api.js"></script>
   <script src="js/windowManager.js"></script>
   <script src="js/summariesManager.js"></script>
@@ -1061,6 +1117,7 @@
   <script src="js/activeChatManager.js"></script>
   <script src="js/helpChatManager.js"></script>
   <script src="js/splitScreenManager.js"></script>
+  <script src="js/notesManager.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

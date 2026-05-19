@@ -269,7 +269,15 @@ const SummariesManager = (() => {
       }
 
       case 'open': {
-        // flatten the sorted tree (not filtered) so nav works across all summaries
+        // If a search is active: clear it, re-render full tree, then reveal path
+        if (searchQuery) {
+          searchQuery = '';
+          const searchInput = document.getElementById('treeSearch');
+          if (searchInput) searchInput.value = '';
+          render(); // render full tree
+          // Expand all ancestor folders so the item is visible
+          _revealPath(nodePath);
+        }
         const flatList = flattenSummaries(sortTree(treeData));
         const node     = flatList.find(n => n.path === nodePath);
         if (node) EditorManager.open(node, flatList);
@@ -344,6 +352,43 @@ const SummariesManager = (() => {
       }
     };
     input.click();
+  }
+
+  // ─── גילוי מסלול עץ (expand כל תיקיות ההורה + גלילה + הדגשה) ───────────────
+
+  function _revealPath(targetPath) {
+    // Build ancestor paths from root down to parent
+    const parts = targetPath.split('/');
+    const ancestors = [];
+    for (let i = 1; i < parts.length; i++) {
+      ancestors.push(parts.slice(0, i).join('/'));
+    }
+
+    const container = document.getElementById('summariesTree');
+
+    // Expand each ancestor folder
+    for (const ancestorPath of ancestors) {
+      expanded.add(ancestorPath);
+      const folderEl = container.querySelector(`.tree-node--folder[data-path="${CSS.escape(ancestorPath)}"]`);
+      if (folderEl) {
+        const children = folderEl.querySelector('.tree-node__children');
+        const toggle   = folderEl.querySelector('.tree-node__toggle');
+        if (children) children.hidden = false;
+        if (toggle)   toggle.textContent = '▼';
+      }
+    }
+
+    // After expansion, find and highlight the target node
+    requestAnimationFrame(() => {
+      const targetEl = container.querySelector(`[data-path="${CSS.escape(targetPath)}"]`);
+      if (!targetEl) return;
+      // Scroll into view
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Flash highlight
+      const row = targetEl.querySelector('.tree-node__row') || targetEl;
+      row.classList.add('tree-node--highlight');
+      setTimeout(() => row.classList.remove('tree-node--highlight'), 1800);
+    });
   }
 
   // ─── ממשק ציבורי ────────────────────────────────────────────────────────────
