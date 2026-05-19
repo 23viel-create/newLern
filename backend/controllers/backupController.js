@@ -208,39 +208,30 @@ const WORD_CACHE_DIR = path.join(DATA_ROOT, 'word_cache');
 async function openInWord(nodePath, title, html) {
   fs.mkdirSync(WORD_CACHE_DIR, { recursive: true });
 
-  // Dual-mirror: if document.doc exists but content.txt is newer, regenerate from content
-  let content;
-  if (html !== undefined) {
-    content = html;
-  } else {
-    content = getSummaryContent(nodePath);
-    // Check if existing document.doc is stale compared to content.txt
-    const summaryDocxPath = path.join(summariesRoot, nodePath, 'document.doc');
-    const contentTxtPath  = path.join(summariesRoot, nodePath, 'content.txt');
-    if (fs.existsSync(summaryDocxPath) && fs.existsSync(contentTxtPath)) {
-      const docxMtime    = fs.statSync(summaryDocxPath).mtimeMs;
-      const contentMtime = fs.statSync(contentTxtPath).mtimeMs;
-      if (contentMtime > docxMtime + 2000) {
-        try { fs.unlinkSync(summaryDocxPath); } catch (e) {
-          if (e.code === 'EBUSY' || e.code === 'EPERM') {
-            throw new Error('קובץ הוורד פתוח כעת בתוכנת Word. אנא שמור וסגור אותו כדי לאפשר סנכרון מחדש.');
-          }
-        }
-      }
-    }
-  }
+  let content = html !== undefined ? html : getSummaryContent(nodePath);
   const buffer = await buildDocx(title || nodePath, content);
 
-  // Save to summary folder as the canonical document.doc (dual-file architecture)
+  // Before writing the fresh export, remove any conflicting Word files from the
+  // summary folder so the user always finds exactly one document to open.
   const summaryFolderPath = path.join(summariesRoot, nodePath);
   const exportPath        = path.join(summaryFolderPath, 'document.doc');
   if (fs.existsSync(summaryFolderPath)) {
+    for (const conflict of ['document.doc', 'document.docx']) {
+      const cp = path.join(summaryFolderPath, conflict);
+      if (fs.existsSync(cp)) {
+        try { fs.unlinkSync(cp); }
+        catch (e) {
+          if (e.code === 'EBUSY' || e.code === 'EPERM')
+            throw new Error('קובץ הוורד פתוח כעת בתוכנת Word. אנא שמור וסגור אותו כדי לאפשר סנכרון מחדש.');
+        }
+      }
+    }
     try {
       fs.writeFileSync(exportPath, buffer);
       console.log('Word Engine [EXPORT]: Writing master web content to:', exportPath);
     } catch (e) {
       if (e.code !== 'EBUSY' && e.code !== 'EPERM') throw e;
-      // File locked by Word — silently skip the summary-folder copy; word_cache copy below still works
+      // File immediately re-locked — word_cache copy below still lets the user open it
     }
   }
 
@@ -464,12 +455,27 @@ function syncWordFile(nodePath) {
     }
   }
 
+  const docxExists = fs.existsSync(docxPath);
+  const docExists  = fs.existsSync(docPath);
+
   let chosenPath = null;
-  let staleDocPath = null; // track old .doc to delete after successful .docx sync
-  if (fs.existsSync(docxPath)) {
-    chosenPath   = docxPath;
-    staleDocPath = fs.existsSync(docPath) ? docPath : null;
-  } else if (fs.existsSync(docPath)) {
+  let stalePath  = null; // older counterpart — deleted after a successful sync
+
+  if (docxExists && docExists) {
+    // Both files present — always pick the one saved most recently
+    const docxMtime = fs.statSync(docxPath).mtimeMs;
+    const docMtime  = fs.statSync(docPath).mtimeMs;
+    if (docxMtime >= docMtime) {
+      chosenPath = docxPath;
+      stalePath  = docPath;
+    } else {
+      chosenPath = docPath;
+      stalePath  = docxPath;
+    }
+    console.log('Word Sync: Detected multiple files. Selected latest modified ->', chosenPath);
+  } else if (docxExists) {
+    chosenPath = docxPath;
+  } else if (docExists) {
     chosenPath = docPath;
   } else {
     console.log(`Word Engine [SYNC]: No Word file found in -> ${dir}`);
@@ -509,10 +515,10 @@ function syncWordFile(nodePath) {
   setSummaryContent(nodePath, body);
   console.log(`Word Engine [SYNC]: content.txt updated for ${nodePath}`);
 
-  // If we read from a native .docx, remove the stale .doc so future syncs
-  // don't accidentally fall back to an outdated HTML export.
-  if (staleDocPath) {
-    try { fs.unlinkSync(staleDocPath); }
+  // Remove the older conflicting file so the next sync always reads the single
+  // freshest source and never confuses old HTML exports with new native saves.
+  if (stalePath) {
+    try { fs.unlinkSync(stalePath); }
     catch { /* locked or already gone — not fatal */ }
   }
 
