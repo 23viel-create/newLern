@@ -358,6 +358,18 @@
             </div>
           </div>
 
+          <div class="form-group">
+            <label class="form-label" for="quizQuotaSelect">מספר שאלות למבחן:</label>
+            <select id="quizQuotaSelect" class="select-field select-field--sm" style="width:auto;min-width:120px">
+              <option value="all">הכל</option>
+              <option value="5">5</option>
+              <option value="10">10</option>
+              <option value="15">15</option>
+              <option value="20">20</option>
+              <option value="30">30</option>
+            </select>
+          </div>
+
           <div class="modal__actions">
             <button id="quizCancelBtn" class="btn btn--secondary">ביטול</button>
             <button id="quizStartBtn"  class="btn btn--primary">התחל בחינה ▶</button>
@@ -512,7 +524,8 @@
         <div class="notes-full-toolbar">
           <button class="btn btn--primary" id="notesFullAddBtn">+ פתק חדש</button>
           <input type="search" id="notesFullSearch" class="input-field notes-full-search"
-                 placeholder="🔍 חפש פתקיות..." dir="rtl" autocomplete="off" />
+                 placeholder="חפש פתקיות..." dir="rtl" autocomplete="off" />
+          <button class="btn btn--secondary btn--sm" id="notesFullSearchBtn">🔍 חפש</button>
           <select id="notesFullSort" class="select-field" style="width:auto">
             <option value="modified">מיון לפי עריכה</option>
             <option value="pinned">נעוצים תחילה</option>
@@ -1121,7 +1134,8 @@
       <span class="notes-drawer__title">📌 לוח פתקיות גלובלי</span>
       <button id="notesDrawerAddBtn" class="btn btn--primary btn--sm">+ פתק חדש</button>
       <input type="search" id="notesDrawerSearch" class="input-field notes-drawer__search"
-             placeholder="🔍 חיפוש פתקיות..." dir="rtl" autocomplete="off" />
+             placeholder="חיפוש פתקיות..." dir="rtl" autocomplete="off" />
+      <button class="btn btn--secondary btn--sm" id="notesDrawerSearchBtn">🔍</button>
     </div>
     <div id="notesDrawerList" class="notes-drawer__list">
       <p class="placeholder-text">פתח את המגירה לצפייה בפתקיות</p>

@@ -532,21 +532,21 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
 }
 .task-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.5rem;
   padding: 0.45rem 0.65rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   margin-bottom: 0.4rem;
 }
 .task-item--done  { opacity: 0.55; }
-.task-item__info  { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.task-item__info  { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 130px; }
 .task-item__type  { font-size: 0.68rem; font-weight: 700; color: var(--color-primary); }
 .task-item__title { font-size: 0.82rem; white-space: normal; word-wrap: break-word; overflow: visible; }
 .task-item__num   { font-size: 0.68rem; color: var(--color-text-muted); }
 .task-item__status { font-size: 0.8rem; color: var(--color-success); white-space: nowrap; flex-shrink: 0; }
-.task-item__actions { display: flex; gap: 0.3rem; align-items: center; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.task-item__actions { display: flex; gap: 0.3rem; align-items: center; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; max-width: 100%; }
 
 /* ===== Settings ===== */
 .settings-panel { margin-bottom: 1.5rem; }

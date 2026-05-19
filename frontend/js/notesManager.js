@@ -324,6 +324,13 @@ const NotesManager = (() => {
       if (container) _renderDrawer(container);
     });
 
+    // Drawer search button
+    document.getElementById('notesDrawerSearchBtn')?.addEventListener('click', () => {
+      _drawerSearch = (document.getElementById('notesDrawerSearch')?.value || '').trim();
+      const container = document.getElementById('notesDrawerList');
+      if (container) _renderDrawer(container);
+    });
+
     // Drawer new note button
     document.getElementById('notesDrawerAddBtn')?.addEventListener('click', () => {
       _openNoteEditor({ id: null, title: '', richBody: '', isPinned: false, targetDate: null, dateCreated: null },
@@ -353,6 +360,10 @@ const NotesManager = (() => {
       });
       document.getElementById('notesFullSearch')?.addEventListener('input', (e) => {
         _fullViewSearch = e.target.value.trim();
+        _renderFullView();
+      });
+      document.getElementById('notesFullSearchBtn')?.addEventListener('click', () => {
+        _fullViewSearch = (document.getElementById('notesFullSearch')?.value || '').trim();
         _renderFullView();
       });
       document.getElementById('notesFullSort')?.addEventListener('change', (e) => {

@@ -430,6 +430,47 @@ ${SYSTEM_GUIDE}
   return await _callGemini(prompt);
 }
 
+// ─── Appeal grade ────────────────────────────────────────────────────────────
+
+async function appealGrade({ question, sampleAnswer, userAnswer, originalCritique, originalScore, appealArgument }) {
+  if (!question) throw new Error('שאלה נדרשת');
+  if (!appealArgument || !appealArgument.trim()) throw new Error('טיעון הערעור נדרש');
+
+  const safeQ    = _sanitize(question).slice(0, 500);
+  const safeSamp = _sanitize(sampleAnswer || '').slice(0, 1000);
+  const safeUser = _sanitize(userAnswer || '').slice(0, 1000);
+  const safeCrit = _sanitize(originalCritique || '').slice(0, 600);
+  const safeArg  = _sanitize(appealArgument).slice(0, 800);
+  const origScore = Math.max(0, Math.min(100, Math.round(Number(originalScore) || 0)));
+
+  const prompt = `אתה פרופסור אקדמי הוגן. סטודנט ערער על הציון שקיבל בשאלה פתוחה. עיין בכל הנתונים ובטיעון הסטודנט, ועדכן את הציון אם הערעור מוצדק.
+
+שאלה: ${safeQ}
+תשובה מצופה: ${safeSamp || '(לא סופקה)'}
+תשובת הסטודנט: ${safeUser}
+ביקורת מקורית: ${safeCrit || '(לא סופקה)'}
+ציון מקורי: ${origScore}/100
+טיעון הסטודנט לערעור: ${safeArg}
+
+הנחיות:
+- אם הטיעון מוצדק — העלה את הציון בהתאם.
+- אם הטיעון אינו מוצדק — שמור על הציון המקורי.
+- ציין בביקורת המעודכנת האם הערעור התקבל ומדוע.
+
+החזר JSON בלבד ללא כל טקסט נוסף, בפורמט המדויק:
+{"newScore":75,"newCritique":"ביקורת מעודכנת בעברית עד 3 משפטים"}
+
+newScore הוא מספר שלם בין 0 ל-100.`;
+
+  const raw  = await _callGemini(prompt);
+  const s    = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  const json = JSON.parse(s);
+  return {
+    newScore:    Math.max(0, Math.min(100, Math.round(Number(json.newScore) || 0))),
+    newCritique: json.newCritique || '',
+  };
+}
+
 // ─── Keys management ─────────────────────────────────────────────────────────
 
 function getKeys() {
@@ -445,6 +486,7 @@ module.exports = {
   suggestQuestions,
   suggestSingleQuestion,
   gradeAnswer,
+  appealGrade,
   getScheduleAdvice,
   chatWithArticles,
   generateLearningProgram,

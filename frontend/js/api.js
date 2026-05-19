@@ -188,6 +188,8 @@ const Api = {
     apiFetchPlain('/ai/suggest-single-question', { method: 'POST', body: { summaryPath, summaryTitle, type } }),
   aiGradeAnswer: (question, sampleAnswer, userAnswer, strictness) =>
     apiFetchPlain('/ai/grade-answer', { method: 'POST', body: { question, sampleAnswer, userAnswer, strictness } }),
+  aiAppealGrade: (params) =>
+    apiFetchPlain('/ai/appeal-grade', { method: 'POST', body: params }),
   aiSystemHelp: (userMessage) =>
     apiFetchPlain('/ai/system-help', { method: 'POST', body: { userMessage } }),
   calendarExtendParashot: () =>

@@ -136,4 +136,15 @@ router.post('/grade-answer', async (req, res) => {
   }
 });
 
+// POST /api/ai/appeal-grade  { question, sampleAnswer, userAnswer, originalCritique, originalScore, appealArgument }
+router.post('/appeal-grade', async (req, res) => {
+  try {
+    const { question, sampleAnswer, userAnswer, originalCritique, originalScore, appealArgument } = req.body;
+    const result = await ctrl.appealGrade({ question, sampleAnswer, userAnswer, originalCritique, originalScore, appealArgument });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
