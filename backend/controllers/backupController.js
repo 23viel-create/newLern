@@ -233,9 +233,11 @@ async function openInWord(nodePath, title, html) {
 
   // Save to summary folder as the canonical document.doc (dual-file architecture)
   const summaryFolderPath = path.join(summariesRoot, nodePath);
+  const exportPath        = path.join(summaryFolderPath, 'document.doc');
   if (fs.existsSync(summaryFolderPath)) {
     try {
-      fs.writeFileSync(path.join(summaryFolderPath, 'document.doc'), buffer);
+      fs.writeFileSync(exportPath, buffer);
+      console.log('Word Engine [EXPORT]: Writing master web content to:', exportPath);
     } catch (e) {
       if (e.code !== 'EBUSY' && e.code !== 'EPERM') throw e;
       // File locked by Word — silently skip the summary-folder copy; word_cache copy below still works
@@ -451,24 +453,37 @@ function syncWordFile(nodePath) {
   const docxPath = path.join(dir, 'document.docx');
   const docPath  = path.join(dir, 'document.doc');
 
+  // Explicitly skip Word temporary lock files (prefixed with ~$)
+  // This guard is defensive — we never construct lock-file paths above,
+  // but protects against unexpected filesystem states.
+  for (const candidate of [docxPath, docPath]) {
+    if (path.basename(candidate).startsWith('~$')) {
+      const err = new Error('לא ניתן לקרוא קובץ נעילה זמני של Word');
+      err.status = 400;
+      throw err;
+    }
+  }
+
   let chosenPath = null;
+  let staleDocPath = null; // track old .doc to delete after successful .docx sync
   if (fs.existsSync(docxPath)) {
-    chosenPath = docxPath;
-    console.log(`Word Sync: Attempting to read -> ${docxPath}`);
+    chosenPath   = docxPath;
+    staleDocPath = fs.existsSync(docPath) ? docPath : null;
   } else if (fs.existsSync(docPath)) {
     chosenPath = docPath;
-    console.log(`Word Sync: Attempting to read -> ${docPath}`);
   } else {
-    console.log(`Word Sync: No Word file found in -> ${dir}`);
+    console.log(`Word Engine [SYNC]: No Word file found in -> ${dir}`);
     const notFoundErr = new Error('לא נמצא קובץ Word שמור עבור סיכום זה.');
     notFoundErr.status = 404;
     throw notFoundErr;
   }
 
+  console.log('Word Engine [SYNC]: Extracting user changes directly from:', chosenPath);
+
   // Read as Buffer first — detect binary ZIP vs HTML text by magic bytes
   const buf      = fs.readFileSync(chosenPath);
   const isBinary = buf[0] === 0x50 && buf[1] === 0x4B; // "PK" ZIP magic
-  console.log(`Word Sync: Format detected — ${isBinary ? 'binary ZIP/DOCX' : 'HTML text'} (${buf.length} bytes)`);
+  console.log(`Word Engine [SYNC]: Format — ${isBinary ? 'binary ZIP/DOCX' : 'HTML text'} (${buf.length} bytes)`);
 
   let body;
   if (isBinary) {
@@ -479,7 +494,7 @@ function syncWordFile(nodePath) {
       if (!xmlEntry) throw new Error('word/document.xml חסר בתוך ה-ZIP');
       const xml = xmlEntry.getData().toString('utf-8');
       body = _convertDocxXmlToHtml(xml);
-      console.log(`Word Sync: Binary extraction yielded ${body.length} chars`);
+      console.log(`Word Engine [SYNC]: Binary extraction yielded ${body.length} chars`);
     } catch (zipErr) {
       throw new Error(`שגיאה בקריאת קובץ Word בינארי: ${zipErr.message}`);
     }
@@ -487,12 +502,20 @@ function syncWordFile(nodePath) {
     // HTML export from Word: permissive extraction, no schema validation
     const raw = buf.toString('utf-8');
     body = _extractWordHtmlBody(raw);
-    console.log(`Word Sync: HTML extraction yielded ${body.length} chars`);
+    console.log(`Word Engine [SYNC]: HTML extraction yielded ${body.length} chars`);
   }
 
   if (!body.trim()) throw new Error('לא ניתן לחלץ תוכן מהקובץ');
   setSummaryContent(nodePath, body);
-  console.log(`Word Sync: Successfully synced ${chosenPath}`);
+  console.log(`Word Engine [SYNC]: content.txt updated for ${nodePath}`);
+
+  // If we read from a native .docx, remove the stale .doc so future syncs
+  // don't accidentally fall back to an outdated HTML export.
+  if (staleDocPath) {
+    try { fs.unlinkSync(staleDocPath); }
+    catch { /* locked or already gone — not fatal */ }
+  }
+
   return { ok: true };
 }
 
