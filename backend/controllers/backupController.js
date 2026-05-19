@@ -512,7 +512,20 @@ function syncWordFile(nodePath, title) {
       throw new Error(`שגיאה בקריאת קובץ Word בינארי: ${zipErr.message}`);
     }
   } else {
-    body = _extractWordHtmlBody(buf.toString('utf-8'));
+    // Heuristic UTF-16LE check: BOM (FF FE) OR null bytes at positions 1 and 3
+    // (e.g. '<' in UTF-16LE is 3C 00, 'h' is 68 00 → bytes 1 and 3 are 0x00)
+    const isUtf16 = (buf[0] === 0xFF && buf[1] === 0xFE) ||
+                    (buf.length > 3 && buf[1] === 0x00 && buf[3] === 0x00);
+    let html;
+    if (isUtf16) {
+      console.log('Word Sync: Heuristic detected UTF-16LE encoding');
+      html = buf.toString('utf16le');
+    } else {
+      console.log('Word Sync: Falling back to UTF-8 encoding');
+      html = buf.toString('utf8');
+    }
+    html = html.replace(/^﻿/, ''); // Strip invisible BOM marker if present
+    body = _extractWordHtmlBody(html);
     console.log(`Word Engine [SYNC]: HTML extraction yielded ${body.length} chars`);
   }
 
