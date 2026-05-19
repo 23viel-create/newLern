@@ -321,28 +321,40 @@ function _convertDocxXmlToHtml(xml) {
   return paras.join('\n');
 }
 
-// ─── Shared Word body sanitizer ───────────────────────────────────────────────
+// ─── Aggressive Word HTML bloat shredder (text .doc path only) ───────────────
+// The binary .docx path (_convertDocxXmlToHtml) produces clean output and
+// does NOT go through this function.
 
 function _sanitizeWordBody(body) {
   let b = body;
-  // Strip XML namespace tags (o:p, w:*, m:*, v:*, x:*)
-  b = b.replace(/<\/?(o|w|m|v|x):[^>\s/]*[^>]*\/?>/gi, '');
-  // Strip xmlns declarations
+
+  // 1. Strip any residual <html> / </html> wrapper that leaked through extraction
+  b = b.replace(/<html[^>]*>|<\/html>/gi, '');
+
+  // 2. Remove all remaining <style> blocks (head-strip may have missed nested ones)
+  b = b.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+
+  // 3. Remove named Office namespace tags first (more readable), then catch-all
+  b = b.replace(/<\/?(o:p|o:smarttagtype)[^>]*>/gi, '');
+  b = b.replace(/<\/?[a-z][a-z0-9]*:[a-z][a-z0-9]*[^>]*\/?>/gi, '');
+
+  // 4. Unwrap WordSection wrapper div — keep inner content
+  b = b.replace(/<div[^>]*\bWordSection\d*\b[^>]*>([\s\S]*?)<\/div>/gi, '$1');
+
+  // 5. Strip xmlns declarations on surviving tags
   b = b.replace(/\s+xmlns(?::[a-z0-9]+)?="[^"]*"/gi, '');
-  // Strip Mso class names
-  b = b.replace(/\s+class="Mso[^"]*"/gi, '');
-  b = b.replace(/\s+class='Mso[^']*'/gi, '');
-  // Strip mso-* inline style directives, keep valid CSS
-  b = b.replace(/style="([^"]*)"/gi, (_m, s) => {
-    const clean = s.split(';')
-      .map(p => p.trim())
-      .filter(p => p && !/^(mso-|tab-stops|text-autospace|punctuation-wrap)/i.test(p))
-      .join('; ');
-    return clean ? `style="${clean}"` : '';
-  });
-  // Collapse empty spans and blank paragraphs Word injects
-  b = b.replace(/<span[^>]*>\s*<\/span>/gi, '');
-  b = b.replace(/<p[^>]*>(\s*&nbsp;\s*|\s*)<\/p>/gi, '');
+
+  // 6. Strip ALL class / style / lang / dir / id attributes (quoted, double or single)
+  b = b.replace(/\s+(class|style|lang|dir|id)="[^"]*"/gi, '');
+  b = b.replace(/\s+(class|style|lang|dir|id)='[^']*'/gi, '');
+
+  // 7. Strip unquoted attribute values Word sometimes emits (e.g. class=WordSection1)
+  b = b.replace(/\s+(class|style|lang|dir|id)=[^\s>]+/gi, '');
+
+  // 8. Remove empty paragraphs and spans left behind after stripping
+  b = b.replace(/<p>\s*<\/p>/gi, '');
+  b = b.replace(/<span>\s*<\/span>/gi, '');
+
   return b.trim();
 }
 
