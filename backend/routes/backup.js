@@ -122,13 +122,14 @@ router.get('/word-sync', (req, res) => {
   }
 });
 
-// POST /api/backup/sync-word  { nodePath }
-// Manual on-demand sync: read document.doc, sanitize, overwrite content.txt
+// POST /api/backup/sync-word  { nodePath, title }
+// Manual on-demand sync: read newest Word file from word_cache or summary folder,
+// sanitize, and overwrite content.txt in the summary tree.
 router.post('/sync-word', (req, res) => {
   try {
-    const { nodePath } = req.body;
+    const { nodePath, title } = req.body;
     if (!nodePath) return res.status(400).json({ error: 'נדרש nodePath' });
-    const result = syncWordFile(nodePath);
+    const result = syncWordFile(nodePath, title);
     res.json(result);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });

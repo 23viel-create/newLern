@@ -219,7 +219,7 @@ const EditorManager = (() => {
       btn.disabled = true;
       btn.textContent = '⏳ מסנכרן...';
       try {
-        await Api.wordSyncManual(currentNode.path);
+        await Api.wordSyncManual(currentNode.path, currentNode.title);
         const cacheBustUrl = `/api/summaries/content?path=${encodeURIComponent(currentNode.path)}&_t=${Date.now()}`;
         const freshRes  = await fetch(cacheBustUrl);
         const freshData = await freshRes.json();

@@ -163,8 +163,8 @@ const Api = {
   wordSync: (nodePath, title) =>
     apiFetchPlain(`/backup/word-sync?nodePath=${encodeURIComponent(nodePath)}&title=${encodeURIComponent(title || nodePath)}`, {}),
 
-  wordSyncManual: (nodePath) =>
-    apiFetchPlain('/backup/sync-word', { method: 'POST', body: { nodePath } }),
+  wordSyncManual: (nodePath, title) =>
+    apiFetchPlain('/backup/sync-word', { method: 'POST', body: { nodePath, title } }),
 
   // ── היסטוריית גרסאות ─────────────────────────────────────────────────
   getHistory:     (nodePath) => apiFetch(`/summaries/history?path=${encodeURIComponent(nodePath)}`),

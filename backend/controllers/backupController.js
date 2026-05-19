@@ -437,89 +437,83 @@ function _pollForWordChanges() {
 }
 
 // ─── Manual on-demand Word sync ───────────────────────────────────────────────
-// Replaces background polling. Called by POST /api/backup/sync-word.
+// Called by POST /api/backup/sync-word { nodePath, title }.
+// Priority order: word_cache (where OS-opened file lives) → summary folder.
+// Within each location, the most recently modified file wins.
 
-function syncWordFile(nodePath) {
-  const dir      = path.join(summariesRoot, nodePath);
-  const docxPath = path.join(dir, 'document.docx');
-  const docPath  = path.join(dir, 'document.doc');
+function syncWordFile(nodePath, title) {
+  // Compute the same safeBase the export uses so we hit the exact word_cache file
+  const safeBase = (title || nodePath).replace(/[^\w֐-׿‏‎ -]/g, '_').slice(0, 60);
+  const treeDir  = path.join(summariesRoot, nodePath);
 
-  // Explicitly skip Word temporary lock files (prefixed with ~$)
-  // This guard is defensive — we never construct lock-file paths above,
-  // but protects against unexpected filesystem states.
-  for (const candidate of [docxPath, docPath]) {
-    if (path.basename(candidate).startsWith('~$')) {
-      const err = new Error('לא ניתן לקרוא קובץ נעילה זמני של Word');
-      err.status = 400;
-      throw err;
-    }
+  // Build the full candidate list: word_cache variants first, then summary folder
+  const allCandidates = [
+    path.join(WORD_CACHE_DIR, safeBase + '.docx'),
+    path.join(WORD_CACHE_DIR, safeBase + '.doc'),
+    path.join(treeDir, 'document.docx'),
+    path.join(treeDir, 'document.doc'),
+  ].filter(p => {
+    if (!fs.existsSync(p)) return false;
+    if (path.basename(p).startsWith('~$')) return false; // skip Word lock files
+    return true;
+  });
+
+  if (allCandidates.length === 0) {
+    console.log(`Word Engine [SYNC]: No Word file found in word_cache or ${treeDir}`);
+    const err = new Error('לא נמצא קובץ Word שמור עבור סיכום זה.');
+    err.status = 404;
+    throw err;
   }
 
-  const docxExists = fs.existsSync(docxPath);
-  const docExists  = fs.existsSync(docPath);
+  // Always pick the most recently modified file across all locations
+  let chosenPath   = allCandidates[0];
+  let chosenMtime  = fs.statSync(chosenPath).mtimeMs;
+  for (let i = 1; i < allCandidates.length; i++) {
+    const mt = fs.statSync(allCandidates[i]).mtimeMs;
+    if (mt > chosenMtime) { chosenMtime = mt; chosenPath = allCandidates[i]; }
+  }
 
-  let chosenPath = null;
-  let stalePath  = null; // older counterpart — deleted after a successful sync
-
-  if (docxExists && docExists) {
-    // Both files present — always pick the one saved most recently
-    const docxMtime = fs.statSync(docxPath).mtimeMs;
-    const docMtime  = fs.statSync(docPath).mtimeMs;
-    if (docxMtime >= docMtime) {
-      chosenPath = docxPath;
-      stalePath  = docPath;
-    } else {
-      chosenPath = docPath;
-      stalePath  = docxPath;
-    }
+  if (allCandidates.length > 1) {
     console.log('Word Sync: Detected multiple files. Selected latest modified ->', chosenPath);
-  } else if (docxExists) {
-    chosenPath = docxPath;
-  } else if (docExists) {
-    chosenPath = docPath;
-  } else {
-    console.log(`Word Engine [SYNC]: No Word file found in -> ${dir}`);
-    const notFoundErr = new Error('לא נמצא קובץ Word שמור עבור סיכום זה.');
-    notFoundErr.status = 404;
-    throw notFoundErr;
   }
 
+  const isFromCache = chosenPath.startsWith(WORD_CACHE_DIR);
+  if (isFromCache) {
+    console.log(`Word Sync: Reading user edits from cache -> ${chosenPath}`);
+  }
   console.log('Word Engine [SYNC]: Extracting user changes directly from:', chosenPath);
 
-  // Read as Buffer first — detect binary ZIP vs HTML text by magic bytes
+  // Read as Buffer — detect binary ZIP vs HTML text via magic bytes ("PK")
   const buf      = fs.readFileSync(chosenPath);
-  const isBinary = buf[0] === 0x50 && buf[1] === 0x4B; // "PK" ZIP magic
+  const isBinary = buf[0] === 0x50 && buf[1] === 0x4B;
   console.log(`Word Engine [SYNC]: Format — ${isBinary ? 'binary ZIP/DOCX' : 'HTML text'} (${buf.length} bytes)`);
 
   let body;
   if (isBinary) {
-    // Native .docx (ZIP): unpack word/document.xml and convert to simple HTML
     try {
       const zip      = new AdmZip(buf);
       const xmlEntry = zip.getEntry('word/document.xml');
       if (!xmlEntry) throw new Error('word/document.xml חסר בתוך ה-ZIP');
-      const xml = xmlEntry.getData().toString('utf-8');
-      body = _convertDocxXmlToHtml(xml);
+      body = _convertDocxXmlToHtml(xmlEntry.getData().toString('utf-8'));
       console.log(`Word Engine [SYNC]: Binary extraction yielded ${body.length} chars`);
     } catch (zipErr) {
       throw new Error(`שגיאה בקריאת קובץ Word בינארי: ${zipErr.message}`);
     }
   } else {
-    // HTML export from Word: permissive extraction, no schema validation
-    const raw = buf.toString('utf-8');
-    body = _extractWordHtmlBody(raw);
+    body = _extractWordHtmlBody(buf.toString('utf-8'));
     console.log(`Word Engine [SYNC]: HTML extraction yielded ${body.length} chars`);
   }
 
   if (!body.trim()) throw new Error('לא ניתן לחלץ תוכן מהקובץ');
-  setSummaryContent(nodePath, body);
-  console.log(`Word Engine [SYNC]: content.txt updated for ${nodePath}`);
 
-  // Remove the older conflicting file so the next sync always reads the single
-  // freshest source and never confuses old HTML exports with new native saves.
-  if (stalePath) {
-    try { fs.unlinkSync(stalePath); }
-    catch { /* locked or already gone — not fatal */ }
+  const targetTreePath = path.join(treeDir, 'content.txt');
+  console.log('Word Sync: Force updating master tree file ->', targetTreePath);
+  setSummaryContent(nodePath, body);
+
+  // Remove every stale candidate so the next sync reads only the freshest source
+  for (const stalePath of allCandidates) {
+    if (stalePath === chosenPath) continue;
+    try { fs.unlinkSync(stalePath); } catch { /* locked or already gone — not fatal */ }
   }
 
   return { ok: true };
