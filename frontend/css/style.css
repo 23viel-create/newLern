@@ -541,7 +541,7 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
   margin-bottom: 0.4rem;
 }
 .task-item--done  { opacity: 0.55; }
-.task-item__info  { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 130px; }
+.task-item__info  { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 180px; overflow-wrap: anywhere; }
 .task-item__type  { font-size: 0.68rem; font-weight: 700; color: var(--color-primary); }
 .task-item__title { font-size: 0.82rem; white-space: normal; word-wrap: break-word; overflow: visible; }
 .task-item__num   { font-size: 0.68rem; color: var(--color-text-muted); }

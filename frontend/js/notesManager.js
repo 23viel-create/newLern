@@ -341,8 +341,14 @@ const NotesManager = (() => {
       document.getElementById('notesDrawer')?.classList.remove('notes-drawer--open');
     });
 
-    // Drawer search
+    // Drawer search — live filter + Enter key
     document.getElementById('notesDrawerSearch')?.addEventListener('input', (e) => {
+      _drawerSearch = e.target.value.trim();
+      const container = document.getElementById('notesDrawerList');
+      if (container) _renderDrawer(container);
+    });
+    document.getElementById('notesDrawerSearch')?.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
       _drawerSearch = e.target.value.trim();
       const container = document.getElementById('notesDrawerList');
       if (container) _renderDrawer(container);
@@ -383,6 +389,11 @@ const NotesManager = (() => {
         );
       });
       document.getElementById('notesFullSearch')?.addEventListener('input', (e) => {
+        _fullViewSearch = e.target.value.trim();
+        _renderFullView();
+      });
+      document.getElementById('notesFullSearch')?.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
         _fullViewSearch = e.target.value.trim();
         _renderFullView();
       });
