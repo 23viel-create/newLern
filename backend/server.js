@@ -1,7 +1,11 @@
 // Bypass corporate/kosher TLS filters (Rimon, NetSpark) for local Gemini API calls
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-require('dotenv').config();
+try {
+  require('dotenv').config();
+} catch (e) {
+  console.log('Production mode: dotenv module not found, relying on system/Electron environment variables.');
+}
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
