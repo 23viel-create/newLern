@@ -1,15 +1,35 @@
 const fs = require('fs');
 const path = require('path');
 
-const AI_KEYS_FILE = path.join(__dirname, '../../data/ai_keys.json');
+// Derive path from limits.js so APP_DATA_DIR is honoured in production.
+// Never use __dirname here — inside app.asar that points to a read-only path.
+const AI_KEYS_FILE = require('./limits').AI_KEYS_FILE;
 
 // In-memory quota tracking per key
 const keyStats = {};
 
 // ─── Persistence helpers ──────────────────────────────────────────────────────
 
+function _ensureKeysFile() {
+  const dir = path.dirname(AI_KEYS_FILE);
+
+  // Auto-correct: if a previous bug created the JSON path as a directory, wipe it.
+  if (fs.existsSync(AI_KEYS_FILE) && fs.statSync(AI_KEYS_FILE).isDirectory()) {
+    fs.rmSync(AI_KEYS_FILE, { recursive: true, force: true });
+  }
+
+  // Ensure the parent directory exists.
+  fs.mkdirSync(dir, { recursive: true });
+
+  // Seed an empty store if the file doesn't exist yet.
+  if (!fs.existsSync(AI_KEYS_FILE)) {
+    fs.writeFileSync(AI_KEYS_FILE, JSON.stringify({ keys: [], lbMode: 'balanced' }, null, 2));
+  }
+}
+
 function _loadSavedData() {
   try {
+    _ensureKeysFile();
     const raw = fs.readFileSync(AI_KEYS_FILE, 'utf8');
     return JSON.parse(raw);
   } catch {
@@ -18,7 +38,7 @@ function _loadSavedData() {
 }
 
 function _persistData(data) {
-  fs.mkdirSync(path.dirname(AI_KEYS_FILE), { recursive: true });
+  _ensureKeysFile();
   fs.writeFileSync(AI_KEYS_FILE, JSON.stringify(data, null, 2));
 }
 
