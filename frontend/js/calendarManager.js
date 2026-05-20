@@ -39,9 +39,97 @@ const CalendarManager = (() => {
     5804:'2043-10-17', 5805:'2044-10-08', 5806:'2045-09-30', 5807:'2046-10-13',
   };
 
-  // Leap years (month 13 exists): mod-19 positions {0,3,6,8,11,14,17}
+  // Leap years (month 13 exists): standard Metonic formula — matches backend srController.js
   function _isHebrewLeap(year) {
-    return [0, 3, 6, 8, 11, 14, 17].includes(((year * 7) + 1) % 19);
+    return ((7 * year + 1) % 19) < 7;
+  }
+
+  // ── Deterministic Hebrew ↔ Gregorian conversion ─────────────────────────────
+  // Mirrors backend/controllers/srController.js so navigation jumps directly to
+  // an absolute coordinate (Year, Month, Day=1) — zero cumulative drift.
+
+  const _HEB_EPOCH = 347997;
+
+  function _hebCalcElapsed(y) {
+    const months = Math.floor((235 * y - 234) / 19);
+    const parts  = 12084 + 13753 * months;
+    let   day    = months * 29 + Math.floor(parts / 25920);
+    if ((3 * (day + 1)) % 7 < 3) day++;
+    return day;
+  }
+
+  function _hebYearStart(y) {
+    const elapsed  = _hebCalcElapsed(y);
+    const elapsed0 = _hebCalcElapsed(y - 1);
+    const elapsed2 = _hebCalcElapsed(y + 1);
+    let   rosh     = elapsed + 1;
+    if ((elapsed - elapsed0) === 356)       rosh += 2;
+    else if ((elapsed2 - elapsed) === 382)  rosh += 1;
+    return _HEB_EPOCH + rosh;
+  }
+
+  function _hebMonthLen(y, m) {
+    const yl = _hebYearStart(y + 1) - _hebYearStart(y);
+    switch (m) {
+      case 1:  return 30; case 2:  return 29; case 3: return 30;
+      case 4:  return 29; case 5:  return 30; case 6: return 29;
+      case 7:  return 30;
+      case 8:  return (yl % 10 === 5) ? 30 : 29;
+      case 9:  return (yl % 10 === 3) ? 29 : 30;
+      case 10: return 29; case 11: return 30;
+      case 12: return _isHebrewLeap(y) ? 30 : 29;
+      case 13: return 29;
+      default: return 30;
+    }
+  }
+
+  function _hebToJdn(y, m, d) {
+    const numM = _isHebrewLeap(y) ? 13 : 12;
+    let jdn = _hebYearStart(y) + d - 1;
+    if (m >= 7) {
+      for (let i = 7; i < m; i++) jdn += _hebMonthLen(y, i);
+    } else {
+      for (let i = 7; i <= numM; i++) jdn += _hebMonthLen(y, i);
+      for (let i = 1; i <  m;   i++) jdn += _hebMonthLen(y, i);
+    }
+    return jdn;
+  }
+
+  function _jdnToGregorian(jdn) {
+    const a  = jdn + 32044;
+    const b  = Math.floor((4 * a + 3) / 146097);
+    const c  = a - Math.floor(146097 * b / 4);
+    const d0 = Math.floor((4 * c + 3) / 1461);
+    const e  = c - Math.floor(1461 * d0 / 4);
+    const mm = Math.floor((5 * e + 2) / 153);
+    return {
+      year:  100 * b + d0 - 4800 + Math.floor(mm / 10),
+      month: mm + 3 - 12 * Math.floor(mm / 10),
+      day:   e - Math.floor((153 * mm + 2) / 5) + 1,
+    };
+  }
+
+  /** Convert absolute Hebrew (year, month, day) → Gregorian {year, month, day}. */
+  function _hebToGregorian(y, m, d) {
+    return _jdnToGregorian(_hebToJdn(y, m, d));
+  }
+
+  // Month traversal order inside a Hebrew year (Tishrei … Elul)
+  const _HEB_ORDER_LEAP    = [7, 8, 9, 10, 11, 12, 13, 1, 2, 3, 4, 5, 6];
+  const _HEB_ORDER_NONLEAP = [7, 8, 9, 10, 11, 12,     1, 2, 3, 4, 5, 6];
+
+  function _nextHebYearMonth(y, m) {
+    const ord = _isHebrewLeap(y) ? _HEB_ORDER_LEAP : _HEB_ORDER_NONLEAP;
+    const idx = ord.indexOf(m);
+    if (idx === ord.length - 1) return { year: y + 1, month: 7 }; // Elul → next Tishrei
+    return { year: y, month: ord[idx + 1] };
+  }
+
+  function _prevHebYearMonth(y, m) {
+    if (m === 7) return { year: y - 1, month: 6 };                  // Tishrei → prev Elul
+    const ord = _isHebrewLeap(y) ? _HEB_ORDER_LEAP : _HEB_ORDER_NONLEAP;
+    const idx = ord.indexOf(m);
+    return { year: y, month: ord[Math.max(0, idx - 1)] };
   }
 
   // Pesach start dates (15 Nisan) for each Hebrew year (approx Gregorian)
@@ -278,10 +366,23 @@ const CalendarManager = (() => {
         currentMonth = d.getMonth() + 1;
       } else {
         if (_calDisplayPref === 'hebrew') {
-          // In Hebrew mode: step by one Hebrew month boundary, then anchor to day 01
-          // so a 30-day month pointer never overflows into a 29-day neighbour.
-          _shiftHebMonth(-1);
-          selectedDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+          // Declarative coordinate mapping: resolve current Hebrew year+month,
+          // step to the previous month token (handles 13-month leap years),
+          // clamp to day 1, convert back to an exact Gregorian anchor — no drift.
+          let refDay = calendarData?.days.find(d => d.date === selectedDate);
+          if (!refDay && calendarData?.days.length)
+            refDay = calendarData.days[Math.floor(calendarData.days.length / 2)];
+          if (refDay) {
+            const targ = _prevHebYearMonth(refDay.hebrewYear, refDay.hebrewMonth);
+            const greg = _hebToGregorian(targ.year, targ.month, 1);
+            currentYear  = greg.year;
+            currentMonth = greg.month;
+            selectedDate = `${greg.year}-${String(greg.month).padStart(2, '0')}-${String(greg.day).padStart(2, '0')}`;
+          } else {
+            currentMonth--;
+            if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+            selectedDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-15`;
+          }
         } else {
           currentMonth--;
           if (currentMonth < 1) { currentMonth = 12; currentYear--; }
@@ -306,9 +407,21 @@ const CalendarManager = (() => {
         currentMonth = d.getMonth() + 1;
       } else {
         if (_calDisplayPref === 'hebrew') {
-          // In Hebrew mode: step by one Hebrew month boundary, then anchor to day 01
-          _shiftHebMonth(1);
-          selectedDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+          // Declarative: same approach as prev, stepping forward one Hebrew month.
+          let refDay = calendarData?.days.find(d => d.date === selectedDate);
+          if (!refDay && calendarData?.days.length)
+            refDay = calendarData.days[Math.floor(calendarData.days.length / 2)];
+          if (refDay) {
+            const targ = _nextHebYearMonth(refDay.hebrewYear, refDay.hebrewMonth);
+            const greg = _hebToGregorian(targ.year, targ.month, 1);
+            currentYear  = greg.year;
+            currentMonth = greg.month;
+            selectedDate = `${greg.year}-${String(greg.month).padStart(2, '0')}-${String(greg.day).padStart(2, '0')}`;
+          } else {
+            currentMonth++;
+            if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+            selectedDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-15`;
+          }
         } else {
           currentMonth++;
           if (currentMonth > 12) { currentMonth = 1; currentYear++; }
@@ -352,64 +465,6 @@ const CalendarManager = (() => {
   function _updateDispToggle() {
     document.querySelectorAll('.cal-disp-btn').forEach(btn =>
       btn.classList.toggle('cal-disp-btn--active', btn.dataset.pref === _calDisplayPref));
-  }
-
-  // Hebrew month navigation: find the boundary of the current Hebrew month,
-  // step ±1 day to land in the adjacent Hebrew month, update currentYear/Month.
-  // Uses selectedDate (same reference as _renderHebrewMonthGrid) so that months
-  // spanning the Gregorian midpoint (e.g. Tammuz occupying only the first 14
-  // days of July) are identified correctly, avoiding the "skip Tammuz" overflow.
-  function _shiftHebMonth(direction) {
-    if (!calendarData) {
-      currentMonth += direction;
-      if (currentMonth < 1)  { currentMonth = 12; currentYear--; }
-      if (currentMonth > 12) { currentMonth = 1;  currentYear++; }
-      return;
-    }
-    // Use selectedDate as reference (mirrors _renderHebrewMonthGrid logic)
-    let refDay = calendarData.days.find(d => d.date === selectedDate);
-    if (!refDay) refDay = calendarData.days[Math.floor(calendarData.days.length / 2)];
-    const hebY = refDay.hebrewYear;
-    const hebM = refDay.hebrewMonth;
-
-    const origYear  = currentYear;
-    const origMonth = currentMonth;
-
-    if (direction > 0) {
-      // Find last visible day of this Hebrew month, step forward 1 day
-      const inMonth = calendarData.days.filter(d => d.hebrewYear === hebY && d.hebrewMonth === hebM);
-      if (inMonth.length) {
-        const lastDate = new Date(inMonth[inMonth.length - 1].date + 'T12:00:00');
-        lastDate.setDate(lastDate.getDate() + 1);
-        currentYear  = lastDate.getFullYear();
-        currentMonth = lastDate.getMonth() + 1;
-        // If still in same Gregorian month, the Hebrew month extends further — advance one more
-        if (currentYear === origYear && currentMonth === origMonth) {
-          currentMonth++;
-          if (currentMonth > 12) { currentMonth = 1; currentYear++; }
-        }
-        return;
-      }
-    } else {
-      // Find first visible day of this Hebrew month, step back 1 day
-      const firstEntry = calendarData.days.find(d => d.hebrewYear === hebY && d.hebrewMonth === hebM);
-      if (firstEntry) {
-        const firstDate = new Date(firstEntry.date + 'T12:00:00');
-        firstDate.setDate(firstDate.getDate() - 1);
-        currentYear  = firstDate.getFullYear();
-        currentMonth = firstDate.getMonth() + 1;
-        // If still in same Gregorian month, the Hebrew month starts before midpoint — go one more back
-        if (currentYear === origYear && currentMonth === origMonth) {
-          currentMonth--;
-          if (currentMonth < 1) { currentMonth = 12; currentYear--; }
-        }
-        return;
-      }
-    }
-    // Fallback
-    currentMonth += direction;
-    if (currentMonth < 1)  { currentMonth = 12; currentYear--; }
-    if (currentMonth > 12) { currentMonth = 1;  currentYear++; }
   }
 
   // ── Month data cache ──────────────────────────────────────────────────────
