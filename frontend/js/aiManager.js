@@ -395,6 +395,19 @@ const AiManager = (() => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') el.sendBtn()?.click();
     });
 
+    // API key generation link — open in OS browser (Electron-aware)
+    document.getElementById('generateApiKeyLink')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      const url = 'https://aistudio.google.com/app/apikey';
+      if (typeof require !== 'undefined' && typeof process !== 'undefined' &&
+          process.versions && process.versions.electron) {
+        const { shell } = require('electron');
+        shell.openExternal(url);
+      } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+    });
+
     // Settings keys
     el.saveKeysBtn()?.addEventListener('click', _saveKeys);
     el.articlesSend()?.addEventListener('click', _sendArticlesChat);
