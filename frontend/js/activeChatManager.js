@@ -70,8 +70,117 @@ const ActiveChatManager = (() => {
           b.classList.toggle('ac-tab--active', b === btn));
         document.getElementById('acTabChat')?.classList.toggle('hidden', tab !== 'chat');
         document.getElementById('acTabSyllabus')?.classList.toggle('hidden', tab !== 'syllabus');
+        document.getElementById('acTabPaths')?.classList.toggle('hidden', tab !== 'paths');
+        if (tab === 'paths') _loadStudyPaths();
       });
     });
+  }
+
+  // ── Study Paths manager ───────────────────────────────────────────────────
+
+  async function _loadStudyPaths() {
+    const list = document.getElementById('studyPathsList');
+    if (!list) return;
+    list.innerHTML = '<p class="hint study-paths-empty">⏳ טוען מסלולים...</p>';
+    try {
+      const paths = await Api.getStudyPaths();
+      _renderStudyPaths(paths);
+    } catch (err) {
+      list.innerHTML = `<p class="hint study-paths-empty" style="color:var(--color-danger)">שגיאה: ${escHtml(err.message)}</p>`;
+    }
+  }
+
+  function _renderStudyPaths(paths) {
+    const list = document.getElementById('studyPathsList');
+    if (!list) return;
+    _hideEditPanel();
+    if (!paths || !paths.length) {
+      list.innerHTML = '<p class="hint study-paths-empty">אין מסלולי למידה פעילים. צור מסלול חדש בכרטיסייה "גנרטור".</p>';
+      return;
+    }
+    list.innerHTML = paths.map(p => {
+      const total     = p.totalCount || p.taskCount || 0;
+      const completed = p.completedCount || 0;
+      const pct       = total ? Math.round((completed / total) * 100) : 0;
+      const unitInfo  = p.isCustomBook && p.unitType
+        ? ` | ${p.unitType} ${p.startUnit}–${p.endUnit}` : '';
+      const dateRange = p.startDate && p.endDate
+        ? `${p.startDate} עד ${p.endDate}` : '';
+      return `
+        <div class="study-path-item" data-pathid="${escHtml(p.id)}">
+          <div class="study-path-item__header">
+            <div>
+              <div class="study-path-item__title">${escHtml(p.bookName)}${p.authorName ? ` — ${escHtml(p.authorName)}` : ''}</div>
+              <div class="study-path-item__subtitle">קצב: ${escHtml(p.pace)}${unitInfo}</div>
+            </div>
+            <div class="study-path-item__actions">
+              <button class="btn btn--ghost btn--sm" onclick="ActiveChatManager._editPath('${escHtml(p.id)}','${escHtml(p.pace).replace(/'/g, "\\'")}')">✏️ ערוך</button>
+              <button class="btn btn--ghost btn--sm" style="color:var(--color-danger)" onclick="ActiveChatManager._deletePath('${escHtml(p.id)}','${escHtml(p.bookName).replace(/'/g, "\\'")}')">🗑️ מחק</button>
+            </div>
+          </div>
+          <div class="study-path-item__meta">
+            ${dateRange ? `<span>📅 ${dateRange}</span>` : ''}
+            <span>📋 סה"כ ${total} ימי לימוד</span>
+            ${p.isCustomBook ? '<span>📌 ספר מותאם אישית</span>' : ''}
+          </div>
+          <div class="study-path-item__progress">${completed} / ${total} ימים הושלמו (${pct}%)</div>
+        </div>`;
+    }).join('');
+  }
+
+  async function _deletePath(id, bookName) {
+    if (!confirm(`למחוק את המסלול "${bookName}"?\nכל משימות המסלול יוסרו מלוח השנה.`)) return;
+    try {
+      await Api.deleteStudyPath(id);
+      await _loadStudyPaths();
+    } catch (err) {
+      alert(`שגיאה במחיקה: ${err.message}`);
+    }
+  }
+
+  function _editPath(id, currentPace) {
+    const panel = document.getElementById('studyPathEditPanel');
+    if (!panel) return;
+    document.getElementById('editPathId').value   = id;
+    document.getElementById('editPathPace').value  = currentPace || '';
+    document.getElementById('editPanelToday').textContent = new Date().toISOString().slice(0, 10);
+    document.getElementById('editPathStatus')?.classList.add('hidden');
+    panel.classList.remove('hidden');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function _hideEditPanel() {
+    document.getElementById('studyPathEditPanel')?.classList.add('hidden');
+  }
+
+  async function _submitEdit() {
+    const id   = document.getElementById('editPathId')?.value;
+    const pace = document.getElementById('editPathPace')?.value.trim();
+    const skipShabbat  = document.getElementById('editPathSkipShabbat')?.checked ?? true;
+    const skipHolidays = document.getElementById('editPathSkipHolidays')?.checked ?? true;
+    if (!id) return;
+
+    const btn    = document.getElementById('editPathConfirmBtn');
+    const status = document.getElementById('editPathStatus');
+    btn.disabled = true;
+    status.textContent = '⏳ ה-AI מחשב מחדש...';
+    status.className   = 'save-status';
+    status.classList.remove('hidden');
+
+    try {
+      const res = await Api.editStudyPath(id, { pace: pace || undefined, skipShabbat, skipHolidays });
+      status.textContent = `✓ ${res.count} משימות חדשות נוצרו מהיום`;
+      status.className   = 'save-status save-status--saved';
+      setTimeout(async () => {
+        _hideEditPanel();
+        await _loadStudyPaths();
+      }, 1800);
+    } catch (err) {
+      status.textContent = `שגיאה: ${err.message}`;
+      status.className   = 'save-status save-status--error';
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   // ── Syllabus form ─────────────────────────────────────────────────────────
@@ -218,9 +327,12 @@ const ActiveChatManager = (() => {
     });
     document.getElementById('acLearningProgramBtn')?.addEventListener('click', _generateProgram);
     document.getElementById('optimizeBtn')?.addEventListener('click', _runOptimize);
+    document.getElementById('editPathConfirmBtn')?.addEventListener('click', _submitEdit);
+    document.getElementById('editPathCancelBtn')?.addEventListener('click', _hideEditPanel);
     _bindTabs();
     _bindSyllabusForm();
   }
 
-  return { init };
+  // Expose path methods for inline onclick handlers
+  return { init, _editPath, _deletePath };
 })();

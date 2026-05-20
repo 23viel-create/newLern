@@ -432,6 +432,7 @@
       <div class="ac-tabs">
         <button class="ac-tab ac-tab--active" data-actab="chat">💬 צ'אט למידה פעילה</button>
         <button class="ac-tab" data-actab="syllabus">📖 גנרטור מסלולי לימוד</button>
+        <button class="ac-tab" data-actab="paths">🗂️ מסלולי למידה</button>
       </div>
 
       <!-- כרטיסית צ'אט -->
@@ -486,6 +487,8 @@
                 <option value="עמודים">עמודים</option>
                 <option value="פרקים">פרקים</option>
                 <option value="דפים">דפים</option>
+                <option value="סימנים">סימנים</option>
+                <option value="הלכות">הלכות</option>
               </select>
             </div>
           </div>
@@ -577,6 +580,48 @@
           </div>
 
           <div id="syllabusResult" class="syllabus-result hidden"></div>
+        </div>
+      </div>
+
+      <!-- כרטיסית מסלולי למידה -->
+      <div id="acTabPaths" class="ac-tab-content hidden">
+        <div class="card study-paths-panel">
+          <div class="study-paths-header">
+            <h2>🗂️ מסלולי למידה פעילים</h2>
+            <p class="hint">כל מסלולי הלימוד שיצרת. לחץ "ערוך" לעדכון הקצב מהיום והלאה.</p>
+          </div>
+
+          <div id="studyPathsList" class="study-paths-list">
+            <p class="hint study-paths-empty">⏳ טוען מסלולים...</p>
+          </div>
+
+          <!-- פאנל עריכת מסלול (inline) -->
+          <div id="studyPathEditPanel" class="study-path-edit-panel hidden">
+            <div class="path-edit-warning">
+              ⚠️ <strong>שים לב:</strong> עריכת המסלול תשפיע רק מתאריך העריכה (<span id="editPanelToday"></span>) והלאה, ולא תשנה היסטוריית למידה שכבר בוצעה.
+            </div>
+            <input type="hidden" id="editPathId" />
+            <div class="form-group" style="margin-top:0.8rem">
+              <label class="form-label" for="editPathPace">קצב התקדמות חדש</label>
+              <input type="text" id="editPathPace" class="input-field input-field--full"
+                     placeholder="לדוגמה: שני פרקים, דף אחד..." dir="rtl" />
+            </div>
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="editPathSkipShabbat" checked />
+                דלג על ימי שבת
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="editPathSkipHolidays" checked />
+                דלג על חגים ומועדים
+              </label>
+            </div>
+            <div class="form-row-actions">
+              <button id="editPathConfirmBtn" class="btn btn--primary btn--sm">✅ אשר עריכה</button>
+              <button id="editPathCancelBtn" class="btn btn--ghost btn--sm">ביטול</button>
+              <span id="editPathStatus" class="save-status hidden"></span>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -1101,6 +1146,20 @@
               <button id="helpChatSendBtn" class="btn btn--primary btn--sm ai-send-btn">שלח</button>
             </div>
           </div>
+        </div>
+
+        <div class="help-section">
+          <h2>📖 גנרטור מסלולי לימוד ומנהל המסלולים</h2>
+          <p>הגנרטור יוצר תוכנית לימוד יומית ומזריק אותה ישירות ללוח השנה. כל המסלולים מנוהלים בכרטיסייה "🗂️ מסלולי למידה".</p>
+          <ul class="help-list">
+            <li><strong>ספר ידוע (רגיל)</strong> — הזן שם ספר, קצב, ותנאי סיום. ה-AI ינתח את מבנה הספר ויפרוס את הלמידה.</li>
+            <li><strong>ספר לא ידוע / מותאם אישית</strong> — סמן "ספר מותאם אישית". ה-AI <em>לא</em> ישתמש בידע חיצוני — יתזמן בדיוק מתמטי לפי הטווח שתגדיר. בחר סוג יחידה: <strong>עמודים, פרקים, דפים, סימנים, הלכות</strong>.</li>
+            <li><strong>אימות AI</strong> — לאחר כל יצירה, המערכת מאמתת שסכום היחידות תואם את הטווח המבוקש. אם לא — ה-AI מחשב מחדש אוטומטית (עד 3 ניסיונות).</li>
+            <li><strong>תאריך התחלה עברי</strong> — הזן תאריך בטקסט חופשי (כגון "א׳ בניסן", "ראש השנה") — ה-AI יפרש אוטומטית.</li>
+            <li><strong>🗂️ מסלולי למידה</strong> — הכרטיסייה מציגה את כל המסלולים הפעילים: שם הספר, תאריכים, כמות ימים שהושלמו מול הכולל.</li>
+            <li><strong>עריכת מסלול (קדימה בלבד)</strong> — לחץ "ערוך" על מסלול קיים לשינוי הקצב. שים לב: <em>עריכה משפיעה רק על ימים שטרם הגיעו</em> — היסטוריית הלמידה שכבר בוצעה נשמרת ללא שינוי. ה-AI יחשב מחדש את היחידות הנותרות מהיום.</li>
+            <li><strong>מחיקת מסלול</strong> — לחץ "מחק" להסרת כל משימות המסלול מלוח השנה (כולל משימות עתידיות).</li>
+          </ul>
         </div>
 
         <div class="help-section">

@@ -210,6 +210,12 @@ const Api = {
     apiFetch('/learning-plans/generate', { method: 'POST', body: params }),
   learningPlanOptimize: () =>
     apiFetch('/learning-plans/optimize', { method: 'POST' }),
+  getStudyPaths: () =>
+    apiFetch('/learning-plans/paths'),
+  deleteStudyPath: (id) =>
+    apiFetch(`/learning-plans/paths/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  editStudyPath: (id, params) =>
+    apiFetch(`/learning-plans/paths/${encodeURIComponent(id)}/edit`, { method: 'POST', body: params }),
 
   // ── קבצי הקשר לצ'אט ──────────────────────────────────────────────────────
   chatFilesList:   () => apiFetch('/chat/files'),

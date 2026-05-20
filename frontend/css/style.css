@@ -1731,3 +1731,49 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
   border-bottom: 1px dashed #c7d2fe;
 }
 .book-item--indented { padding-right: 1.2rem; }
+
+/* ── מסלולי למידה (study paths panel) ───────────────────────────────────── */
+.study-paths-panel { max-width: 720px; margin: 0 auto; }
+.study-paths-header { margin-bottom: 1rem; }
+
+.study-paths-list { display: flex; flex-direction: column; gap: 0.7rem; }
+.study-paths-empty { text-align: center; padding: 2rem 0; color: var(--color-text-muted); }
+
+.study-path-item {
+  border: 1px solid var(--color-border); border-radius: var(--radius);
+  padding: 0.85rem 1rem; background: var(--color-bg);
+  direction: rtl;
+}
+.study-path-item__header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem;
+}
+.study-path-item__title {
+  font-weight: 700; font-size: 0.97rem; color: var(--color-text);
+}
+.study-path-item__subtitle {
+  font-size: 0.78rem; color: var(--color-text-muted); margin-top: 0.15rem;
+}
+.study-path-item__meta {
+  display: flex; flex-wrap: wrap; gap: 0.4rem 1rem;
+  font-size: 0.78rem; color: var(--color-text-muted);
+  margin-top: 0.5rem;
+}
+.study-path-item__progress {
+  font-size: 0.78rem; margin-top: 0.4rem; color: #166534;
+  background: #dcfce7; border-radius: 9999px; display: inline-block;
+  padding: 0.1rem 0.55rem;
+}
+.study-path-item__actions {
+  display: flex; gap: 0.4rem; flex-shrink: 0; margin-top: 0.1rem;
+}
+
+.path-edit-warning {
+  background: #fef9c3; border: 1px solid #fde68a; border-radius: var(--radius);
+  padding: 0.65rem 0.9rem; font-size: 0.83rem; color: #92400e;
+  margin-bottom: 0.75rem; direction: rtl;
+}
+
+.study-path-edit-panel {
+  border-top: 2px dashed var(--color-border);
+  padding-top: 1rem; margin-top: 1rem;
+}
