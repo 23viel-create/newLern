@@ -1,8 +1,7 @@
 'use strict';
 const fs   = require('fs');
 const path = require('path');
-
-const NOTES_DIR = path.resolve(__dirname, '../../data/notes');
+const { NOTES_DIR } = require('../config/limits');
 
 function _ensureDir() {
   if (!fs.existsSync(NOTES_DIR)) fs.mkdirSync(NOTES_DIR, { recursive: true });

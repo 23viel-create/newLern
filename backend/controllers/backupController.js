@@ -4,7 +4,7 @@ const { exec } = require('child_process');
 const AdmZip = require('adm-zip');
 const { summariesRoot, getSummaryContent, setSummaryContent } = require('./filesController');
 
-const DATA_ROOT = path.resolve(__dirname, '../../data');
+const { DATA_DIR: DATA_ROOT, SCHEDULE_FILE: DATA_SCHEDULE_FILE, BACKUPS_DIR, WORD_CACHE_DIR: _WORD_CACHE_DIR } = require('../config/limits');
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -106,7 +106,7 @@ function exportZip(subPath) {
   _addDirToZip(zip, exportRoot, 'summaries_tree');
 
   // Add schedule.json
-  const scheduleFile = path.join(DATA_ROOT, 'schedule.json');
+  const scheduleFile = DATA_SCHEDULE_FILE;
   if (fs.existsSync(scheduleFile)) {
     zip.addFile('schedule.json', fs.readFileSync(scheduleFile));
   }
@@ -181,7 +181,7 @@ function importZip(buffer, targetRelPath) {
 // ─── List backups ─────────────────────────────────────────────────────────────
 
 function listBackups() {
-  const backupsDir = path.join(DATA_ROOT, 'backups');
+  const backupsDir = BACKUPS_DIR;
   if (!fs.existsSync(backupsDir)) return [];
   return fs.readdirSync(backupsDir)
     .filter(f => f.endsWith('.zip'))
@@ -194,7 +194,7 @@ function listBackups() {
 
 // Save a backup copy to data/backups/
 function saveBackup(buffer) {
-  const backupsDir = path.join(DATA_ROOT, 'backups');
+  const backupsDir = BACKUPS_DIR;
   fs.mkdirSync(backupsDir, { recursive: true });
   const name = `backup_${_ts()}.zip`;
   fs.writeFileSync(path.join(backupsDir, name), buffer);
@@ -203,7 +203,7 @@ function saveBackup(buffer) {
 
 // ─── Open in local Word ───────────────────────────────────────────────────────
 
-const WORD_CACHE_DIR = path.join(DATA_ROOT, 'word_cache');
+const WORD_CACHE_DIR = _WORD_CACHE_DIR;
 
 async function openInWord(nodePath, title, html) {
   fs.mkdirSync(WORD_CACHE_DIR, { recursive: true });

@@ -1,8 +1,7 @@
 'use strict';
 const fs   = require('fs');
 const path = require('path');
-
-const BOOKS_DIR = path.resolve(__dirname, '../../data/books');
+const { BOOKS_DIR } = require('../config/limits');
 
 const SUPPORTED_EXTS = ['.pdf', '.docx', '.pptx'];
 

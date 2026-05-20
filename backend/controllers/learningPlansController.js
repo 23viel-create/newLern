@@ -27,16 +27,17 @@ async function _callGemini(prompt) {
 
 // ── Study Paths persistence ──────────────────────────────────────────────────
 
-const STUDY_PATHS_FILE = path.join(__dirname, '../../data/study_paths.json');
+const { STUDY_PATHS_FILE, ensureJsonFile } = require('../config/limits');
 
 function readStudyPaths() {
   try {
-    if (!fs.existsSync(STUDY_PATHS_FILE)) return { paths: [] };
+    ensureJsonFile(STUDY_PATHS_FILE, { paths: [] });
     return JSON.parse(fs.readFileSync(STUDY_PATHS_FILE, 'utf8'));
   } catch { return { paths: [] }; }
 }
 
 function writeStudyPaths(data) {
+  ensureJsonFile(STUDY_PATHS_FILE, { paths: [] });
   fs.writeFileSync(STUDY_PATHS_FILE, JSON.stringify(data, null, 2), 'utf8');
 }
 

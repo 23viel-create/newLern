@@ -2,7 +2,7 @@ const fs   = require('fs');
 const path = require('path');
 const { SUMMARIES_DIR } = require('../config/limits');
 
-const summariesRoot = path.resolve(__dirname, SUMMARIES_DIR, 'root');
+const summariesRoot = path.join(SUMMARIES_DIR, 'root');
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 

@@ -1,7 +1,6 @@
 const fs   = require('fs');
 const path = require('path');
-
-const CHAT_CONTEXT_DIR = path.join(__dirname, '../../data/chat_context');
+const { CHAT_CONTEXT_DIR } = require('../config/limits');
 
 function _ensure() {
   fs.mkdirSync(CHAT_CONTEXT_DIR, { recursive: true });

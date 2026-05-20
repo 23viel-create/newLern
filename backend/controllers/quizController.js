@@ -1,11 +1,11 @@
 'use strict';
 const fs   = require('fs');
 const path = require('path');
-const { SUMMARIES_DIR, SCHEDULE_FILE } = require('../config/limits');
+const { SUMMARIES_DIR, SCHEDULE_FILE, QUIZ_HISTORY_FILE, ensureJsonFile } = require('../config/limits');
 
-const summariesRoot = path.resolve(__dirname, SUMMARIES_DIR, 'root');
-const scheduleFile  = path.resolve(__dirname, SCHEDULE_FILE);
-const HISTORY_FILE  = path.resolve(__dirname, '../../data/quiz_history.json');
+const summariesRoot = path.join(SUMMARIES_DIR, 'root');
+const scheduleFile  = SCHEDULE_FILE;
+const HISTORY_FILE  = QUIZ_HISTORY_FILE;
 
 // ── Security ──────────────────────────────────────────────────────────────────
 
@@ -204,13 +204,13 @@ function _addDays(dateStr, n) {
 
 function _readHistory() {
   try {
-    if (!fs.existsSync(HISTORY_FILE)) return [];
+    ensureJsonFile(HISTORY_FILE, []);
     return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf-8')) || [];
   } catch { return []; }
 }
 
 function _writeHistory(arr) {
-  fs.mkdirSync(path.dirname(HISTORY_FILE), { recursive: true });
+  ensureJsonFile(HISTORY_FILE, []);
   fs.writeFileSync(HISTORY_FILE, JSON.stringify(arr, null, 2));
 }
 

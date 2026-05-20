@@ -5,7 +5,7 @@ const { getNextKey, recordUsage, recordError, recordQuotaExhausted, getKeyStatus
 const { MAX_PROMPT_CHARS, MAX_CONTEXT_CHARS, ARTICLES_DIR } = require('../config/limits');
 const { getSettings } = require('./srController');
 
-const ARTICLES_PATH = path.join(__dirname, ARTICLES_DIR);
+const ARTICLES_PATH = ARTICLES_DIR;
 
 // ─── AI scope guardrails ──────────────────────────────────────────────────────
 

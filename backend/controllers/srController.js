@@ -1,9 +1,7 @@
 'use strict';
 const fs   = require('fs');
 const path = require('path');
-const { SCHEDULE_FILE } = require('../config/limits');
-
-const scheduleFile = path.resolve(__dirname, SCHEDULE_FILE);
+const { SCHEDULE_FILE, ensureJsonFile } = require('../config/limits');
 
 // ── Defaults ────────────────────────────────────────────────────────────────
 
@@ -18,19 +16,16 @@ const DEFAULT_SETTINGS = {
 // ── File I/O ─────────────────────────────────────────────────────────────────
 
 function readSchedule() {
-  if (!fs.existsSync(scheduleFile)) {
-    return { settings: { ...DEFAULT_SETTINGS }, tasks: [] };
-  }
-  const raw = JSON.parse(fs.readFileSync(scheduleFile, 'utf-8'));
+  ensureJsonFile(SCHEDULE_FILE, { settings: { ...DEFAULT_SETTINGS }, tasks: [] });
+  const raw = JSON.parse(fs.readFileSync(SCHEDULE_FILE, 'utf-8'));
   if (!raw.settings) raw.settings = { ...DEFAULT_SETTINGS };
   if (!raw.tasks) raw.tasks = [];
   return raw;
 }
 
 function writeSchedule(data) {
-  const dir = path.dirname(scheduleFile);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(scheduleFile, JSON.stringify(data, null, 2));
+  ensureJsonFile(SCHEDULE_FILE, { settings: { ...DEFAULT_SETTINGS }, tasks: [] });
+  fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(data, null, 2));
 }
 
 // ── Hebrew Calendar ──────────────────────────────────────────────────────────
