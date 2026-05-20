@@ -132,6 +132,9 @@ const Api = {
     apiFetch('/quizzes/bundle', { method: 'POST', body: { paths } }),
   submitQuizResult: (summaryPath, totalScore, questionResults) =>
     apiFetch('/quizzes/submit', { method: 'POST', body: { summaryPath, totalScore, questionResults } }),
+  getQuizHistory:    () => apiFetch('/quizzes/history'),
+  saveQuizHistory:   (entry) => apiFetch('/quizzes/history', { method: 'POST', body: entry }),
+  deleteQuizHistory: (timestamp) => apiFetch('/quizzes/history', { method: 'DELETE', body: { timestamp } }),
 
   // ── גיבוי וייצוא ────────────────────────────────────────────────────────
   /** Returns a download URL for a specific node's ZIP */

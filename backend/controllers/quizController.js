@@ -5,6 +5,7 @@ const { SUMMARIES_DIR, SCHEDULE_FILE } = require('../config/limits');
 
 const summariesRoot = path.resolve(__dirname, SUMMARIES_DIR, 'root');
 const scheduleFile  = path.resolve(__dirname, SCHEDULE_FILE);
+const HISTORY_FILE  = path.resolve(__dirname, '../../data/quiz_history.json');
 
 // ── Security ──────────────────────────────────────────────────────────────────
 
@@ -199,4 +200,39 @@ function _addDays(dateStr, n) {
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 }
 
-module.exports = { getQuestions, addQuestion, updateQuestion, deleteQuestion, getBundle, submitResult };
+// ── Quiz History ──────────────────────────────────────────────────────────────
+
+function _readHistory() {
+  try {
+    if (!fs.existsSync(HISTORY_FILE)) return [];
+    return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf-8')) || [];
+  } catch { return []; }
+}
+
+function _writeHistory(arr) {
+  fs.mkdirSync(path.dirname(HISTORY_FILE), { recursive: true });
+  fs.writeFileSync(HISTORY_FILE, JSON.stringify(arr, null, 2));
+}
+
+function getHistory() {
+  return _readHistory().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+}
+
+function saveHistory(entry) {
+  const arr = _readHistory();
+  const idx = arr.findIndex(e => e.timestamp === entry.timestamp);
+  if (idx >= 0) arr[idx] = entry; // overwrite same timestamp (appeal update)
+  else          arr.push(entry);
+  _writeHistory(arr);
+}
+
+function deleteHistory(timestamp) {
+  const arr  = _readHistory();
+  const next = arr.filter(e => e.timestamp !== timestamp);
+  if (next.length === arr.length) {
+    const err = new Error('רשומה לא נמצאה'); err.status = 404; throw err;
+  }
+  _writeHistory(next);
+}
+
+module.exports = { getQuestions, addQuestion, updateQuestion, deleteQuestion, getBundle, submitResult, getHistory, saveHistory, deleteHistory };

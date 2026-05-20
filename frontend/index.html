@@ -308,8 +308,22 @@
       </div>
 
       <div class="quiz-fullscreen-body">
+        <!-- היסטוריית מבחנים -->
+        <div id="quizHistoryPanel" class="quiz-step hidden">
+          <div class="quiz-history-header">
+            <h2>📜 מבחנים קודמים</h2>
+            <button id="quizHistoryBackBtn" class="btn btn--secondary btn--sm">← חזרה להגדרות</button>
+          </div>
+          <div id="quizHistoryList" class="quiz-history-list">
+            <p class="placeholder-text">טוען...</p>
+          </div>
+        </div>
+
         <!-- שלב 1: הגדרות -->
         <div id="quizConfig" class="quiz-step">
+          <div class="quiz-history-bar">
+            <button id="quizHistoryBtn" class="btn btn--ghost btn--sm">📜 מבחנים קודמים</button>
+          </div>
           <h2 id="quizConfigTitle">הגדרות בחינה</h2>
           <p id="quizConfigInfo" class="quiz-config-info"></p>
 

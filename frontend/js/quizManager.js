@@ -26,6 +26,10 @@ const QuizManager = (() => {
   let _revealed     = new Set();  // indices whose open answer has been shown
   let _previousView = 'dashboard'; // view to return to when quiz closes
 
+  // ─── History state ────────────────────────────────────────────────────────
+  let _quizHistory             = [];
+  let _currentHistoryTimestamp = null;
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   function _esc(str) {
@@ -615,6 +619,7 @@ const QuizManager = (() => {
     document.getElementById('quizConfig').classList.remove('hidden');
     document.getElementById('quizTestArea').classList.add('hidden');
     document.getElementById('quizResults').classList.add('hidden');
+    document.getElementById('quizHistoryPanel')?.classList.add('hidden');
 
     const total = _quizQs.length;
     const opens = _quizQs.filter(q => q.qtype === 'open').length;
@@ -634,6 +639,11 @@ const QuizManager = (() => {
     document.getElementById('quizStartBtn').onclick  = _startTest;
     document.getElementById('quizCancelBtn').onclick = _closeQuiz;
     document.getElementById('quizBackBtn').onclick   = _closeQuiz;
+    document.getElementById('quizHistoryBtn').onclick = _showHistoryPanel;
+    document.getElementById('quizHistoryBackBtn').onclick = () => {
+      document.getElementById('quizHistoryPanel')?.classList.add('hidden');
+      document.getElementById('quizConfig')?.classList.remove('hidden');
+    };
 
     // ── Quota input + "All" checkbox ──────────────────────────────────────
     const quotaInput = document.getElementById('quizQuotaInput');
@@ -1110,6 +1120,10 @@ const QuizManager = (() => {
       await Api.submitQuizResult(null, 0,
         _answers.map(a => ({ id: a.id, qtype: a.qtype, summaryPath: a.summaryPath, score: a.score ?? 0 })));
     } catch (err) { console.error('שגיאה בשמירת תוצאות:', err.message); }
+
+    // Save full history snapshot
+    _currentHistoryTimestamp = new Date().toISOString();
+    _saveQuizHistorySnapshot(_currentHistoryTimestamp);
   }
 
   // ─── Result card builders ─────────────────────────────────────────────────
@@ -1289,7 +1303,10 @@ const QuizManager = (() => {
     }
 
     const stillPending = _quizQs.some((q, i) => q.qtype === 'open' && !_answers[i].answered);
-    if (!stillPending) _renderFinalScore();
+    if (!stillPending) {
+      _renderFinalScore();
+      if (_currentHistoryTimestamp) _saveQuizHistorySnapshot(_currentHistoryTimestamp);
+    }
   }
 
   // ─── MCQ lazy explanation ─────────────────────────────────────────────────
@@ -1388,6 +1405,12 @@ const QuizManager = (() => {
         }
         wrapEl.querySelector('.quiz-appeal-form')?.remove();
         wrapEl.querySelector('.quiz-appeal-btn')?.remove();
+
+        // ── Recalculate total score after appeal ─────────────────────────
+        const hasUngradedOpen = !_config.aiGrade &&
+          _quizQs.some((q, idx) => q.qtype === 'open' && !_answers[idx].answered);
+        if (!hasUngradedOpen) _renderFinalScore();
+        if (_currentHistoryTimestamp) _saveQuizHistorySnapshot(_currentHistoryTimestamp);
       } catch (err) {
         alert(`שגיאה בערעור: ${err.message}`);
         submitBtn.disabled = false;
@@ -1395,6 +1418,157 @@ const QuizManager = (() => {
         loadingEl?.classList.add('hidden');
       }
     });
+  }
+
+  // ─── Quiz History ─────────────────────────────────────────────────────────
+
+  async function _saveQuizHistorySnapshot(ts) {
+    const answered = _answers.filter(a => a.answered);
+    const sumScore = answered.reduce((s, a) => s + (a.score ?? 0), 0);
+    const pct      = _quizQs.length > 0 ? Math.round((sumScore / _quizQs.length) * 100) : 0;
+    const entry = {
+      timestamp:     ts,
+      quizTitle:     _quizTitle,
+      score:         pct,
+      questionCount: _quizQs.length,
+      answeredCount: answered.length,
+      questions: _quizQs.map((q, i) => {
+        const a = _answers[i];
+        return {
+          question:            q.question,
+          qtype:               q.qtype,
+          summaryTitle:        q.summaryTitle || '',
+          answer:              q.answer || '',
+          options:             q.options || null,
+          correct_option_index: q.correct_option_index,
+          userText:            a.userText || '',
+          selectedOption:      a.selectedOption,
+          score:               a.score,
+          aiScore:             a.aiScore,
+          aiCritique:          a.aiCritique || '',
+          answered:            a.answered,
+        };
+      }),
+    };
+    try { await Api.saveQuizHistory(entry); }
+    catch (err) { console.error('שגיאה בשמירת היסטוריה:', err.message); }
+  }
+
+  async function _showHistoryPanel() {
+    document.getElementById('quizConfig')?.classList.add('hidden');
+    document.getElementById('quizHistoryPanel')?.classList.remove('hidden');
+    await _renderHistoryList();
+  }
+
+  async function _renderHistoryList() {
+    const listEl = document.getElementById('quizHistoryList');
+    if (!listEl) return;
+    listEl.innerHTML = '<p class="placeholder-text">טוען...</p>';
+    try {
+      _quizHistory = await Api.getQuizHistory();
+      if (!_quizHistory.length) {
+        listEl.innerHTML = '<p class="placeholder-text">אין מבחנים קודמים עדיין.</p>';
+        return;
+      }
+      listEl.innerHTML = _quizHistory.map((entry, i) => {
+        const date     = new Date(entry.timestamp).toLocaleString('he-IL');
+        const scoreNum = entry.score ?? 0;
+        const scoreCls = scoreNum >= 80 ? 'score--great' : scoreNum >= 60 ? 'score--ok' : 'score--poor';
+        return `<div class="quiz-history-item">
+          <div class="quiz-history-item__info" data-action="view-history" data-idx="${i}" role="button" tabindex="0">
+            <span class="quiz-history-item__title">${_esc(entry.quizTitle || 'מבחן')}</span>
+            <span class="quiz-history-item__date">${date}</span>
+            <span class="quiz-score-mini ${scoreCls}">${scoreNum}%</span>
+            <span class="quiz-history-item__count">${entry.answeredCount ?? '?'}/${entry.questionCount ?? '?'} שאלות</span>
+          </div>
+          <button class="btn btn--xs btn--danger-ghost quiz-history-delete-btn"
+                  data-timestamp="${_esc(entry.timestamp)}" title="מחק מבחן זה">🗑️</button>
+        </div>`;
+      }).join('');
+
+      listEl.querySelectorAll('[data-action="view-history"]').forEach(el => {
+        el.addEventListener('click', () => _viewHistoryEntry(_quizHistory[parseInt(el.dataset.idx, 10)]));
+      });
+
+      listEl.querySelectorAll('.quiz-history-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const ts = btn.dataset.timestamp;
+          const ok = await WindowManager.confirm('האם למחוק מבחן זה מההיסטוריה? לא ניתן לשחזר.');
+          if (!ok) return;
+          try {
+            await Api.deleteQuizHistory(ts);
+            await _renderHistoryList();
+            _showHistoryToast('המבחן נמחק בהצלחה ✓');
+          } catch (err) {
+            alert(`שגיאה במחיקה: ${err.message}`);
+          }
+        });
+      });
+    } catch (err) {
+      listEl.innerHTML = `<p class="placeholder-text error-text">שגיאה בטעינת ההיסטוריה: ${_esc(err.message)}</p>`;
+    }
+  }
+
+  function _viewHistoryEntry(entry) {
+    if (!entry) return;
+    document.getElementById('quizHistoryPanel')?.classList.add('hidden');
+
+    // Reconstruct quiz state from snapshot for read-only display
+    _quizQs = (entry.questions || []).map(q => ({
+      question:            q.question,
+      qtype:               q.qtype,
+      summaryTitle:        q.summaryTitle,
+      answer:              q.answer,
+      options:             q.options,
+      correct_option_index: q.correct_option_index,
+    }));
+    _answers = (entry.questions || []).map(q => ({
+      id:             null,
+      qtype:          q.qtype,
+      summaryPath:    '',
+      score:          q.score,
+      answered:       q.answered,
+      selectedOption: q.selectedOption,
+      selfAssess:     null,
+      userText:       q.userText || '',
+      aiGraded:       q.aiScore != null,
+      aiScore:        q.aiScore,
+      aiCritique:     q.aiCritique || '',
+    }));
+    _config.aiGrade = (entry.questions || []).some(q => q.aiScore != null);
+
+    const resultsEl = document.getElementById('quizResults');
+    document.getElementById('quizTestArea').classList.add('hidden');
+    resultsEl.classList.remove('hidden');
+    resultsEl.innerHTML = `
+      <h2 class="quiz-results-title">תוצאות מבחן — ${_esc(entry.quizTitle || 'מבחן')}</h2>
+      <div class="quiz-history-view-badge">📜 צפייה בהיסטוריה — ${new Date(entry.timestamp).toLocaleString('he-IL')}</div>
+      <div id="quizScoreDisplay" class="quiz-score-display"></div>
+      <div id="quizResultsList"  class="quiz-results-list"></div>
+      <div class="modal__actions">
+        <button id="quizCloseResultsBtn" class="btn btn--primary">סגור</button>
+      </div>`;
+
+    const listEl = document.getElementById('quizResultsList');
+    listEl.innerHTML = `<h4 class="quiz-results-heading">פירוט תשובות</h4>` +
+      _quizQs.map((_, i) => _buildResultCard(i)).join('');
+    _bindResultCardEvents(listEl);
+    _renderFinalScore();
+    document.getElementById('quizCloseResultsBtn').onclick = _closeQuiz;
+  }
+
+  function _showHistoryToast(msg) {
+    let toast = document.getElementById('quizHistoryToast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'quizHistoryToast';
+      toast.className = 'quiz-history-toast';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.classList.add('quiz-history-toast--visible');
+    setTimeout(() => toast.classList.remove('quiz-history-toast--visible'), 3000);
   }
 
   function _closeQuiz() {

@@ -2,7 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const {
   getQuestions, addQuestion, updateQuestion, deleteQuestion,
-  getBundle, submitResult,
+  getBundle, submitResult, getHistory, saveHistory, deleteHistory,
 } = require('../controllers/quizController');
 
 // ── Manual question CRUD ──────────────────────────────────────────────────────
@@ -90,6 +90,31 @@ router.post('/submit', (req, res) => {
     submitResult(summaryPath || null, totalScore ?? 0, questionResults || []);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+// ── Quiz History ──────────────────────────────────────────────────────────────
+
+router.get('/history', (_req, res) => {
+  try { res.json({ success: true, data: getHistory() }); }
+  catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+router.post('/history', (req, res) => {
+  try {
+    const entry = req.body;
+    if (!entry || !entry.timestamp) return res.status(400).json({ success: false, message: 'timestamp נדרש' });
+    saveHistory(entry);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+});
+
+router.delete('/history', (req, res) => {
+  try {
+    const { timestamp } = req.body;
+    if (!timestamp) return res.status(400).json({ success: false, message: 'timestamp נדרש' });
+    deleteHistory(timestamp);
+    res.json({ success: true });
+  } catch (err) { res.status(err.status || 500).json({ success: false, message: err.message }); }
 });
 
 // ── AI generation (legacy — requires aiController) ────────────────────────────

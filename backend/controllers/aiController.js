@@ -66,43 +66,51 @@ function _sanitize(text) {
 }
 
 async function _callGemini(prompt, taskType = 'general') {
-  const status = getKeyStatus();
-  const healthyCount = status.filter(k => k.healthy).length;
-  if (status.length > 0 && healthyCount === 0) {
-    throw new Error('שגיאה: לא נשארו מפתחות API תקינים או פעילים במערכת. אנא הזן מפתח תקין במסך ההגדרות.');
-  }
-
-  const key = getNextKey(taskType);
-  if (!key) {
-    if (!status.length) throw new Error('אין מפתחות Gemini API מוגדרים — הוסף מפתח בהגדרות');
-    const poolLabel = taskType === 'quiz' ? 'מבחנים' : 'צ\'אט';
-    throw new Error(`אין מפתחות זמינים כרגע עבור משימות ${poolLabel}. המתן לסיום קירור המפתחות, או שנה את מצב חלוקת העומסים בהגדרות.`);
-  }
-
   const totalChars = prompt.length;
   if (totalChars > MAX_PROMPT_CHARS) throw new Error(`הפרומפט ארוך מדי (${totalChars} תווים, מקסימום ${MAX_PROMPT_CHARS})`);
 
-  const genAI = new GoogleGenerativeAI(key);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
-  try {
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    recordUsage(key, totalChars + (text?.length || 0));
-    return text;
-  } catch (err) {
-    const msg = err.message || '';
-    if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || /quota/i.test(msg)) {
-      recordQuotaExhausted(key);
-      throw new Error('המכסה במפתח זה הסתיימה. המערכת עוברת אוטומטית למפתח הבא.');
-    }
-    if (msg.includes('503') || msg.includes('SERVICE_UNAVAILABLE') || /overload/i.test(msg)) {
-      recordError(key);
-      throw new Error('השרתים של גוגל עמוסים כרגע באופן זמני, אנא נסה שוב בעוד מספר רגעים.');
-    }
-    recordError(key);
-    throw new Error(`שגיאת Gemini API: ${err.message}`);
+  const status = getKeyStatus();
+  if (status.length > 0 && status.filter(k => k.healthy).length === 0) {
+    throw new Error('שגיאה: לא נשארו מפתחות API תקינים או פעילים במערכת. אנא הזן מפתח תקין במסך ההגדרות.');
   }
+
+  // Retry loop — up to 3 attempts, rotating to a fresh key on every 429
+  const maxAttempts = Math.min(3, Math.max(1, getApiKeys().length));
+  let lastQuotaError;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const key = getNextKey(taskType);
+    if (!key) {
+      if (!status.length) throw new Error('אין מפתחות Gemini API מוגדרים — הוסף מפתח בהגדרות');
+      const poolLabel = taskType === 'quiz' ? 'מבחנים' : 'צ\'אט';
+      throw new Error(`אין מפתחות זמינים כרגע עבור משימות ${poolLabel}. המתן לסיום קירור המפתחות, או שנה את מצב חלוקת העומסים בהגדרות.`);
+    }
+
+    const genAI = new GoogleGenerativeAI(key);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+    try {
+      const result = await model.generateContent(prompt);
+      const text   = result.response.text();
+      recordUsage(key, totalChars + (text?.length || 0));
+      return text;
+    } catch (err) {
+      const msg = err.message || '';
+      if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || /quota/i.test(msg)) {
+        recordQuotaExhausted(key);
+        lastQuotaError = new Error('כל מפתחות ה-API הזמינים הגיעו למכסה. נסה שוב מאוחר יותר.');
+        continue; // rotate to next key
+      }
+      if (msg.includes('503') || msg.includes('SERVICE_UNAVAILABLE') || /overload/i.test(msg)) {
+        recordError(key);
+        throw new Error('השרתים של גוגל עמוסים כרגע באופן זמני, אנא נסה שוב בעוד מספר רגעים.');
+      }
+      recordError(key);
+      throw new Error(`שגיאת Gemini API: ${err.message}`);
+    }
+  }
+
+  throw lastQuotaError || new Error('כל ניסיונות ה-API נכשלו. אנא נסה שנית.');
 }
 
 function _loadArticles() {
