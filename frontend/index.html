@@ -797,6 +797,39 @@
         <div id="extendParashotResult" class="hidden" style="margin-top:0.75rem;font-size:0.85rem"></div>
       </div>
 
+      <!-- ייבוא וייצוא קבצי Word -->
+      <div class="settings-panel card">
+        <h2>📄 ייבוא וייצוא קבצי Word</h2>
+        <p class="hint">ייצא את כל הסיכומים כקבצי Word בתוך ZIP, או ייבא תיקיית Word שלמה לתוך עץ הסיכומים.</p>
+
+        <div class="form-group">
+          <label class="form-label">ייצוא — כל הסיכומים כקבצי Word</label>
+          <p class="hint">יצור קובץ ZIP ובתוכו קובץ <code>.doc</code> לכל סיכום, לפי מבנה עץ התיקיות.</p>
+          <button id="exportWordZipBtn" class="btn btn--secondary">⬇ ייצא הכל כ-Word ZIP</button>
+        </div>
+
+        <hr class="settings-divider" />
+
+        <div class="form-group">
+          <label class="form-label">ייבוא — בחר תיקיית Word מהמחשב</label>
+          <p class="hint">בחר תיקייה מהמחשב שלך. רק קבצי <code>.doc</code> ו-<code>.docx</code> יעובדו; שאר הקבצים יידלגו.</p>
+          <input type="file" id="wordFolderInput" webkitdirectory directory multiple
+                 class="input-field" style="padding:0.3rem" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="wordImportTarget">תיקיית יעד בעץ הסיכומים</label>
+          <input type="text" id="wordImportTarget" class="input-field" value="root"
+                 placeholder="root או root/הלכה/שבת" dir="ltr" />
+          <p class="hint">השאר <code>root</code> כדי לייבא ישירות לשורש, או ציין נתיב קיים כדי לקנן בתוכו.</p>
+        </div>
+
+        <div class="form-row-actions">
+          <button id="wordImportBtn" class="btn btn--primary">📥 ייבא תיקיית Word</button>
+          <span id="wordImportMsg" class="save-status hidden"></span>
+        </div>
+      </div>
+
       <!-- אבחון מערכת -->
       <div class="settings-panel card">
         <h2>🔍 אבחון מערכת</h2>
@@ -811,7 +844,68 @@
     <section id="view-help" class="view hidden">
       <div class="help-screen">
         <h1 class="help-title">📖 מדריך למשתמש — מערכת למידה פעילה</h1>
-        <p class="help-intro">המערכת מיועדת ללמידה אישית עצמאית, שמירת סיכומים, בחינה עצמית וחזרה מרווחת. כל הנתונים שמורים <strong>מקומית בלבד</strong> במחשבך.</p>
+        <p class="help-intro">מערכת למידה פעילה אישית: סיכומים, בחינה עצמית, חזרה מרווחת, ופתקיות חכמות. כל הנתונים שמורים <strong>מקומית בלבד</strong> במחשבך — ללא שרת חיצוני, ללא ענן.</p>
+
+        <div class="help-section">
+          <h2>📄 ניהול סיכומים וסנכרון Word</h2>
+          <p>הסיכומים מאורגנים בעץ תיקיות. כל סיכום ניתן לעריכה בדפדפן ולסנכרון עם Word לקריאת שבת.</p>
+          <ul class="help-list">
+            <li><strong>📄 פתח ב-Word</strong> — יוצר קובץ <code>.doc</code> RTL עם הסיכום ופותח אותו ב-Word.</li>
+            <li><strong>🔄 סנכרן עם Word</strong> — לאחר עריכה ב-Word ושמירה, לחץ כדי לייבא את השינויים בחזרה לעורך. המערכת מזהה אוטומטית <code>.docx</code> ו-<code>.doc</code> ובוחרת את הקובץ החדש ביותר.</li>
+            <li><strong>קידוד UTF-16</strong> — Word לעיתים שומר HTML בקידוד UTF-16LE. המערכת מזהה זאת אוטומטית בעזרת בדיקת BOM ומבנה bytes.</li>
+            <li><strong>ייבוא תיקיית Word בתפזורת</strong> — בהגדרות → "ייבוא וייצוא קבצי Word": בחר תיקייה שלמה מהמחשב, ציין תיקיית יעד בעץ הסיכומים, ולחץ "ייבא". כל קובץ <code>.doc</code>/<code>.docx</code> יהפוך לסיכום עם שמירת מבנה תת-התיקיות.</li>
+            <li><strong>ייצוא כל הסיכומים כ-Word ZIP</strong> — בהגדרות → לחץ "ייצא הכל כ-Word ZIP" לקבלת ZIP ובו קובץ <code>.doc</code> לכל סיכום לפי מבנה העץ.</li>
+            <li><strong>ייצוא ZIP רגיל</strong> — גיבוי מלא של כל הנתונים (סיכומים, שאלות, הקלטות).</li>
+            <li><strong>🕐 גרסאות</strong> — עד 5 גרסאות קודמות של כל סיכום, ניתן לשחזר בלחיצה.</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>📝 פתקיות חכמות</h2>
+          <p>פתקיות ניתנות לקישור ליום מסוים בלוח השנה, או לשמור ללא תאריך. הן מופיעות בלוח השנה, בלוח המרכזי, ובמגירה הגלובלית.</p>
+          <ul class="help-list">
+            <li><strong>פתק ללא תאריך</strong> — בעת יצירת פתק, סמן "ללא תאריך" כדי לשמור פתק כללי שאינו קשור ליום ספציפי.</li>
+            <li><strong>פתק מקושר ליום</strong> — לחץ על יום בלוח השנה ➜ "+ פתק" ליצירת פתק המשויך לתאריך זה.</li>
+            <li><strong>רשימת מטלות עם תיבות סימון</strong> — הכפתור ☑ בסרגל הכלים מוסיף שורת צ'קבוקס. כיוון RTL/LTR מזוהה אוטומטית לפי אותיות ראשוניות.</li>
+            <li><strong>חיפוש גלובלי</strong> — המגירה (📝 בסרגל הניווט) מאפשרת חיפוש בכותרות ובתוכן כל הפתקיות. לחץ Enter או "🔍 חפש".</li>
+            <li><strong>נעיצה</strong> — פתקים נעוצים מופיעים תמיד ראשונים בכל תצוגה.</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>🎯 מנוע מבחני AI מתקדם</h2>
+          <p>הבחינה העצמית תומכת בשאלות פתוחות ובחירה מרובה, עם בדיקת AI אופציונלית וערעור על ציונים.</p>
+          <ul class="help-list">
+            <li><strong>מספר שאלות (מכסה)</strong> — בהגדרת המבחן, בחר כמה שאלות לכלול. סמן "הכל" לבחינה על הכל, או הזן מספר ספציפי. השאלות עוברות ערבול Fisher-Yates.</li>
+            <li><strong>ערבול אפשרויות</strong> — בשאלות בחירה מרובה, סדר האפשרויות מערבל בכל בחינה — התשובה הנכונה אינה תמיד באותו מיקום.</li>
+            <li><strong>בדיקה בסוף המבחן</strong> — בחר "משוב בסוף" כדי לענות על כל השאלות ללא הפסקות, ולקבל ציון כולל ובקורת AI מפורטת בסיום.</li>
+            <li><strong>בדיקה ידנית</strong> — כאשר AI כבוי, לאחר הבחינה ניתן לדרג כל שאלה פתוחה ידנית (0–100) לחישוב הציון הסופי.</li>
+            <li><strong>ערעור על הציון (ערעור AI)</strong> — לצד כל שאלה שנבדקה ע"י AI, לחץ "ערער על הציון", הסבר מדוע תשובתך נכונה, ושלח. ה-AI יבחן מחדש כפרופסור אקדמי הוגן ויעדכן את הציון אם הערעור מוצדק. יוצג יומן: <em>"ציון מקורי: X ← ציון לאחר ערעור: Y"</em>.</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>📊 לוח משימות ועומס דינמי</h2>
+          <p>לוח השנה מציג את עומס החזרות בצבעים, המחושבים על בסיס מתמטי לפי מחצית העומס המקסימלי.</p>
+          <ul class="help-list">
+            <li><strong>צבעי עומס בלוח:</strong> ירוק = עד מחצית מסף העומס, כתום = מעל המחצית, שחור = מעל הסף המלא.</li>
+            <li><strong>סף עומס כבד</strong> — ניתן להגדרה בהגדרות. ברירת מחדל: 9 משימות ביום.</li>
+            <li><strong>סיימתי עד לכאן היום</strong> — פעולה בלתי הפיכה: מסמנת את המשימה כהושלמת חלקית בלי לספור אותה כחזרה מלאה. לא ניתן לבטל.</li>
+            <li><strong>דחיית משימה</strong> — לחץ "דחה" להזזת המשימה ליום הבא.</li>
+            <li><strong>למדתי אתמול</strong> — לסימון חזרה שנעשתה אתמול ולא תועדה.</li>
+          </ul>
+        </div>
+
+        <div class="help-section">
+          <h2>📚 מאגר ספרים</h2>
+          <p>העלה ספרי PDF ואחסן אותם בתיקיות. ה-AI יכול לשלב אותם כמקורות ידע בשיחה.</p>
+          <ul class="help-list">
+            <li><strong>תיקיות מקוננות</strong> — ניתן ליצור מבנה תיקיות היררכי לארגון הספרים לפי נושא.</li>
+            <li><strong>חיפוש ספרים</strong> — חפש לפי שם הספר בשדה החיפוש בראש המסך.</li>
+            <li><strong>שימוש ב-AI</strong> — בעורך הסיכום, בחר ספרים רלוונטיים בעמודת ה-AI כדי שיתייחס לתוכנם בתשובות.</li>
+            <li><strong>הגבלת היקף ידע</strong> — בהגדרות ניתן להגביל את ה-AI למאגר הספרים בלבד.</li>
+          </ul>
+        </div>
 
         <div class="help-section">
           <h2>📊 מסך ראשי</h2>

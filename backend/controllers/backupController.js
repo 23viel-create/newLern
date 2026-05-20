@@ -544,4 +544,107 @@ function syncWordFile(nodePath, title) {
   return { ok: true };
 }
 
-module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, syncWordFile };
+// ─── Bulk Word folder import ───────────────────────────────────────────────
+// Accepts an array of multer file objects plus a parallel array of relPaths
+// (webkitRelativePath values) and a targetRoot prefix.
+
+async function bulkImportWord(files, relPaths, targetRoot) {
+  const results = { imported: 0, skipped: 0, errors: [] };
+  const now = new Date().toISOString();
+
+  for (let i = 0; i < files.length; i++) {
+    const file    = files[i];
+    const relPath = (relPaths[i] || file.originalname).replace(/\\/g, '/');
+    const ext     = path.extname(file.originalname).toLowerCase();
+
+    if (!['.doc', '.docx'].includes(ext)) { results.skipped++; continue; }
+
+    const base    = targetRoot ? `${targetRoot.replace(/\/+$/, '')}/${relPath}` : relPath;
+    const parts   = base.split('/').filter(Boolean);
+    const rawFile = parts[parts.length - 1];
+    const sumName = rawFile.replace(/\.(doc|docx)$/i, '');
+    const folders = parts.slice(0, -1);
+
+    try {
+      // Ensure all ancestor folders have meta.json
+      let curRel = '';
+      for (const part of folders) {
+        curRel = curRel ? `${curRel}/${part}` : part;
+        const absDir = path.join(summariesRoot, curRel);
+        if (!fs.existsSync(absDir)) {
+          fs.mkdirSync(absDir, { recursive: true });
+          fs.writeFileSync(path.join(absDir, 'meta.json'),
+            JSON.stringify({ title: part, type: 'folder', createdAt: now, updatedAt: now }, null, 2));
+        }
+      }
+
+      // Create summary folder
+      const sumRel = curRel ? `${curRel}/${sumName}` : sumName;
+      const sumAbs = path.join(summariesRoot, sumRel);
+      fs.mkdirSync(sumAbs, { recursive: true });
+
+      // Extract content — reuse Phase 32 heuristic pipeline
+      const buf    = file.buffer;
+      const isBin  = buf[0] === 0x50 && buf[1] === 0x4B;
+      let body = '';
+      if (isBin) {
+        const zip      = new AdmZip(buf);
+        const xmlEntry = zip.getEntry('word/document.xml');
+        if (xmlEntry) body = _convertDocxXmlToHtml(xmlEntry.getData().toString('utf-8'));
+      } else {
+        const isUtf16 = (buf[0] === 0xFF && buf[1] === 0xFE) ||
+                        (buf.length > 3 && buf[1] === 0x00 && buf[3] === 0x00);
+        let html = isUtf16 ? buf.toString('utf16le') : buf.toString('utf8');
+        html     = html.replace(/^﻿/, '');
+        body     = _extractWordHtmlBody(html);
+      }
+
+      fs.writeFileSync(path.join(sumAbs, 'meta.json'),
+        JSON.stringify({ title: sumName, type: 'summary', createdAt: now, updatedAt: now }, null, 2));
+      fs.writeFileSync(path.join(sumAbs, 'content.txt'),          body || '');
+      fs.writeFileSync(path.join(sumAbs, 'questions_open.json'), '[]');
+      fs.writeFileSync(path.join(sumAbs, 'questions_mc.json'),   '[]');
+      results.imported++;
+    } catch (err) {
+      results.errors.push({ file: relPath, error: err.message });
+    }
+  }
+  return results;
+}
+
+// ─── Export full tree as Word ZIP ──────────────────────────────────────────
+// Walk summaries_tree, convert every summary to Word HTML via buildDocx,
+// add as {relPath}.doc inside a ZIP, return the ZIP buffer.
+
+function exportWordZip() {
+  const zip = new AdmZip();
+
+  function walk(dir, relBase) {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+    catch { return; }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const absDir   = path.join(dir, entry.name);
+      const rel      = relBase ? `${relBase}/${entry.name}` : entry.name;
+      const metaFile = path.join(absDir, 'meta.json');
+      if (!fs.existsSync(metaFile)) continue;
+      let meta;
+      try { meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8')); } catch { continue; }
+      if (meta.type === 'summary') {
+        try {
+          const content   = getSummaryContent(rel);
+          const docBuffer = buildDocx(meta.title || entry.name, content);
+          zip.addFile(`${rel}.doc`, docBuffer);
+        } catch { /* skip summaries that fail */ }
+      } else {
+        walk(absDir, rel);
+      }
+    }
+  }
+
+  walk(summariesRoot, '');
+  return zip.toBuffer();
+}
+
+module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, syncWordFile, bulkImportWord, exportWordZip };

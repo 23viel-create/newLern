@@ -4,6 +4,7 @@ const router  = express.Router();
 
 const {
   buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, syncWordFile,
+  bulkImportWord, exportWordZip,
 } = require('../controllers/backupController');
 const {
   getSummaryContent, getSummaryHistory, restoreHistoryVersion,
@@ -133,6 +134,34 @@ router.post('/sync-word', (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// POST /api/backup/import-word-bulk — import a folder of Word files
+router.post('/import-word-bulk', upload.array('files', 500), async (req, res) => {
+  try {
+    const files      = req.files || [];
+    const rawPaths   = req.body.paths;
+    const relPaths   = Array.isArray(rawPaths) ? rawPaths : (rawPaths ? [rawPaths] : []);
+    const targetRoot = (req.body.targetRoot || '').trim().replace(/^\/+|\/+$/g, '');
+    if (!files.length) return res.status(400).json({ success: false, message: 'לא נבחרו קבצים' });
+    const result = await bulkImportWord(files, relPaths, targetRoot);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/backup/export-word-zip — export full tree as Word files in a ZIP
+router.get('/export-word-zip', (req, res) => {
+  try {
+    const buffer = exportWordZip();
+    const fname  = `word_export_${new Date().toISOString().slice(0, 10)}.zip`;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    res.send(buffer);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

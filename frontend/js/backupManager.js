@@ -217,6 +217,8 @@ const BackupManager = (() => {
     document.getElementById('importZipBtn')     ?.addEventListener('click', importZip);
     document.getElementById('refreshBackupsBtn')?.addEventListener('click', loadBackupList);
     document.getElementById('runDiagnosticsBtn')?.addEventListener('click', runDiagnostics);
+    document.getElementById('wordImportBtn')      ?.addEventListener('click', bulkImportWord);
+    document.getElementById('exportWordZipBtn')   ?.addEventListener('click', exportWordZip);
 
     // Close history on overlay click
     document.getElementById('historyModal')?.querySelector('.modal__overlay')
@@ -224,5 +226,46 @@ const BackupManager = (() => {
         document.getElementById('historyModal')?.classList.add('hidden'));
   }
 
-  return { init, loadBackupList, exportDocx, exportZip, openHistory, runDiagnostics };
+  // ─── Bulk Word folder import ──────────────────────────────────────────────
+  async function bulkImportWord() {
+    const input      = document.getElementById('wordFolderInput');
+    const targetRoot = (document.getElementById('wordImportTarget')?.value || 'root').trim();
+    const msgEl      = document.getElementById('wordImportMsg');
+    const files      = Array.from(input?.files || []);
+    if (!files.length) { _setMsg(msgEl, 'יש לבחור תיקייה תחילה', 'error'); return; }
+
+    _setMsg(msgEl, `מייבא ${files.length} קבצים...`, 'ok');
+    const fd = new FormData();
+    files.forEach(f => {
+      fd.append('files', f, f.name);
+      fd.append('paths', f.webkitRelativePath || f.name);
+    });
+    fd.append('targetRoot', targetRoot);
+
+    try {
+      const res  = await fetch('/api/backup/import-word-bulk', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'שגיאת שרת');
+      const r       = data.data;
+      const errPart = r.errors?.length ? ` | ${r.errors.length} שגיאות` : '';
+      _setMsg(msgEl, `✓ יובאו ${r.imported} סיכומים, דולגו ${r.skipped} קבצים${errPart}`, 'ok');
+      if (typeof SummariesManager !== 'undefined') SummariesManager.init();
+      if (input) input.value = '';
+    } catch (err) {
+      _setMsg(msgEl, `שגיאה: ${err.message}`, 'error');
+    }
+  }
+
+  // ─── Export full tree as Word ZIP ─────────────────────────────────────────
+  function exportWordZip() {
+    const fname = `word_export_${new Date().toISOString().slice(0, 10)}.zip`;
+    const a = document.createElement('a');
+    a.href     = '/api/backup/export-word-zip';
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  return { init, loadBackupList, exportDocx, exportZip, openHistory, runDiagnostics, bulkImportWord, exportWordZip };
 })();
