@@ -1,0 +1,64 @@
+{
+  "name": "active-learning-system",
+  "version": "1.0.0",
+  "description": "מערכת למידה פעילה — שרת מקומי + ממשק Electron",
+  "main": "electron/main.js",
+  "scripts": {
+    "start":     "node backend/server.js",
+    "dev":       "concurrently \"nodemon backend/server.js\" \"wait-on http://localhost:3000 && electron .\"",
+    "electron":  "electron .",
+    "pack":      "electron-builder --dir",
+    "dist":      "electron-builder",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "adm-zip":               "^0.5.17",
+    "cors":                  "^2.8.5",
+    "docx":                  "^9.6.1",
+    "dotenv":                "^16.4.5",
+    "express":               "^4.19.2",
+    "multer":                "^2.1.1",
+    "officeparser":          "^7.0.3",
+    "pdf-parse":             "^2.4.5"
+  },
+  "devDependencies": {
+    "concurrently":   "^9.0.0",
+    "electron":       "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "nodemon":        "^3.1.4",
+    "wait-on":        "^8.0.0"
+  },
+  "build": {
+    "appId":       "com.activeLearning.app",
+    "productName": "מערכת למידה פעילה",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "frontend/**/*",
+      "backend/**/*",
+      "node_modules/**/*",
+      "!node_modules/.cache",
+      "!**/*.md",
+      "!**/.git"
+    ],
+    "extraResources": [
+      {
+        "from": "data",
+        "to":   "data",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon":   "electron/assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick":           false,
+      "allowToChangeInstallationDirectory": true,
+      "installerLanguages": ["he", "en"]
+    }
+  }
+}
