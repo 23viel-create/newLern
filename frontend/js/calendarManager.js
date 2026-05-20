@@ -277,11 +277,16 @@ const CalendarManager = (() => {
         currentYear  = d.getFullYear();
         currentMonth = d.getMonth() + 1;
       } else {
-        // RIGHT arrow (❯, calPrevMonth) = go to past = decrement one Gregorian month
-        currentMonth--;
-        if (currentMonth < 1) { currentMonth = 12; currentYear--; }
-        // Anchor selectedDate to mid-month so _renderHebrewMonthGrid finds correct ref
-        selectedDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-15`;
+        if (_calDisplayPref === 'hebrew') {
+          // In Hebrew mode: step by one Hebrew month boundary, then anchor to day 01
+          // so a 30-day month pointer never overflows into a 29-day neighbour.
+          _shiftHebMonth(-1);
+          selectedDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+        } else {
+          currentMonth--;
+          if (currentMonth < 1) { currentMonth = 12; currentYear--; }
+          selectedDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-15`;
+        }
       }
       loadCalendar();
     });
@@ -300,11 +305,15 @@ const CalendarManager = (() => {
         currentYear  = d.getFullYear();
         currentMonth = d.getMonth() + 1;
       } else {
-        // LEFT arrow (❮, calNextMonth) = go to future = increment one Gregorian month
-        currentMonth++;
-        if (currentMonth > 12) { currentMonth = 1; currentYear++; }
-        // Anchor selectedDate to mid-month so _renderHebrewMonthGrid finds correct ref
-        selectedDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-15`;
+        if (_calDisplayPref === 'hebrew') {
+          // In Hebrew mode: step by one Hebrew month boundary, then anchor to day 01
+          _shiftHebMonth(1);
+          selectedDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+        } else {
+          currentMonth++;
+          if (currentMonth > 12) { currentMonth = 1; currentYear++; }
+          selectedDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-15`;
+        }
       }
       loadCalendar();
     });
@@ -347,8 +356,9 @@ const CalendarManager = (() => {
 
   // Hebrew month navigation: find the boundary of the current Hebrew month,
   // step ±1 day to land in the adjacent Hebrew month, update currentYear/Month.
-  // Guard: if the step lands back in the same Gregorian month (Hebrew month
-  // extends past the displayed midpoint), advance one additional Gregorian month.
+  // Uses selectedDate (same reference as _renderHebrewMonthGrid) so that months
+  // spanning the Gregorian midpoint (e.g. Tammuz occupying only the first 14
+  // days of July) are identified correctly, avoiding the "skip Tammuz" overflow.
   function _shiftHebMonth(direction) {
     if (!calendarData) {
       currentMonth += direction;
@@ -356,9 +366,11 @@ const CalendarManager = (() => {
       if (currentMonth > 12) { currentMonth = 1;  currentYear++; }
       return;
     }
-    const mid = calendarData.days[Math.floor(calendarData.days.length / 2)];
-    const hebY = mid.hebrewYear;
-    const hebM = mid.hebrewMonth;
+    // Use selectedDate as reference (mirrors _renderHebrewMonthGrid logic)
+    let refDay = calendarData.days.find(d => d.date === selectedDate);
+    if (!refDay) refDay = calendarData.days[Math.floor(calendarData.days.length / 2)];
+    const hebY = refDay.hebrewYear;
+    const hebM = refDay.hebrewMonth;
 
     const origYear  = currentYear;
     const origMonth = currentMonth;
