@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { getNextKey, recordUsage, recordError, recordQuotaExhausted, getKeyStatus, getApiKeys, saveApiKeys } = require('../config/gemini');
+const { getNextKey, recordUsage, recordError, recordQuotaExhausted, getKeyStatus, getApiKeys, saveApiKeys, getLbMode, setLbMode } = require('../config/gemini');
 const { MAX_PROMPT_CHARS, MAX_CONTEXT_CHARS, ARTICLES_DIR } = require('../config/limits');
 const { getSettings } = require('./srController');
 
@@ -65,15 +65,19 @@ function _sanitize(text) {
     .slice(0, MAX_CONTEXT_CHARS);
 }
 
-async function _callGemini(prompt) {
+async function _callGemini(prompt, taskType = 'general') {
   const status = getKeyStatus();
   const healthyCount = status.filter(k => k.healthy).length;
   if (status.length > 0 && healthyCount === 0) {
     throw new Error('שגיאה: לא נשארו מפתחות API תקינים או פעילים במערכת. אנא הזן מפתח תקין במסך ההגדרות.');
   }
 
-  const key = getNextKey();
-  if (!key) throw new Error('אין מפתחות Gemini API מוגדרים — הוסף מפתח בהגדרות');
+  const key = getNextKey(taskType);
+  if (!key) {
+    if (!status.length) throw new Error('אין מפתחות Gemini API מוגדרים — הוסף מפתח בהגדרות');
+    const poolLabel = taskType === 'quiz' ? 'מבחנים' : 'צ\'אט';
+    throw new Error(`אין מפתחות זמינים כרגע עבור משימות ${poolLabel}. המתן לסיום קירור המפתחות, או שנה את מצב חלוקת העומסים בהגדרות.`);
+  }
 
   const totalChars = prompt.length;
   if (totalChars > MAX_PROMPT_CHARS) throw new Error(`הפרומפט ארוך מדי (${totalChars} תווים, מקסימום ${MAX_PROMPT_CHARS})`);
@@ -167,7 +171,7 @@ ${corpus}
   }
 
   const prompt = `${guardrail}${systemPart}\n\nשאלת המשתמש: ${safeMsg}`;
-  return await _callGemini(prompt);
+  return await _callGemini(prompt, 'general');
 }
 
 // ─── Suggest questions ────────────────────────────────────────────────────────
@@ -195,7 +199,7 @@ ${formatInstr}
 
 ענה אך ורק ב-JSON תקין, ללא טקסט נוסף.`;
 
-  const raw = await _callGemini(prompt);
+  const raw = await _callGemini(prompt, 'quiz');
   try {
     const jsonStr = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
     return JSON.parse(jsonStr);
@@ -216,7 +220,7 @@ async function getScheduleAdvice({ heavyDays, totalTasks }) {
 הצע תוכנית פשוטה לפיזור העומס על ימים אחרים בשבוע.
 ענה בעברית בלבד, עד 5 משפטים.`;
 
-  return await _callGemini(prompt);
+  return await _callGemini(prompt, 'general');
 }
 
 // ─── Article chat ─────────────────────────────────────────────────────────────
@@ -245,7 +249,7 @@ ${corpus}
 כלול: חלוקת נושאים, אסטרטגיות מומלצות, ואיך לשלב חזרה מרווחת ובחינה עצמית.
 ענה בעברית בלבד, בפורמט ברור עם כותרות.`;
 
-  return await _callGemini(prompt);
+  return await _callGemini(prompt, 'general');
 }
 
 // ─── Parse SR program from Hebrew text ───────────────────────────────────────
@@ -267,7 +271,7 @@ async function parseSrProgramFromText(hebrewText) {
 
 ענה אך ורק ב-JSON תקין: [מספר, מספר, ...] — ללא שום טקסט נוסף.`;
 
-  const raw = await _callGemini(prompt);
+  const raw = await _callGemini(prompt, 'general');
   const jsonStr = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
   let arr;
   try { arr = JSON.parse(jsonStr); } catch { throw new Error('ה-AI לא הצליח לפרש את הטקסט. נסה ניסוח אחר.'); }
@@ -331,7 +335,7 @@ async function suggestSingleQuestion({ summaryPath, summaryTitle, type }) {
 
 כותרת הסיכום: ${safeTitle}${contextBlock}`;
 
-    const raw  = await _callGemini(prompt);
+    const raw  = await _callGemini(prompt, 'quiz');
     const json = _parseJson(raw);
     if (!json.question || !Array.isArray(json.options) || json.options.length < 2) {
       throw new Error('תשובת ה-AI אינה בפורמט הנכון');
@@ -349,7 +353,7 @@ async function suggestSingleQuestion({ summaryPath, summaryTitle, type }) {
 
 כותרת הסיכום: ${safeTitle}${contextBlock}`;
 
-    const raw  = await _callGemini(prompt);
+    const raw  = await _callGemini(prompt, 'quiz');
     const json = _parseJson(raw);
     if (!json.question) throw new Error('תשובת ה-AI אינה בפורמט הנכון');
     return { question: json.question, answer: json.answer || '' };
@@ -390,7 +394,7 @@ ${strictInstruction}
 
 score הוא מספר שלם בין 0 ל-100.`;
 
-  const raw  = await _callGemini(prompt);
+  const raw  = await _callGemini(prompt, 'quiz');
   const s    = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
   const json = JSON.parse(s);
   const score = Math.max(0, Math.min(100, Math.round(Number(json.score) || 0)));
@@ -427,7 +431,7 @@ ${SYSTEM_GUIDE}
 שאלת המשתמש: ${safeMsg}
 
 ענה בעברית, בצורה ידידותית וקצרה (עד 5 משפטים).`;
-  return await _callGemini(prompt);
+  return await _callGemini(prompt, 'general');
 }
 
 // ─── Appeal grade ────────────────────────────────────────────────────────────
@@ -462,7 +466,7 @@ async function appealGrade({ question, sampleAnswer, userAnswer, originalCritiqu
 
 newScore הוא מספר שלם בין 0 ל-100.`;
 
-  const raw  = await _callGemini(prompt);
+  const raw  = await _callGemini(prompt, 'quiz');
   const s    = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
   const json = JSON.parse(s);
   return {
@@ -495,4 +499,6 @@ module.exports = {
   getKeyStatus,
   getKeys,
   updateKeys,
+  getLbMode,
+  setLbMode,
 };

@@ -218,6 +218,7 @@ const AiManager = (() => {
     const slotCount = Math.max(savedCount, 1);
     for (let i = 0; i < slotCount; i++) _addKeyRow(container, i);
     _appendAddKeyButton(container);
+    _updateLbVisibility();
   }
 
   function _addKeyRow(container, index) {
@@ -274,6 +275,7 @@ const AiManager = (() => {
       const msg = el.keysSavedMsg();
       if (msg) { msg.classList.remove('hidden'); setTimeout(() => msg.classList.add('hidden'), 2500); }
       await _refreshBattery();
+      _updateLbVisibility();
     } catch (err) {
       alert(`שגיאה בשמירת מפתחות: ${err.message}`);
     }
@@ -420,9 +422,58 @@ const AiManager = (() => {
     document.getElementById('chatContextUploadBtn')?.addEventListener('click', _uploadChatContextFile);
     await _loadChatContextList();
 
+    // Load-balancing mode selector
+    await _initLbMode();
+
     await _renderKeyFields();
     await _refreshBattery();
     _renderContextActions();
+  }
+
+  // ─── Load-balancing mode ──────────────────────────────────────────────────
+
+  async function _initLbMode() {
+    const select  = document.getElementById('lbModeSelect');
+    const section = document.getElementById('lbModeSection');
+    const hint    = document.getElementById('lbModeHint');
+    const msgEl   = document.getElementById('lbModeSavedMsg');
+    if (!select || !section || !hint) return;
+
+    // Fetch current mode from server
+    try {
+      const { mode } = await Api.aiGetLbMode();
+      select.value = mode || 'balanced';
+    } catch { /* ignore — default stays 'balanced' */ }
+
+    // Show section only when key count > 4
+    _updateLbVisibility();
+
+    select.addEventListener('change', async () => {
+      try {
+        await Api.aiSetLbMode(select.value);
+        if (msgEl) {
+          msgEl.classList.remove('hidden');
+          setTimeout(() => msgEl.classList.add('hidden'), 3000);
+        }
+      } catch (err) {
+        alert(`שגיאה בשמירת מצב: ${err.message}`);
+      }
+    });
+  }
+
+  function _updateLbVisibility() {
+    const select  = document.getElementById('lbModeSelect');
+    const section = document.getElementById('lbModeSection');
+    const hint    = document.getElementById('lbModeHint');
+    if (!select || !section || !hint) return;
+    const keys = el.apiKeysList()?.querySelectorAll('.api-key-row').length || 0;
+    if (keys > 4) {
+      section.classList.remove('hidden');
+      hint.classList.add('hidden');
+    } else {
+      section.classList.add('hidden');
+      hint.classList.remove('hidden');
+    }
   }
 
   // ─── Chat Context File Manager ────────────────────────────────────────────

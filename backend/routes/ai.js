@@ -147,4 +147,24 @@ router.post('/appeal-grade', async (req, res) => {
   }
 });
 
+// GET  /api/ai/lb-mode        — returns current load-balancing mode
+router.get('/lb-mode', (_req, res) => {
+  try { res.json({ mode: ctrl.getLbMode() }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PUT  /api/ai/lb-mode        — { mode: 'balanced' | 'test_focused' }
+router.put('/lb-mode', (req, res) => {
+  try {
+    const { mode } = req.body;
+    if (!['balanced', 'test_focused'].includes(mode)) {
+      return res.status(400).json({ error: 'mode חייב להיות balanced או test_focused' });
+    }
+    ctrl.setLbMode(mode);
+    res.json({ ok: true, mode: ctrl.getLbMode() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

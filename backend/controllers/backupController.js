@@ -713,4 +713,44 @@ async function bulkImportWordFromZip(zipBuffer, targetRoot) {
   return results;
 }
 
-module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, syncWordFile, bulkImportWord, bulkImportWordFromZip, exportWordZip };
+// ─── Granular node ZIP export ─────────────────────────────────────────────────
+// Zips a single summary folder or a parent folder inside summaries_tree.
+// Excludes any global app state — only the node's own files are included.
+
+function exportNodeZip(targetPath) {
+  const safeRel = path.normalize(targetPath).replace(/^(\.\.(\/|\\|$))+/, '');
+  const nodeAbs = path.resolve(summariesRoot, safeRel);
+
+  // Path traversal guard
+  if (!nodeAbs.startsWith(path.resolve(summariesRoot))) {
+    const err = new Error('נתיב לא חוקי'); err.status = 400; throw err;
+  }
+  if (!fs.existsSync(nodeAbs)) {
+    const err = new Error('הנתיב לא נמצא'); err.status = 404; throw err;
+  }
+
+  const zip = new AdmZip();
+
+  function _addDir(dir, zipBase) {
+    for (const entry of fs.readdirSync(dir)) {
+      const abs = path.join(dir, entry);
+      const rel = zipBase ? `${zipBase}/${entry}` : entry;
+      if (fs.statSync(abs).isDirectory()) {
+        _addDir(abs, rel);
+      } else {
+        zip.addFile(rel, fs.readFileSync(abs));
+      }
+    }
+  }
+
+  const stat = fs.statSync(nodeAbs);
+  if (stat.isDirectory()) {
+    _addDir(nodeAbs, '');
+  } else {
+    zip.addFile(path.basename(nodeAbs), fs.readFileSync(nodeAbs));
+  }
+
+  return zip.toBuffer();
+}
+
+module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, syncWordFile, bulkImportWord, bulkImportWordFromZip, exportWordZip, exportNodeZip };

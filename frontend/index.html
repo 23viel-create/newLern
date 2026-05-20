@@ -679,6 +679,19 @@
           <span id="keysSavedMsg" class="save-status save-status--saved hidden">נשמר ✓</span>
         </div>
 
+        <!-- מצב חלוקת עומסים -->
+        <hr class="settings-divider" />
+        <div id="lbModeSection" class="form-group hidden">
+          <label class="form-label" for="lbModeSelect">מצב ניהול מפתחות (חלוקת עומסים)</label>
+          <select id="lbModeSelect" class="input-field" dir="rtl">
+            <option value="balanced">מאוזן — כל המפתחות חולקים את העומס שווה בשווה</option>
+            <option value="test_focused">ממוקד מבחנים — מפתח 1 לצ'אט, מפתחות 2+ למבחנים</option>
+          </select>
+          <p class="hint">במצב ממוקד מבחנים: מפתח 1 שמור לצ'אט ולהסברים; מפתחות 2 ואילך מוקצים לבחינות, הפקת שאלות וערעורים.</p>
+          <span id="lbModeSavedMsg" class="save-status save-status--saved hidden">נשמר ✓</span>
+        </div>
+        <p id="lbModeHint" class="hint">הוסף לפחות 5 מפתחות כדי לאפשר חלוקת עומסים ממוקדת.</p>
+
         <!-- צ'אט מאמרים — מחייב לפחות מפתח אחד -->
         <hr class="settings-divider" />
         <h3>צ'אט למידה פעילה</h3>

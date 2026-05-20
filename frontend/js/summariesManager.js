@@ -163,6 +163,7 @@ const SummariesManager = (() => {
             <div class="tree-node__actions">
               <button class="btn btn--xs btn--ghost" data-action="quiz-folder"   data-path="${p}" data-name="${rawName}" title="בחן על כל הסיכומים בתיקייה">🎯</button>
               <button class="btn btn--xs btn--ghost" data-action="import-file"   data-path="${p}" data-name="${rawName}" title="ייבא קובץ Word או שמע לתיקייה">📥</button>
+              <button class="btn btn--xs btn--ghost" data-action="export-zip"    data-path="${p}" data-name="${rawName}" title="ייצא חומר לימוד (ZIP)">📦</button>
               <button class="btn btn--xs btn--ghost" data-action="new-folder"    data-path="${p}" title="תיקייה חדשה בתוך ${rawName}">📁+</button>
               <button class="btn btn--xs btn--ghost" data-action="new-summary"   data-path="${p}" title="סיכום חדש בתוך ${rawName}">📄+</button>
               <button class="btn btn--xs btn--ghost" data-action="rename"        data-path="${p}" data-name="${rawName}">✏️</button>
@@ -184,8 +185,9 @@ const SummariesManager = (() => {
           <div class="tree-node__actions">
             <button class="btn btn--xs btn--ghost" data-action="quiz-node"  data-path="${p}" data-name="${rawName}" title="התחל בחינה על סיכום זה">🎯</button>
             <button class="btn btn--xs btn--ghost" data-action="edit-questions" data-path="${p}" data-name="${rawName}" title="ערוך שאלות">📝</button>
-            <button class="btn btn--xs btn--ghost" data-action="plan"   data-path="${p}" data-name="${rawName}" title="תזמן חזרות מרווחות">📅</button>
-            <button class="btn btn--xs btn--ghost" data-action="rename" data-path="${p}" data-name="${rawName}">✏️</button>
+            <button class="btn btn--xs btn--ghost" data-action="plan"       data-path="${p}" data-name="${rawName}" title="תזמן חזרות מרווחות">📅</button>
+            <button class="btn btn--xs btn--ghost" data-action="export-zip" data-path="${p}" data-name="${rawName}" title="ייצא חומר לימוד (ZIP)">📦</button>
+            <button class="btn btn--xs btn--ghost" data-action="rename"     data-path="${p}" data-name="${rawName}">✏️</button>
             <button class="btn btn--xs btn--danger-ghost" data-action="delete" data-path="${p}" data-name="${rawName}" data-type="summary">🗑️</button>
           </div>
         </div>
@@ -314,6 +316,18 @@ const SummariesManager = (() => {
       case 'plan': {
         // Show program selector modal then plan
         PlanProgramModal.open(nodePath, nodeName);
+        break;
+      }
+
+      case 'export-zip': {
+        const fname = `${(nodeName || nodePath.split('/').pop())}_${new Date().toISOString().slice(0, 10)}.zip`;
+        const url   = Api.exportNodeZipUrl(nodePath);
+        const a     = document.createElement('a');
+        a.href      = url;
+        a.download  = fname;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
         break;
       }
 

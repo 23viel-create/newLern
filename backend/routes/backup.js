@@ -4,7 +4,7 @@ const router  = express.Router();
 
 const {
   buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, syncWordFile,
-  bulkImportWord, bulkImportWordFromZip, exportWordZip,
+  bulkImportWord, bulkImportWordFromZip, exportWordZip, exportNodeZip,
 } = require('../controllers/backupController');
 const {
   getSummaryContent, getSummaryHistory, restoreHistoryVersion,
@@ -160,6 +160,22 @@ router.post('/import-word-bulk', upload.array('files', 500), async (req, res) =>
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/backup/export-node-zip?targetPath=... — zip a specific node/folder
+router.get('/export-node-zip', (req, res) => {
+  try {
+    const { targetPath } = req.query;
+    if (!targetPath) return res.status(400).json({ error: 'נדרש targetPath' });
+    const buffer   = exportNodeZip(targetPath);
+    const nodeName = targetPath.split('/').filter(Boolean).pop() || 'node';
+    const fname    = `${nodeName}_${new Date().toISOString().slice(0, 10)}.zip`;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    res.send(buffer);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 

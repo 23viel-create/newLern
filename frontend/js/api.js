@@ -134,6 +134,10 @@ const Api = {
     apiFetch('/quizzes/submit', { method: 'POST', body: { summaryPath, totalScore, questionResults } }),
 
   // ── גיבוי וייצוא ────────────────────────────────────────────────────────
+  /** Returns a download URL for a specific node's ZIP */
+  exportNodeZipUrl: (targetPath) =>
+    `${API_BASE}/backup/export-node-zip?targetPath=${encodeURIComponent(targetPath)}`,
+
   /** Returns a download URL for the ZIP — open in tab or anchor */
   backupZipUrl: (subPath, save) => {
     let url = `${API_BASE}/backup/zip`;
@@ -195,6 +199,8 @@ const Api = {
     apiFetchPlain('/ai/appeal-grade', { method: 'POST', body: params }),
   aiSystemHelp: (userMessage) =>
     apiFetchPlain('/ai/system-help', { method: 'POST', body: { userMessage } }),
+  aiGetLbMode:  () => apiFetchPlain('/ai/lb-mode', {}),
+  aiSetLbMode:  (mode) => apiFetchPlain('/ai/lb-mode', { method: 'PUT', body: { mode } }),
   calendarExtendParashot: () =>
     apiFetch('/calendar/extend-parashot', { method: 'POST' }),
   learningPlanGenerate: (params) =>
