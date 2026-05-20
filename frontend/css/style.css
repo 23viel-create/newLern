@@ -1551,6 +1551,26 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
 .syllabus-day { padding: 0.2rem 0; border-bottom: 1px solid var(--color-border); }
 .syllabus-day:last-child { border-bottom: none; }
 
+/* ── Clear-existing checkbox row ─────────────────────────────────────────── */
+.syllabus-clear-row {
+  border: 1px solid #fca5a5;
+  background: #fff5f5;
+  border-radius: var(--radius);
+  padding: 0.6rem 0.85rem;
+}
+.checkbox-label--warning { color: #b91c1c; font-weight: 600; }
+.checkbox-label--warning input[type="checkbox"] { accent-color: #dc2626; }
+.syllabus-clear-hint {
+  color: #b91c1c;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  border-radius: var(--radius);
+  padding: 0.4rem 0.7rem;
+  font-size: 0.82rem;
+  margin-top: 0.4rem;
+  margin-bottom: 0;
+}
+
 /* ── ייעוץ איזון עומסים ──────────────────────────────────────────────────── */
 .optimize-recommendation {
   background: var(--color-bg); border: 1px solid var(--color-border);

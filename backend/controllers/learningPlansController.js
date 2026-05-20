@@ -318,6 +318,7 @@ async function generateLearningPlan(req, res) {
       bookName, authorName, pace,
       endCondition, targetDate, startDate, hebrewStartDate,
       startingPoint, skipShabbat, skipHolidays,
+      clearExisting,
       isCustomBook, unitType, startUnit, endUnit,
     } = req.body;
 
@@ -388,6 +389,13 @@ async function generateLearningPlan(req, res) {
     }
 
     const schedule = readSchedule();
+
+    if (clearExisting) {
+      // Wipe all existing tasks and all study paths so the manager stays in sync
+      schedule.tasks = [];
+      writeStudyPaths({ paths: [] });
+    }
+
     schedule.tasks.push(...newTasks);
     writeSchedule(schedule);
 

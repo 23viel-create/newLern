@@ -295,6 +295,10 @@ const ActiveChatManager = (() => {
       document.getElementById('syllabusUnitRequiredHint')?.classList.add('hidden');
     });
 
+    document.getElementById('syllabusClearExisting')?.addEventListener('change', (e) => {
+      document.getElementById('syllabusClearHint')?.classList.toggle('hidden', !e.target.checked);
+    });
+
     document.getElementById('syllabusGenerateBtn')?.addEventListener('click', _generateSyllabus);
   }
 
@@ -309,6 +313,7 @@ const ActiveChatManager = (() => {
     const targetDate      = document.getElementById('syllabusTargetDate')?.value || '';
     const skipShabbat     = document.getElementById('syllabusSkipShabbat')?.checked ?? true;
     const skipHolidays    = document.getElementById('syllabusSkipHolidays')?.checked ?? true;
+    const clearExisting   = document.getElementById('syllabusClearExisting')?.checked ?? false;
     const isCustomBook    = document.getElementById('syllabusCustomBook')?.checked ?? false;
     const unitType        = document.getElementById('syllabusUnitType')?.value || 'עמודים';
     const startUnitRaw    = document.getElementById('syllabusStartUnit')?.value;
@@ -344,6 +349,7 @@ const ActiveChatManager = (() => {
         hebrewStartDate:  hebrewStartDate || undefined,
         startingPoint:    startingPoint   || undefined,
         skipShabbat, skipHolidays,
+        clearExisting,
         isCustomBook,
         unitType:   isCustomBook ? unitType : undefined,
         startUnit,
