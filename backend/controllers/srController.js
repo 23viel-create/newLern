@@ -44,6 +44,12 @@ const HEBREW_MONTH_NAMES = {
   12: 'אדר', 13: 'אדר ב׳',
 };
 
+// In a leap year month 12 = Adar I (אדר א׳), not plain Adar
+function _getHebrewMonthName(month, year) {
+  if (month === 12 && isHebrewLeap(year)) return 'אדר א׳';
+  return HEBREW_MONTH_NAMES[month] || '';
+}
+
 function isHebrewLeap(y) {
   return ((7 * y + 1) % 19) < 7;
 }
@@ -426,7 +432,7 @@ function getCalendarData(yearMonth) {
       hebrewDay: heb.day,
       hebrewMonth: heb.month,
       hebrewYear: heb.year,
-      hebrewMonthName: HEBREW_MONTH_NAMES[heb.month] || '',
+      hebrewMonthName: _getHebrewMonthName(heb.month, heb.year),
     });
   }
 

@@ -201,6 +201,12 @@ const CalendarManager = (() => {
     7:'תשרי', 8:'חשוון', 9:'כסלו', 10:'טבת', 11:'שבט', 12:'אדר', 13:'אדר ב׳',
   };
 
+  // In a leap year month 12 = Adar I (אדר א׳); all other months are year-independent
+  function _hebrewMonthName(month, year) {
+    if (month === 12 && _isHebrewLeap(year)) return 'אדר א׳';
+    return HEBREW_MONTH_NAMES[month] || `חודש ${month}`;
+  }
+
   // Sun–Sat headers (Hebrew week starts Sunday, RTL display)
   const DOW_HEADERS = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
 
@@ -488,7 +494,7 @@ const CalendarManager = (() => {
 
     const label = document.getElementById('calMonthLabel');
     if (label) {
-      const hebName = HEBREW_MONTH_NAMES[hebM] || `חודש ${hebM}`;
+      const hebName = _hebrewMonthName(hebM, hebY);
       label.innerHTML =
         `<strong>${hebName} ${_toGematria(hebY)}</strong> <span class="cal-month-sub">(${gregSub})</span>`;
     }
@@ -534,14 +540,14 @@ const CalendarManager = (() => {
       // Two Hebrew months span this Gregorian month — concatenate names
       const first  = hebMonthsSeen[0];
       const second = hebMonthsSeen[hebMonthsSeen.length - 1];
-      const firstName  = HEBREW_MONTH_NAMES[first.month]  || `חודש ${first.month}`;
-      const secondName = HEBREW_MONTH_NAMES[second.month] || `חודש ${second.month}`;
+      const firstName  = _hebrewMonthName(first.month, first.year);
+      const secondName = _hebrewMonthName(second.month, second.year);
       // Use the year of the predominant (later) month
       const hebYear = _toGematria(second.year);
       hebLabel = `${firstName} - ${secondName} ${hebYear}`;
     } else if (hebMonthsSeen.length === 1) {
       const m = hebMonthsSeen[0];
-      hebLabel = `${HEBREW_MONTH_NAMES[m.month] || `חודש ${m.month}`} ${_toGematria(m.year)}`;
+      hebLabel = `${_hebrewMonthName(m.month, m.year)} ${_toGematria(m.year)}`;
     }
 
     if (_calDisplayPref === 'gregorian') {
@@ -727,10 +733,10 @@ const CalendarManager = (() => {
     if (label) {
       const s = weekDays[0], e = weekDays[6];
       const startHeb = s.hebrewDay
-        ? `${HEB_NUMS[s.hebrewDay] || s.hebrewDay} ${HEBREW_MONTH_NAMES[s.hebrewMonth]}`
+        ? `${HEB_NUMS[s.hebrewDay] || s.hebrewDay} ${_hebrewMonthName(s.hebrewMonth, s.hebrewYear)}`
         : s.date;
       const endHeb = e.hebrewDay
-        ? `${HEB_NUMS[e.hebrewDay] || e.hebrewDay} ${HEBREW_MONTH_NAMES[e.hebrewMonth]}`
+        ? `${HEB_NUMS[e.hebrewDay] || e.hebrewDay} ${_hebrewMonthName(e.hebrewMonth, e.hebrewYear)}`
         : e.date;
       label.innerHTML = `<span>${startHeb} — ${endHeb}</span>`;
     }
@@ -754,7 +760,7 @@ const CalendarManager = (() => {
     if (label) {
       if (dayData?.hebrewDay) {
         const fullHeb =
-          `${HEB_NUMS[dayData.hebrewDay]} ב${HEBREW_MONTH_NAMES[dayData.hebrewMonth]} ${_toGematria(dayData.hebrewYear)}`;
+          `${HEB_NUMS[dayData.hebrewDay]} ב${_hebrewMonthName(dayData.hebrewMonth, dayData.hebrewYear)} ${_toGematria(dayData.hebrewYear)}`;
         label.innerHTML =
           `<strong>${fullHeb}</strong> <span class="cal-month-sub">(${_formatDateLabel(selectedDate)})</span>`;
       } else {
@@ -770,7 +776,7 @@ const CalendarManager = (() => {
       : '<div class="cal-day-tasks-summary">אין משימות</div>';
 
     const hebLine = dayData?.hebrewDay
-      ? `<div class="cal-day-single__heb">${HEB_NUMS[dayData.hebrewDay]} ב${HEBREW_MONTH_NAMES[dayData.hebrewMonth]}</div>`
+      ? `<div class="cal-day-single__heb">${HEB_NUMS[dayData.hebrewDay]} ב${_hebrewMonthName(dayData.hebrewMonth, dayData.hebrewYear)}</div>`
       : '';
 
     const grid = document.getElementById('calGrid');
@@ -919,7 +925,7 @@ const CalendarManager = (() => {
     if (!cached) return '';
     const dayData = cached.days.find(d => d.date === dateStr);
     if (!dayData?.hebrewDay) return '';
-    return `${HEB_NUMS[dayData.hebrewDay] || dayData.hebrewDay} ב${HEBREW_MONTH_NAMES[dayData.hebrewMonth]} ${_toGematria(dayData.hebrewYear)}`;
+    return `${HEB_NUMS[dayData.hebrewDay] || dayData.hebrewDay} ב${_hebrewMonthName(dayData.hebrewMonth, dayData.hebrewYear)} ${_toGematria(dayData.hebrewYear)}`;
   }
 
   function _formatDateLabel(dateStr) {
