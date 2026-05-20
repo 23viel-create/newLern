@@ -992,7 +992,80 @@
         <div id="diagnosticsResult" class="diagnostics-result hidden"></div>
       </div>
 
+      <!-- ניהול נתונים ואיפוס -->
+      <div class="settings-panel card settings-panel--danger" id="dataResetPanel">
+        <h2>🗑️ ניהול נתונים ואיפוס</h2>
+        <p class="hint danger-hint">
+          ⚠️ פעולות אלה בלתי הפיכות לחלוטין. הנתונים יימחקו לצמיתות ואינם ניתנים לשחזור, אלא אם יש לך גיבוי.
+        </p>
+
+        <div class="reset-actions">
+          <div class="reset-action-row">
+            <div class="reset-action-info">
+              <strong>📝 מחיקת כל הפתקיות</strong>
+              <span class="hint">מוחק את כל הפתקיות השמורות במערכת</span>
+            </div>
+            <button class="btn btn--danger-outline"
+                    onclick="SettingsManager.openResetModal('notes')">
+              מחק פתקיות
+            </button>
+          </div>
+
+          <div class="reset-action-row">
+            <div class="reset-action-info">
+              <strong>📅 מחיקת לוח הזמנים ומסלולי למידה</strong>
+              <span class="hint">מוחק את כל המשימות, החזרות המרווחות ומסלולי הלמידה</span>
+            </div>
+            <button class="btn btn--danger-outline"
+                    onclick="SettingsManager.openResetModal('schedule')">
+              מחק לוח זמנים
+            </button>
+          </div>
+
+          <div class="reset-action-row">
+            <div class="reset-action-info">
+              <strong>📚 מחיקת כל הסיכומים</strong>
+              <span class="hint">מוחק את כל עץ הסיכומים, השאלות, ההקלטות והגרסאות — מאפס את ספריית התוכן</span>
+            </div>
+            <button class="btn btn--danger-outline"
+                    onclick="SettingsManager.openResetModal('summaries')">
+              מחק סיכומים
+            </button>
+          </div>
+
+          <div class="reset-action-row reset-action-row--full-reset">
+            <div class="reset-action-info">
+              <strong>💥 איפוס מלא — מחיקת כל הנתונים</strong>
+              <span class="hint">מוחק הכל: סיכומים, שאלות, לוח זמנים, מסלולים, פתקיות, ספרים, מאמרים וגיבויים. המערכת תחזור למצב התקנה חדשה.</span>
+            </div>
+            <button class="btn btn--danger"
+                    onclick="SettingsManager.openResetModal('all')">
+              🗑️ אפס הכל
+            </button>
+          </div>
+        </div>
+      </div>
+
     </section>
+
+    <!-- ── מודל אישור מחיקה ── -->
+    <div id="dataResetModal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal__overlay" onclick="SettingsManager.closeResetModal()"></div>
+      <div class="modal__box modal__box--narrow" dir="rtl">
+        <h2 id="dataResetModalTitle" class="modal-danger-title">⚠️ אישור מחיקה</h2>
+        <p id="dataResetModalDesc" class="modal-danger-desc"></p>
+        <p class="modal-danger-warning">פעולה זו <strong>בלתי הפיכה לחלוטין</strong>. לא ניתן לשחזר את הנתונים לאחר מכן.</p>
+        <div class="modal-danger-actions">
+          <button id="dataResetCancelBtn" class="btn btn--primary btn--full" onclick="SettingsManager.closeResetModal()">
+            ביטול — אל תמחק
+          </button>
+          <button id="dataResetConfirmBtn" class="btn btn--danger btn--full" onclick="SettingsManager.confirmReset()">
+            אני מבין, מחק הכל
+          </button>
+        </div>
+        <div id="dataResetSpinner" class="modal-spinner hidden">⏳ מוחק...</div>
+      </div>
+    </div>
 
     <!-- ── מסך עזרה ── -->
     <section id="view-help" class="view hidden">
@@ -1480,6 +1553,7 @@
   <script src="js/helpChatManager.js"></script>
   <script src="js/splitScreenManager.js"></script>
   <script src="js/notesManager.js"></script>
+  <script src="js/settingsManager.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

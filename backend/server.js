@@ -16,6 +16,7 @@ const calendarRouter      = require('./routes/calendar');
 const learningPlansRouter = require('./routes/learningPlans');
 const notesRouter         = require('./routes/notes');
 const chatRouter          = require('./routes/chat');
+const dataRouter          = require('./routes/data');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,6 +37,7 @@ app.use('/api/calendar',       calendarRouter);
 app.use('/api/learning-plans', learningPlansRouter);
 app.use('/api/notes',          notesRouter);
 app.use('/api/chat',           chatRouter);
+app.use('/api/data',           dataRouter);
 
 // בדיקת תקינות השרת
 app.get('/api/health', (_req, res) => {

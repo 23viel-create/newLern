@@ -252,4 +252,10 @@ const Api = {
     if (folder) fd.append('folder', folder);
     return apiFormFetch('/books/upload', fd);
   },
+
+  // ── איפוס נתונים ─────────────────────────────────────────────────────────
+  resetNotes:     () => apiFetch('/data/reset-notes',     { method: 'DELETE' }),
+  resetSchedule:  () => apiFetch('/data/reset-schedule',  { method: 'DELETE' }),
+  resetSummaries: () => apiFetch('/data/reset-summaries', { method: 'DELETE' }),
+  resetAll:       () => apiFetch('/data/reset-all',       { method: 'DELETE' }),
 };
