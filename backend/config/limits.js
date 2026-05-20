@@ -16,13 +16,20 @@ const DATA_BASE = process.env.APP_DATA_DIR
 function ensureJsonFile(filePath, defaultValue) {
   const dir = path.dirname(filePath);
 
-  // Auto-correct: if the path exists as a directory, wipe it
+  // Guard 1: if the parent directory path somehow exists as a FILE, remove it
+  if (fs.existsSync(dir) && !fs.statSync(dir).isDirectory()) {
+    fs.rmSync(dir, { force: true });
+  }
+
+  // Ensure the parent directory exists
+  fs.mkdirSync(dir, { recursive: true });
+
+  // Guard 2: if the target path exists as a DIRECTORY (prior crash artifact), wipe it
   if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
     fs.rmSync(filePath, { recursive: true, force: true });
   }
 
-  fs.mkdirSync(dir, { recursive: true });
-
+  // Seed an empty default if the file still doesn't exist
   if (!fs.existsSync(filePath)) {
     fs.writeFileSync(filePath, JSON.stringify(defaultValue, null, 2));
   }

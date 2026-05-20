@@ -27,7 +27,7 @@ async function _callGemini(prompt) {
 
 // ── Study Paths persistence ──────────────────────────────────────────────────
 
-const { STUDY_PATHS_FILE, ensureJsonFile } = require('../config/limits');
+const { SCHEDULE_FILE, STUDY_PATHS_FILE, ensureJsonFile } = require('../config/limits');
 
 function readStudyPaths() {
   try {
@@ -38,6 +38,11 @@ function readStudyPaths() {
 
 function writeStudyPaths(data) {
   ensureJsonFile(STUDY_PATHS_FILE, { paths: [] });
+  // Inline mop-up: re-check immediately before write
+  if (fs.existsSync(STUDY_PATHS_FILE) && fs.statSync(STUDY_PATHS_FILE).isDirectory()) {
+    fs.rmSync(STUDY_PATHS_FILE, { recursive: true, force: true });
+    fs.mkdirSync(path.dirname(STUDY_PATHS_FILE), { recursive: true });
+  }
   fs.writeFileSync(STUDY_PATHS_FILE, JSON.stringify(data, null, 2), 'utf8');
 }
 
@@ -391,6 +396,13 @@ async function generateLearningPlan(req, res) {
     const schedule = readSchedule();
 
     if (clearExisting) {
+      // Mop-up both data files before wiping, so we never write onto a directory
+      for (const fp of [SCHEDULE_FILE, STUDY_PATHS_FILE]) {
+        if (fs.existsSync(fp) && fs.statSync(fp).isDirectory()) {
+          fs.rmSync(fp, { recursive: true, force: true });
+        }
+        fs.mkdirSync(path.dirname(fp), { recursive: true });
+      }
       // Wipe all existing tasks and all study paths so the manager stays in sync
       schedule.tasks = [];
       writeStudyPaths({ paths: [] });

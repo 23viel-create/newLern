@@ -25,6 +25,12 @@ function readSchedule() {
 
 function writeSchedule(data) {
   ensureJsonFile(SCHEDULE_FILE, { settings: { ...DEFAULT_SETTINGS }, tasks: [] });
+  // Inline mop-up: re-check immediately before write in case the path was
+  // recreated as a directory between the ensureJsonFile call and here
+  if (fs.existsSync(SCHEDULE_FILE) && fs.statSync(SCHEDULE_FILE).isDirectory()) {
+    fs.rmSync(SCHEDULE_FILE, { recursive: true, force: true });
+    fs.mkdirSync(path.dirname(SCHEDULE_FILE), { recursive: true });
+  }
   fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(data, null, 2));
 }
 
