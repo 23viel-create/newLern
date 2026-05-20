@@ -416,9 +416,112 @@ const AiManager = (() => {
     });
     el.programBtn()?.addEventListener('click', _generateLearningProgram);
 
+    // Chat context file manager
+    document.getElementById('chatContextUploadBtn')?.addEventListener('click', _uploadChatContextFile);
+    await _loadChatContextList();
+
     await _renderKeyFields();
     await _refreshBattery();
     _renderContextActions();
+  }
+
+  // ─── Chat Context File Manager ────────────────────────────────────────────
+
+  async function _loadChatContextList() {
+    const listEl = document.getElementById('chatContextList');
+    if (!listEl) return;
+    try {
+      const files = await Api.chatFilesList();
+      if (!files.length) {
+        listEl.innerHTML = '<p class="placeholder-text">אין קבצים מועלים עדיין</p>';
+        return;
+      }
+      listEl.innerHTML = files.map(f => `
+        <div class="chat-ctx-item" data-name="${_escAttr(f.name)}">
+          <span class="chat-ctx-item__name">${_escHtml(f.name)}</span>
+          <span class="chat-ctx-item__size">${(f.size / 1024).toFixed(1)} KB</span>
+          <button class="btn btn--ghost btn--xs ctx-preview-btn">הצג</button>
+          <button class="btn btn--ghost btn--xs ctx-delete-btn">מחק</button>
+          <div class="chat-ctx-preview hidden"></div>
+        </div>
+      `).join('');
+
+      listEl.querySelectorAll('.ctx-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const item = btn.closest('.chat-ctx-item');
+          const name = item?.dataset.name;
+          if (!name) return;
+          try {
+            await Api.chatFilesDelete(name);
+            await _loadChatContextList();
+          } catch (err) {
+            alert(`שגיאה במחיקה: ${err.message}`);
+          }
+        });
+      });
+
+      listEl.querySelectorAll('.ctx-preview-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const item    = btn.closest('.chat-ctx-item');
+          const name    = item?.dataset.name;
+          const previewEl = item?.querySelector('.chat-ctx-preview');
+          if (!previewEl) return;
+          if (!previewEl.classList.contains('hidden')) {
+            previewEl.classList.add('hidden');
+            previewEl.innerHTML = '';
+            btn.textContent = 'הצג';
+            return;
+          }
+          const url = Api.chatFilesPreviewUrl(name);
+          const ext = name.split('.').pop().toLowerCase();
+          if (ext === 'pdf') {
+            previewEl.innerHTML = `<iframe src="${url}" title="${_escAttr(name)}"></iframe>`;
+          } else {
+            previewEl.innerHTML = `<div class="chat-ctx-preview__text">טוען...</div>`;
+            fetch(url).then(r => r.text()).then(text => {
+              previewEl.querySelector('.chat-ctx-preview__text').textContent = text;
+            }).catch(() => {
+              previewEl.querySelector('.chat-ctx-preview__text').textContent = 'לא ניתן לטעון תצוגה מקדימה';
+            });
+          }
+          previewEl.classList.remove('hidden');
+          btn.textContent = 'סגור';
+        });
+      });
+    } catch {
+      listEl.innerHTML = '<p class="placeholder-text">שגיאה בטעינת הקבצים</p>';
+    }
+  }
+
+  async function _uploadChatContextFile() {
+    const input  = document.getElementById('chatContextFileInput');
+    const msgEl  = document.getElementById('chatContextUploadMsg');
+    const file   = input?.files?.[0];
+    if (!file) { _showCtxMsg(msgEl, 'יש לבחור קובץ תחילה', 'err'); return; }
+    _showCtxMsg(msgEl, 'מעלה...', 'info');
+    try {
+      await Api.chatFilesUpload(file);
+      _showCtxMsg(msgEl, 'הקובץ הועלה בהצלחה ✓', 'ok');
+      if (input) input.value = '';
+      await _loadChatContextList();
+    } catch (err) {
+      _showCtxMsg(msgEl, `שגיאה: ${err.message}`, 'err');
+    }
+  }
+
+  function _showCtxMsg(el, text, type) {
+    if (!el) return;
+    el.textContent = text;
+    el.className = `save-status ${type === 'ok' ? 'save-status--saved' : type === 'err' ? 'save-status--error' : ''}`;
+    el.classList.remove('hidden');
+    if (type === 'ok') setTimeout(() => el.classList.add('hidden'), 4000);
+  }
+
+  function _escHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function _escAttr(s) {
+    return String(s || '').replace(/"/g,'&quot;');
   }
 
   return { init, setContext, setOffline, refreshBattery: _refreshBattery };

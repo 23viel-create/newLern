@@ -218,6 +218,7 @@ const BackupManager = (() => {
     document.getElementById('refreshBackupsBtn')?.addEventListener('click', loadBackupList);
     document.getElementById('runDiagnosticsBtn')?.addEventListener('click', runDiagnostics);
     document.getElementById('wordImportBtn')      ?.addEventListener('click', bulkImportWord);
+    document.getElementById('wordZipImportBtn')   ?.addEventListener('click', importWordZip);
     document.getElementById('exportWordZipBtn')   ?.addEventListener('click', exportWordZip);
 
     // Close history on overlay click
@@ -256,6 +257,33 @@ const BackupManager = (() => {
     }
   }
 
+  // ─── Import ZIP of Word files ─────────────────────────────────────────────
+  async function importWordZip() {
+    const input      = document.getElementById('wordZipInput');
+    const targetRoot = (document.getElementById('wordImportTarget')?.value || 'root').trim();
+    const msgEl      = document.getElementById('wordImportMsg');
+    const file       = input?.files?.[0];
+    if (!file) { _setMsg(msgEl, 'יש לבחור קובץ ZIP תחילה', 'error'); return; }
+
+    _setMsg(msgEl, 'מייבא מתוך ZIP...', 'ok');
+    const fd = new FormData();
+    fd.append('files', file, file.name);
+    fd.append('targetRoot', targetRoot);
+
+    try {
+      const res  = await fetch('/api/backup/import-word-bulk', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'שגיאת שרת');
+      const r       = data.data;
+      const errPart = r.errors?.length ? ` | ${r.errors.length} שגיאות` : '';
+      _setMsg(msgEl, `✓ יובאו ${r.imported} סיכומים, דולגו ${r.skipped} קבצים${errPart}`, 'ok');
+      if (typeof SummariesManager !== 'undefined') SummariesManager.init();
+      if (input) input.value = '';
+    } catch (err) {
+      _setMsg(msgEl, `שגיאה: ${err.message}`, 'error');
+    }
+  }
+
   // ─── Export full tree as Word ZIP ─────────────────────────────────────────
   function exportWordZip() {
     const fname = `word_export_${new Date().toISOString().slice(0, 10)}.zip`;
@@ -267,5 +295,5 @@ const BackupManager = (() => {
     document.body.removeChild(a);
   }
 
-  return { init, loadBackupList, exportDocx, exportZip, openHistory, runDiagnostics, bulkImportWord, exportWordZip };
+  return { init, loadBackupList, exportDocx, exportZip, openHistory, runDiagnostics, bulkImportWord, importWordZip, exportWordZip };
 })();

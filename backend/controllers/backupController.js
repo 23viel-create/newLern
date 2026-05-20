@@ -647,4 +647,70 @@ function exportWordZip() {
   return zip.toBuffer();
 }
 
-module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, syncWordFile, bulkImportWord, exportWordZip };
+// ─── Bulk Word import from a ZIP container ────────────────────────────────────
+// Accepts a ZIP buffer whose entries are .doc / .docx files (preserving folder
+// structure). Each entry is processed through the same heuristic pipeline used
+// by bulkImportWord so the caller can treat both paths identically.
+
+async function bulkImportWordFromZip(zipBuffer, targetRoot) {
+  const container = new AdmZip(zipBuffer);
+  const entries   = container.getEntries().filter(e => !e.isDirectory);
+  const results   = { imported: 0, skipped: 0, errors: [] };
+  const now       = new Date().toISOString();
+
+  for (const entry of entries) {
+    const ext = path.extname(entry.entryName).toLowerCase();
+    if (!['.doc', '.docx'].includes(ext)) { results.skipped++; continue; }
+
+    const relPath = entry.entryName.replace(/\\/g, '/');
+    const base    = targetRoot ? `${targetRoot.replace(/\/+$/, '')}/${relPath}` : relPath;
+    const parts   = base.split('/').filter(Boolean);
+    const rawFile = parts[parts.length - 1];
+    const sumName = rawFile.replace(/\.(doc|docx)$/i, '');
+    const folders = parts.slice(0, -1);
+
+    try {
+      let curRel = '';
+      for (const part of folders) {
+        curRel = curRel ? `${curRel}/${part}` : part;
+        const absDir = path.join(summariesRoot, curRel);
+        if (!fs.existsSync(absDir)) {
+          fs.mkdirSync(absDir, { recursive: true });
+          fs.writeFileSync(path.join(absDir, 'meta.json'),
+            JSON.stringify({ title: part, type: 'folder', createdAt: now, updatedAt: now }, null, 2));
+        }
+      }
+
+      const sumRel = curRel ? `${curRel}/${sumName}` : sumName;
+      const sumAbs = path.join(summariesRoot, sumRel);
+      fs.mkdirSync(sumAbs, { recursive: true });
+
+      const buf    = entry.getData();
+      const isBin  = buf[0] === 0x50 && buf[1] === 0x4B;
+      let body = '';
+      if (isBin) {
+        const innerZip = new AdmZip(buf);
+        const xmlEntry = innerZip.getEntry('word/document.xml');
+        if (xmlEntry) body = _convertDocxXmlToHtml(xmlEntry.getData().toString('utf-8'));
+      } else {
+        const isUtf16 = (buf[0] === 0xFF && buf[1] === 0xFE) ||
+                        (buf.length > 3 && buf[1] === 0x00 && buf[3] === 0x00);
+        let html = isUtf16 ? buf.toString('utf16le') : buf.toString('utf8');
+        html = html.replace(/^﻿/, '');
+        body = _extractWordHtmlBody(html);
+      }
+
+      fs.writeFileSync(path.join(sumAbs, 'meta.json'),
+        JSON.stringify({ title: sumName, type: 'summary', createdAt: now, updatedAt: now }, null, 2));
+      fs.writeFileSync(path.join(sumAbs, 'content.txt'),          body || '');
+      fs.writeFileSync(path.join(sumAbs, 'questions_open.json'), '[]');
+      fs.writeFileSync(path.join(sumAbs, 'questions_mc.json'),   '[]');
+      results.imported++;
+    } catch (err) {
+      results.errors.push({ file: relPath, error: err.message });
+    }
+  }
+  return results;
+}
+
+module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, syncWordFile, bulkImportWord, bulkImportWordFromZip, exportWordZip };

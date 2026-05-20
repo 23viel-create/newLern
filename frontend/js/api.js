@@ -202,6 +202,19 @@ const Api = {
   learningPlanOptimize: () =>
     apiFetch('/learning-plans/optimize', { method: 'POST' }),
 
+  // ── קבצי הקשר לצ'אט ──────────────────────────────────────────────────────
+  chatFilesList:   () => apiFetch('/chat/files'),
+  chatFilesUpload: (file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiFormFetch('/chat/files', fd);
+  },
+  chatFilesDelete: (name) =>
+    fetch(`${API_BASE}/chat/files/${encodeURIComponent(name)}`, { method: 'DELETE' })
+      .then(r => r.json())
+      .then(d => { if (!d.success) throw new Error(d.message); return d; }),
+  chatFilesPreviewUrl: (name) => `${API_BASE}/chat/files/${encodeURIComponent(name)}`,
+
   // ── פתקיות ───────────────────────────────────────────────────────────────
   getNotes:     (date)   => apiFetch(date ? `/notes?date=${encodeURIComponent(date)}` : '/notes'),
   saveNote:     (note)   => apiFetch('/notes', { method: 'POST', body: note }),

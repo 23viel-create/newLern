@@ -819,6 +819,13 @@
         </div>
 
         <div class="form-group">
+          <label class="form-label">ייבוא — קובץ ZIP המכיל קבצי Word</label>
+          <p class="hint">ניתן גם לייבא <code>.zip</code> שבתוכו קבצי <code>.doc</code> / <code>.docx</code>. מבנה התיקיות בתוך ה-ZIP ישוחזר אוטומטית.</p>
+          <input type="file" id="wordZipInput" accept=".zip"
+                 class="input-field" style="padding:0.3rem" />
+        </div>
+
+        <div class="form-group">
           <label class="form-label" for="wordImportTarget">תיקיית יעד בעץ הסיכומים</label>
           <input type="text" id="wordImportTarget" class="input-field" value="root"
                  placeholder="root או root/הלכה/שבת" dir="ltr" />
@@ -826,8 +833,32 @@
         </div>
 
         <div class="form-row-actions">
-          <button id="wordImportBtn" class="btn btn--primary">📥 ייבא תיקיית Word</button>
+          <button id="wordImportBtn"    class="btn btn--primary">📥 ייבא תיקיית Word</button>
+          <button id="wordZipImportBtn" class="btn btn--secondary">📦 ייבא ZIP של Word</button>
           <span id="wordImportMsg" class="save-status hidden"></span>
+        </div>
+      </div>
+
+      <!-- ניהול קבצי הקשר לצ'אט -->
+      <div class="settings-panel card">
+        <h2>📎 ניהול קבצי צ'אט (למידה פעילה)</h2>
+        <p class="hint">העלה קבצי PDF, Word, או טקסט שישמשו כהקשר לצ'אט ה-AI. הקבצים נשמרים מקומית בלבד.</p>
+
+        <div class="form-group">
+          <label class="form-label">העלאת קובץ הקשר חדש</label>
+          <div class="chat-ctx-upload-row">
+            <input type="file" id="chatContextFileInput" accept=".pdf,.txt,.doc,.docx"
+                   class="input-field" style="padding:0.3rem; flex:1" />
+            <button id="chatContextUploadBtn" class="btn btn--primary btn--sm">⬆ העלה</button>
+          </div>
+          <span id="chatContextUploadMsg" class="save-status hidden"></span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">קבצים שמורים</label>
+          <div id="chatContextList" class="chat-ctx-list">
+            <p class="placeholder-text">טוען...</p>
+          </div>
         </div>
       </div>
 

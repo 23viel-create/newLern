@@ -4,7 +4,7 @@ const router  = express.Router();
 
 const {
   buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, syncWordFile,
-  bulkImportWord, exportWordZip,
+  bulkImportWord, bulkImportWordFromZip, exportWordZip,
 } = require('../controllers/backupController');
 const {
   getSummaryContent, getSummaryHistory, restoreHistoryVersion,
@@ -137,15 +137,26 @@ router.post('/sync-word', (req, res) => {
   }
 });
 
-// POST /api/backup/import-word-bulk — import a folder of Word files
+// POST /api/backup/import-word-bulk — import a folder OR a ZIP of Word files
+// Detects a single .zip upload and extracts it via bulkImportWordFromZip;
+// otherwise processes the array of .doc/.docx files as a folder import.
+const path = require('path');
 router.post('/import-word-bulk', upload.array('files', 500), async (req, res) => {
   try {
     const files      = req.files || [];
-    const rawPaths   = req.body.paths;
-    const relPaths   = Array.isArray(rawPaths) ? rawPaths : (rawPaths ? [rawPaths] : []);
     const targetRoot = (req.body.targetRoot || '').trim().replace(/^\/+|\/+$/g, '');
     if (!files.length) return res.status(400).json({ success: false, message: 'לא נבחרו קבצים' });
-    const result = await bulkImportWord(files, relPaths, targetRoot);
+
+    // ZIP container upload: single file whose extension is .zip
+    if (files.length === 1 && path.extname(files[0].originalname).toLowerCase() === '.zip') {
+      const result = await bulkImportWordFromZip(files[0].buffer, targetRoot);
+      return res.json({ success: true, data: result });
+    }
+
+    // Folder upload: array of .doc/.docx with webkitRelativePath metadata
+    const rawPaths = req.body.paths;
+    const relPaths = Array.isArray(rawPaths) ? rawPaths : (rawPaths ? [rawPaths] : []);
+    const result   = await bulkImportWord(files, relPaths, targetRoot);
     res.json({ success: true, data: result });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

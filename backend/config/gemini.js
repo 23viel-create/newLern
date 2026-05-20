@@ -47,11 +47,13 @@ let _keyIndex = 0;
 function getNextKey() {
   const keys = getApiKeys();
   if (!keys.length) return null;
+  const now = Date.now();
   for (let attempt = 0; attempt < keys.length; attempt++) {
     const key = keys[_keyIndex % keys.length];
     _keyIndex = (_keyIndex + 1) % keys.length;
     const stats = keyStats[key] || { chars: 0, errors: 0 };
-    if (stats.errors < 3) return key;
+    const inCooldown = stats.cooldownUntil && stats.cooldownUntil > now;
+    if (!inCooldown && stats.errors < 3) return key;
   }
   return null;
 }
@@ -69,20 +71,26 @@ function recordError(key) {
 
 function recordQuotaExhausted(key) {
   if (!keyStats[key]) keyStats[key] = { chars: 0, errors: 0, lastUsed: 0 };
-  keyStats[key].errors = 99; // mark as permanently exhausted for this session
+  // Put key into 2-hour cooldown instead of permanently discarding it
+  keyStats[key].cooldownUntil = Date.now() + 2 * 60 * 60 * 1000;
   keyStats[key].quotaExhausted = true;
 }
 
 function getKeyStatus() {
   const keys = getApiKeys();
+  const now = Date.now();
   return keys.map((k, i) => {
     const stats = keyStats[k] || { chars: 0, errors: 0 };
+    const inCooldown = !!(stats.cooldownUntil && stats.cooldownUntil > now);
+    const cooldownMinutes = inCooldown ? Math.ceil((stats.cooldownUntil - now) / 60000) : 0;
     return {
       index: i + 1,
       masked: k.length > 10 ? k.slice(0, 6) + '…' + k.slice(-4) : '(קצר)',
       charsUsed: stats.chars,
       errors: stats.errors,
-      healthy: stats.errors < 3,
+      healthy: !inCooldown && stats.errors < 3,
+      inCooldown,
+      cooldownMinutes,
     };
   });
 }
