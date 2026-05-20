@@ -414,6 +414,38 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
   font-weight: 700;
 }
 
+/* ── Calendar picker row (month/year quick-jump + today) ── */
+.cal-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.6rem;
+  direction: rtl;
+}
+.cal-today-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.cal-select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.22rem 0.4rem;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 6px;
+  background: var(--color-bg, #fff);
+  color: var(--color-text, #111);
+  font-size: 0.83rem;
+  font-family: inherit;
+  cursor: pointer;
+  direction: rtl;
+  transition: border-color 0.15s;
+}
+.cal-select:focus {
+  outline: 2px solid var(--color-primary, #6366f1);
+  outline-offset: 1px;
+  border-color: var(--color-primary, #6366f1);
+}
+
 /* ===== Calendar Legend ===== */
 .cal-legend {
   display: flex;

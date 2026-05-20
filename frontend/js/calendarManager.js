@@ -449,6 +449,9 @@ const CalendarManager = (() => {
       });
     });
 
+    // Month/Year picker initialisation (must run after DOM is ready)
+    _initPickers();
+
     // Display preference toggle (עברי / לועזי)
     document.querySelectorAll('.cal-disp-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -465,6 +468,68 @@ const CalendarManager = (() => {
   function _updateDispToggle() {
     document.querySelectorAll('.cal-disp-btn').forEach(btn =>
       btn.classList.toggle('cal-disp-btn--active', btn.dataset.pref === _calDisplayPref));
+  }
+
+  // ── Month/Year quick-picker ───────────────────────────────────────────────
+
+  function _initPickers() {
+    const monthSel = document.getElementById('calMonthPicker');
+    const yearSel  = document.getElementById('calYearPicker');
+    if (!monthSel || !yearSel) return;
+
+    // Gregorian month names (Hebrew locale), index 1–12
+    MONTH_NAMES_GREG.forEach((name, i) => {
+      if (i === 0) return;
+      const opt = document.createElement('option');
+      opt.value       = i;
+      opt.textContent = name;
+      monthSel.appendChild(opt);
+    });
+
+    // Year range: today-3 … today+7, extended dynamically by _syncPickers
+    const base = new Date().getFullYear();
+    for (let y = base - 3; y <= base + 7; y++) {
+      const opt = document.createElement('option');
+      opt.value = opt.textContent = y;
+      yearSel.appendChild(opt);
+    }
+
+    // Jump on change
+    function _onPickerChange() {
+      currentMonth = +monthSel.value;
+      currentYear  = +yearSel.value;
+      selectedDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+      _monthCache  = {};
+      loadCalendar();
+    }
+    monthSel.addEventListener('change', _onPickerChange);
+    yearSel.addEventListener('change',  _onPickerChange);
+
+    _syncPickers();
+  }
+
+  /** Keep the month/year dropdowns in sync with the active view state. */
+  function _syncPickers() {
+    const monthSel = document.getElementById('calMonthPicker');
+    const yearSel  = document.getElementById('calYearPicker');
+    if (!monthSel || !yearSel) return;
+
+    monthSel.value = String(currentMonth);
+
+    // Extend year list if the user navigated outside the initial range
+    if (yearSel.options.length) {
+      while (+yearSel.options[0].value > currentYear) {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = String(+yearSel.options[0].value - 1);
+        yearSel.insertBefore(opt, yearSel.firstChild);
+      }
+      while (+yearSel.options[yearSel.options.length - 1].value < currentYear) {
+        const opt = document.createElement('option');
+        opt.value = opt.textContent = String(+yearSel.options[yearSel.options.length - 1].value + 1);
+        yearSel.appendChild(opt);
+      }
+    }
+    yearSel.value = String(currentYear);
   }
 
   // ── Month data cache ──────────────────────────────────────────────────────
@@ -491,6 +556,7 @@ const CalendarManager = (() => {
   }
 
   async function loadCalendar() {
+    _syncPickers();           // keep month/year dropdowns in sync with view state
     const grid = document.getElementById('calGrid');
     try {
       calendarData = await _getMonthData(currentYear, currentMonth);

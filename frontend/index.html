@@ -40,7 +40,11 @@
             <button id="calPrevMonth" class="btn btn--ghost btn--sm" title="חודש קודם (עבר)">❯</button>
             <span id="calMonthLabel" class="cal-month-label">טוען...</span>
             <button id="calNextMonth" class="btn btn--ghost btn--sm" title="חודש הבא (עתיד)">❮</button>
-            <button id="calTodayBtn"  class="btn btn--secondary btn--sm">היום</button>
+          </div>
+          <div class="cal-picker-row">
+            <button id="calTodayBtn" class="btn btn--secondary btn--sm cal-today-btn" title="חזור להיום">📅 היום</button>
+            <select id="calMonthPicker" class="cal-select" dir="rtl" aria-label="בחר חודש"></select>
+            <select id="calYearPicker"  class="cal-select" dir="rtl" aria-label="בחר שנה"></select>
           </div>
           <div class="cal-view-tabs">
             <button class="cal-view-btn cal-view-btn--active" data-view="monthly">חודשי</button>
