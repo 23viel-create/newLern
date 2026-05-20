@@ -4,12 +4,11 @@
   "description": "מערכת למידה פעילה — שרת מקומי + ממשק Electron",
   "main": "electron/main.js",
   "scripts": {
-    "start":     "node backend/server.js",
-    "dev":       "concurrently \"nodemon backend/server.js\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron":  "electron .",
-    "pack":      "electron-builder --dir",
-    "dist":      "electron-builder",
-    "postinstall": "electron-builder install-app-deps"
+    "start":    "node backend/server.js",
+    "dev":      "concurrently \"nodemon backend/server.js\" \"wait-on http://localhost:3000 && electron .\"",
+    "electron": "electron .",
+    "pack":     "electron-builder --dir",
+    "dist":     "electron-builder"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -23,11 +22,11 @@
     "pdf-parse":             "^2.4.5"
   },
   "devDependencies": {
-    "concurrently":   "^9.0.0",
-    "electron":       "^33.0.0",
-    "electron-builder": "^25.0.0",
-    "nodemon":        "^3.1.4",
-    "wait-on":        "^8.0.0"
+    "concurrently":    "^9.0.0",
+    "electron":        "^33.0.0",
+    "electron-builder":"^25.0.0",
+    "nodemon":         "^3.1.4",
+    "wait-on":         "^8.0.0"
   },
   "build": {
     "appId":       "com.activeLearning.app",
@@ -39,26 +38,21 @@
       "electron/**/*",
       "frontend/**/*",
       "backend/**/*",
-      "node_modules/**/*",
-      "!node_modules/.cache",
-      "!**/*.md",
-      "!**/.git"
+      "!backend/node_modules/**"
     ],
     "extraResources": [
       {
-        "from": "data",
-        "to":   "data",
-        "filter": ["**/*"]
+        "from":   "data",
+        "to":     "data",
+        "filter": ["**/*", "!backups/**", "!books/**"]
       }
     ],
     "win": {
-      "target": "nsis",
-      "icon":   "electron/assets/icon.ico"
+      "target": "nsis"
     },
     "nsis": {
-      "oneClick":           false,
-      "allowToChangeInstallationDirectory": true,
-      "installerLanguages": ["he", "en"]
+      "oneClick":                          false,
+      "allowToChangeInstallationDirectory": true
     }
   }
 }

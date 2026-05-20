@@ -1,3 +1,12 @@
+const path = require('path');
+
+// In a packaged Electron app, APP_DATA_DIR is set by electron/main.js to a
+// writable location (app.getPath('userData')/data). In dev mode it falls back
+// to the repo's own data/ directory relative to this file.
+const DATA_BASE = process.env.APP_DATA_DIR
+  ? path.resolve(process.env.APP_DATA_DIR)
+  : path.join(__dirname, '../../data');
+
 module.exports = {
   // מגבלות קבצים
   MAX_SUMMARY_SIZE_MB: 10,
@@ -9,10 +18,10 @@ module.exports = {
   MAX_PROMPT_CHARS: 8000,
   MAX_CONTEXT_CHARS: 3000,
 
-  // ספריית הנתונים (נתיבים יחסיים מתוך backend/controllers/)
-  DATA_DIR: '../../data',
-  SUMMARIES_DIR: '../../data/summaries_tree',
-  SCHEDULE_FILE: '../../data/schedule.json',
-  AI_KEYS_FILE: '../../data/ai_keys.json',
-  ARTICLES_DIR: '../../data/articles',
+  // ספריית הנתונים — absolute paths resolved at startup
+  DATA_DIR:      DATA_BASE,
+  SUMMARIES_DIR: path.join(DATA_BASE, 'summaries_tree'),
+  SCHEDULE_FILE: path.join(DATA_BASE, 'schedule.json'),
+  AI_KEYS_FILE:  path.join(DATA_BASE, 'ai_keys.json'),
+  ARTICLES_DIR:  path.join(DATA_BASE, 'articles'),
 };
