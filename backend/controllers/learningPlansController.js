@@ -62,22 +62,42 @@ async function generateLearningPlan(req, res) {
   try {
     const {
       bookName, authorName, pace,
-      endCondition,   // 'book' | 'date'
-      targetDate,     // ISO date string (used when endCondition === 'date')
-      startDate,      // ISO date string, defaults to today
-      startingPoint,  // optional chapter/page to start from
+      endCondition,     // 'book' | 'date'
+      targetDate,       // ISO date string (used when endCondition === 'date')
+      startDate,        // ISO date string, defaults to today
+      hebrewStartDate,  // free-text Hebrew date (NLP resolved by AI)
+      startingPoint,    // optional chapter/page to start from
       skipShabbat,
       skipHolidays,
+      isCustomBook,     // boolean — custom book with explicit bounds
+      unitType,         // 'עמודים' | 'פרקים' | 'דפים'
+      startUnit,        // number — first unit to study
+      endUnit,          // number — last unit to study
     } = req.body;
 
     if (!bookName || !pace) {
       return res.status(400).json({ success: false, message: 'שם הספר וקצב ההתקדמות נדרשים' });
     }
+    if (isCustomBook && (!startUnit || !endUnit)) {
+      return res.status(400).json({ success: false, message: 'חובה להזין יחידת התחלה וסיום עבור ספר מותאם אישית' });
+    }
 
-    const safeBook   = String(bookName).slice(0, 120);
-    const safeAuthor = String(authorName || '').slice(0, 80);
-    const safePace   = String(pace).slice(0, 120);
-    const safePoint  = startingPoint ? String(startingPoint).slice(0, 120).trim() : '';
+    const safeBook    = String(bookName).slice(0, 120);
+    const safeAuthor  = String(authorName || '').slice(0, 80);
+    const safePace    = String(pace).slice(0, 120);
+    const safePoint   = startingPoint ? String(startingPoint).slice(0, 120).trim() : '';
+    const safeHebDate = hebrewStartDate ? String(hebrewStartDate).slice(0, 80).trim() : '';
+
+    // ── Current date anchor (injected into prompt as ground truth) ───────────
+    const todayIso  = new Date().toISOString().slice(0, 10);
+    const todayHeb  = (() => {
+      try {
+        const [y, m, d] = todayIso.split('-').map(Number);
+        const h = gregorianToHebrew(y, m, d);
+        const monthName = HEBREW_MONTH_NAMES[h.month] || `חודש ${h.month}`;
+        return `${h.day} ב${monthName} ${h.year}`;
+      } catch { return ''; }
+    })();
 
     // ── Step 1: AI generates syllabus array ──────────────────────────────────
     const endNote = endCondition === 'date' && targetDate
@@ -85,28 +105,43 @@ async function generateLearningPlan(req, res) {
       : 'עד סוף הספר (הפק רשימה שלמה)';
 
     const startNote = safePoint && safePoint !== 'מההתחלה'
-      ? `\nנקודת התחלה: ${safePoint} — הפריט הראשון במערך חייב להתחיל מנקודה זו בדיוק.`
+      ? `\nנקודת התחלה בספר: ${safePoint} — הפריט הראשון חייב להתחיל מנקודה זו בדיוק.`
+      : '';
+
+    const hebDateNote = safeHebDate
+      ? `\n\n## תאריך התחלה עברי (NLP)\nהמשתמש ציין תאריך התחלה עברי בטקסט חופשי: "${safeHebDate}".\nהשתמש בעוגן התאריך הנוכחי לעיל כדי לפרש את התאריך העברי הזה לתאריך לועזי מדויק, והחזר אותו בשדה "resolvedStartDate" (ISO YYYY-MM-DD) ב-JSON שלך.\nאם אינך מצליח לפרש, השתמש בתאריך הנוכחי.`
+      : '';
+
+    const boundsNote = (startUnit && endUnit)
+      ? `\n\n## הגבלת יחידות\nסוג יחידה: ${unitType || 'יחידות'}.\nהמשתמש הגדיר טווח מחייב: מ-${unitType || 'יחידה'} ${startUnit} עד ${unitType || 'יחידה'} ${endUnit}.\nחובה להגביל את כל פריטי הלימוד בדיוק לטווח זה. אל תכלול יחידות מחוץ לטווח [${startUnit}–${endUnit}].`
       : '';
 
     const prompt = `אתה מומחה בתכנון לימוד של ספרות תורנית ואקדמית.
-המשתמש מבקש לתכנן לימוד של הספר: "${safeBook}"${safeAuthor ? ` (מאת ${safeAuthor})` : ''}.
-קצב ההתקדמות: "${safePace}" לכל יום לימוד.
-תנאי סיום: ${endNote}.${startNote}
 
-המשימה שלך:
-1. נתח את מבנה הספר (פרקים, דפים, הלכות, חלקים — לפי מה שמתאים לספר זה).
-2. חלק את הספר לפי קצב ההתקדמות המבוקש.
+## עוגן תאריך נוכחי
+תאריך מערכת היום (לועזי): ${todayIso}${todayHeb ? `\nתאריך עברי מקביל: ${todayHeb}` : ''}.
+השתמש בעוגן זה כתאריך ייחוס מוחלט לכל חישובי תאריך.
+
+## בקשת המשתמש
+ספר: "${safeBook}"${safeAuthor ? ` (מאת ${safeAuthor})` : ''}.
+קצב התקדמות: "${safePace}" לכל יום לימוד.
+תנאי סיום: ${endNote}.${startNote}${hebDateNote}${boundsNote}
+
+## משימה
+1. נתח את מבנה הספר (פרקים, דפים, הלכות, חלקים — לפי מה שמתאים).
+2. חלק לפי הקצב המבוקש${startUnit && endUnit ? ` בתוך הטווח [${startUnit}–${endUnit}] בלבד` : ''}.
 3. הפק מערך JSON של פריטי לימוד יומיים.
 
-פורמט הפלט — JSON בלבד, ללא שום טקסט אחר:
+## פורמט פלט — JSON בלבד, ללא טקסט נוסף:
 [{"title":"שם הפריט הספציפי לקריאה"}, ...]
+${safeHebDate ? '\nאם פירשת תאריך עברי, הוסף לאובייקט הראשון: {"title":"...","resolvedStartDate":"YYYY-MM-DD"}' : ''}
 
-דוגמאות:
+## דוגמאות
 • גמרא יומא: [{"title":"יומא דף ב׳ א׳–ב׳"}, {"title":"יומא דף ג׳ א׳–ב׳"}]
 • משנה תורה, הלכות דעות: [{"title":"הלכות דעות פרק א׳"}, {"title":"הלכות דעות פרק ב׳"}]
 • ספר כללי: [{"title":"פרק 1: שם הפרק"}, {"title":"פרק 2: שם הפרק"}]
 
-חשוב: כתוב כותרות ספציפיות ומפורטות. הגבל ל-365 פריטים לכל היותר.
+חשוב: כותרות ספציפיות ומפורטות. הגבל ל-365 פריטים לכל היותר.
 ענה ב-JSON בלבד.`;
 
     const raw = await _callGemini(prompt);

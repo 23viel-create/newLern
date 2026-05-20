@@ -470,6 +470,44 @@
                    placeholder="לדוגמה: גמרא יומא, משנה תורה הלכות דעות, מסילת ישרים..." dir="rtl" />
           </div>
 
+          <!-- ספר מותאם אישית -->
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="syllabusCustomBook" />
+              ספר מותאם אישית (הגדרת גבולות מדויקים)
+            </label>
+          </div>
+
+          <!-- סוג יחידה — מוצג רק עבור ספר מותאם אישית -->
+          <div id="syllabusCustomSection" class="hidden">
+            <div class="form-group">
+              <label class="form-label" for="syllabusUnitType">סוג יחידה</label>
+              <select id="syllabusUnitType" class="input-field input-field--full cal-select" dir="rtl">
+                <option value="עמודים">עמודים</option>
+                <option value="פרקים">פרקים</option>
+                <option value="דפים">דפים</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- טווח יחידות — אופציונלי לספר רגיל, חובה לספר מותאם -->
+          <div id="syllabusUnitRangeSection">
+            <div class="syllabus-unit-row">
+              <div class="form-group">
+                <label class="form-label" for="syllabusStartUnit">יחידה התחלה <span id="syllabusUnitReqBadge" class="hidden" style="color:var(--color-danger)">*</span></label>
+                <input type="number" id="syllabusStartUnit" class="input-field" min="1" placeholder="1" dir="rtl" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="syllabusEndUnit">יחידה סיום <span class="hidden" id="syllabusUnitReqBadge2" style="color:var(--color-danger)">*</span></label>
+                <input type="number" id="syllabusEndUnit" class="input-field" min="1" placeholder="100" dir="rtl" />
+              </div>
+            </div>
+            <p id="syllabusUnitRequiredHint" class="hint hidden" style="color:var(--color-danger);font-size:0.78rem">
+              ⚠️ חובה להזין יחידת התחלה וסיום עבור ספר זה
+            </p>
+            <p class="hint" style="font-size:0.78rem">לדוגמה: עמוד 1 עד עמוד 120 — ה-AI יוגבל לטווח זה בלבד</p>
+          </div>
+
           <div class="form-group">
             <label class="form-label" for="syllabusAuthor">שם המחבר (אופציונלי)</label>
             <input type="text" id="syllabusAuthor" class="input-field input-field--full"
@@ -490,8 +528,15 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="syllabusStartDate">תאריך התחלה</label>
+            <label class="form-label" for="syllabusStartDate">תאריך התחלה (לועזי)</label>
             <input type="date" id="syllabusStartDate" class="input-field" />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="syllabusHebrewDate">תאריך התחלה עברי (טקסט חופשי)</label>
+            <input type="text" id="syllabusHebrewDate" class="input-field input-field--full"
+                   placeholder="לדוגמה: א׳ בניסן, י׳ בתשרי תשפ״ז, ראש השנה..." dir="rtl" />
+            <p class="hint" style="font-size:0.78rem">השאר ריק לשימוש בתאריך הלועזי — ה-AI יפרש את התאריך העברי באופן אוטומטי</p>
           </div>
 
           <div class="form-group">

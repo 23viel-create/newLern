@@ -76,7 +76,7 @@ const ActiveChatManager = (() => {
 
   // ── Syllabus form ─────────────────────────────────────────────────────────
   function _bindSyllabusForm() {
-    // Set today as default start date
+    // Default start date to today
     const startEl = document.getElementById('syllabusStartDate');
     if (startEl && !startEl.value) {
       startEl.value = new Date().toISOString().slice(0, 10);
@@ -90,24 +90,48 @@ const ActiveChatManager = (() => {
       });
     });
 
+    // Custom-book checkbox: reveal unit-type select + mark fields required
+    document.getElementById('syllabusCustomBook')?.addEventListener('change', (e) => {
+      const isCustom = e.target.checked;
+      document.getElementById('syllabusCustomSection')?.classList.toggle('hidden', !isCustom);
+      document.getElementById('syllabusUnitReqBadge')?.classList.toggle('hidden', !isCustom);
+      document.getElementById('syllabusUnitReqBadge2')?.classList.toggle('hidden', !isCustom);
+      document.getElementById('syllabusUnitRequiredHint')?.classList.add('hidden');
+    });
+
     // Generate button
     document.getElementById('syllabusGenerateBtn')?.addEventListener('click', _generateSyllabus);
   }
 
   async function _generateSyllabus() {
-    const bookName      = document.getElementById('syllabusBook')?.value.trim();
-    const authorName    = document.getElementById('syllabusAuthor')?.value.trim() || '';
-    const pace          = document.getElementById('syllabusPace')?.value.trim();
-    const startDate     = document.getElementById('syllabusStartDate')?.value || '';
-    const startingPoint = document.getElementById('syllabusStartingPoint')?.value.trim() || '';
-    const endCond       = document.querySelector('input[name="syllabusEnd"]:checked')?.value || 'book';
-    const targetDate    = document.getElementById('syllabusTargetDate')?.value || '';
-    const skipShabbat   = document.getElementById('syllabusSkipShabbat')?.checked ?? true;
-    const skipHolidays  = document.getElementById('syllabusSkipHolidays')?.checked ?? true;
+    const bookName        = document.getElementById('syllabusBook')?.value.trim();
+    const authorName      = document.getElementById('syllabusAuthor')?.value.trim() || '';
+    const pace            = document.getElementById('syllabusPace')?.value.trim();
+    const startDate       = document.getElementById('syllabusStartDate')?.value || '';
+    const hebrewStartDate = document.getElementById('syllabusHebrewDate')?.value.trim() || '';
+    const startingPoint   = document.getElementById('syllabusStartingPoint')?.value.trim() || '';
+    const endCond         = document.querySelector('input[name="syllabusEnd"]:checked')?.value || 'book';
+    const targetDate      = document.getElementById('syllabusTargetDate')?.value || '';
+    const skipShabbat     = document.getElementById('syllabusSkipShabbat')?.checked ?? true;
+    const skipHolidays    = document.getElementById('syllabusSkipHolidays')?.checked ?? true;
+    const isCustomBook    = document.getElementById('syllabusCustomBook')?.checked ?? false;
+    const unitType        = document.getElementById('syllabusUnitType')?.value || 'עמודים';
+    const startUnitRaw    = document.getElementById('syllabusStartUnit')?.value;
+    const endUnitRaw      = document.getElementById('syllabusEndUnit')?.value;
+    const startUnit       = startUnitRaw ? Number(startUnitRaw) : undefined;
+    const endUnit         = endUnitRaw   ? Number(endUnitRaw)   : undefined;
 
+    // ── Validation ──────────────────────────────────────────────────────────
     if (!bookName) { alert('יש להזין שם ספר'); return; }
     if (!pace)     { alert('יש להזין קצב התקדמות'); return; }
     if (endCond === 'date' && !targetDate) { alert('יש להזין תאריך יעד'); return; }
+
+    if (isCustomBook && (!startUnit || !endUnit)) {
+      document.getElementById('syllabusUnitRequiredHint')?.classList.remove('hidden');
+      document.getElementById('syllabusStartUnit')?.focus();
+      return;
+    }
+    document.getElementById('syllabusUnitRequiredHint')?.classList.add('hidden');
 
     const btn    = document.getElementById('syllabusGenerateBtn');
     const status = document.getElementById('syllabusStatus');
@@ -121,8 +145,15 @@ const ActiveChatManager = (() => {
     try {
       const res = await Api.learningPlanGenerate({
         bookName, authorName, pace, endCondition: endCond,
-        targetDate: endCond === 'date' ? targetDate : undefined,
-        startDate, startingPoint: startingPoint || undefined, skipShabbat, skipHolidays,
+        targetDate:       endCond === 'date' ? targetDate : undefined,
+        startDate,
+        hebrewStartDate:  hebrewStartDate || undefined,
+        startingPoint:    startingPoint   || undefined,
+        skipShabbat, skipHolidays,
+        isCustomBook,
+        unitType:   isCustomBook ? unitType : undefined,
+        startUnit,
+        endUnit,
       });
 
       const { count, firstDate, lastDate, tasks } = res;
