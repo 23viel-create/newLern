@@ -1,6 +1,8 @@
 // ─── מנהל מסך למידה פעילה עצמאי ─────────────────────────────────────────────
 const ActiveChatManager = (() => {
-  let _bound = false;
+  let _bound       = false;
+  let _currentPaths = [];   // cache for inline onclick lookups
+  let _pendingEdit  = null;  // { id, pace } while backlog modal is open
 
   // ── Markdown renderer ──────────────────────────────────────────────────────
   function _mdToHtml(text) {
@@ -91,21 +93,27 @@ const ActiveChatManager = (() => {
   }
 
   function _renderStudyPaths(paths) {
+    _currentPaths = paths || [];
     const list = document.getElementById('studyPathsList');
     if (!list) return;
     _hideEditPanel();
-    if (!paths || !paths.length) {
+    if (!_currentPaths.length) {
       list.innerHTML = '<p class="hint study-paths-empty">אין מסלולי למידה פעילים. צור מסלול חדש בכרטיסייה "גנרטור".</p>';
       return;
     }
-    list.innerHTML = paths.map(p => {
+    list.innerHTML = _currentPaths.map(p => {
       const total     = p.totalCount || p.taskCount || 0;
       const completed = p.completedCount || 0;
+      const backlog   = p.backlogCount  || 0;
       const pct       = total ? Math.round((completed / total) * 100) : 0;
       const unitInfo  = p.isCustomBook && p.unitType
         ? ` | ${p.unitType} ${p.startUnit}–${p.endUnit}` : '';
       const dateRange = p.startDate && p.endDate
         ? `${p.startDate} עד ${p.endDate}` : '';
+      const backlogBadge = backlog > 0
+        ? `<span class="study-path-item__backlog-badge">⚠️ ${backlog} ימים בפיגור</span>` : '';
+      const paceSafe    = escHtml(p.pace).replace(/'/g, "\\'");
+      const bookSafe    = escHtml(p.bookName).replace(/'/g, "\\'");
       return `
         <div class="study-path-item" data-pathid="${escHtml(p.id)}">
           <div class="study-path-item__header">
@@ -114,8 +122,8 @@ const ActiveChatManager = (() => {
               <div class="study-path-item__subtitle">קצב: ${escHtml(p.pace)}${unitInfo}</div>
             </div>
             <div class="study-path-item__actions">
-              <button class="btn btn--ghost btn--sm" onclick="ActiveChatManager._editPath('${escHtml(p.id)}','${escHtml(p.pace).replace(/'/g, "\\'")}')">✏️ ערוך</button>
-              <button class="btn btn--ghost btn--sm" style="color:var(--color-danger)" onclick="ActiveChatManager._deletePath('${escHtml(p.id)}','${escHtml(p.bookName).replace(/'/g, "\\'")}')">🗑️ מחק</button>
+              <button class="btn btn--ghost btn--sm" onclick="ActiveChatManager._editPath('${escHtml(p.id)}','${paceSafe}')">✏️ ערוך</button>
+              <button class="btn btn--ghost btn--sm" style="color:var(--color-danger)" onclick="ActiveChatManager._deletePath('${escHtml(p.id)}','${bookSafe}')">🗑️ מחק</button>
             </div>
           </div>
           <div class="study-path-item__meta">
@@ -123,7 +131,7 @@ const ActiveChatManager = (() => {
             <span>📋 סה"כ ${total} ימי לימוד</span>
             ${p.isCustomBook ? '<span>📌 ספר מותאם אישית</span>' : ''}
           </div>
-          <div class="study-path-item__progress">${completed} / ${total} ימים הושלמו (${pct}%)</div>
+          <div class="study-path-item__progress">${completed} / ${total} ימים הושלמו (${pct}%)${backlogBadge}</div>
         </div>`;
     }).join('');
   }
@@ -138,13 +146,87 @@ const ActiveChatManager = (() => {
     }
   }
 
+  // ── Edit path: detect backlog first ──────────────────────────────────────
+
   function _editPath(id, currentPace) {
+    const pathData = _currentPaths.find(p => p.id === id);
+
+    if (pathData && (pathData.backlogCount || 0) > 0) {
+      _showBacklogModal(pathData);
+    } else {
+      _showEditPanel(id, currentPace, null);
+    }
+  }
+
+  // ── Backlog Resolution Modal ──────────────────────────────────────────────
+
+  function _showBacklogModal(pathData) {
+    _pendingEdit = { id: pathData.id, pace: pathData.pace };
+
+    const modal = document.getElementById('backlogModal');
+    if (!modal) return;
+
+    const backlog  = pathData.backlogCount || 0;
+    const units    = pathData.backlogUnits || backlog;
+    const unitLbl  = pathData.isCustomBook && pathData.unitType
+      ? `(${units} ${pathData.unitType})`
+      : '';
+
+    const desc = document.getElementById('backlogModalDesc');
+    if (desc) {
+      desc.innerHTML = `נמצאו <strong>${backlog} יום</strong> שלא הושלמו ${unitLbl} עד היום בספר <strong>${escHtml(pathData.bookName)}</strong>.<br>בחר כיצד לטפל בפיגור:`;
+    }
+
+    // Reset radio and error
+    document.querySelectorAll('input[name="backlogMode"]').forEach(r => { r.checked = false; });
+    document.querySelectorAll('.backlog-option').forEach(el => el.classList.remove('backlog-option--selected'));
+    document.getElementById('backlogModalError')?.classList.add('hidden');
+
+    modal.classList.remove('hidden');
+  }
+
+  function _hideBacklogModal() {
+    document.getElementById('backlogModal')?.classList.add('hidden');
+    _pendingEdit = null;
+  }
+
+  function _onBacklogContinue() {
+    const selected = document.querySelector('input[name="backlogMode"]:checked');
+    if (!selected) {
+      document.getElementById('backlogModalError')?.classList.remove('hidden');
+      return;
+    }
+    const mode = selected.value; // 'compress' | 'extend' | 'independent'
+    const { id, pace } = _pendingEdit;
+    _hideBacklogModal();
+    _showEditPanel(id, pace, mode);
+  }
+
+  // ── Edit Panel ────────────────────────────────────────────────────────────
+
+  function _showEditPanel(id, currentPace, resolutionMode) {
     const panel = document.getElementById('studyPathEditPanel');
     if (!panel) return;
-    document.getElementById('editPathId').value   = id;
-    document.getElementById('editPathPace').value  = currentPace || '';
+
+    document.getElementById('editPathId').value          = id;
+    document.getElementById('editPathPace').value        = currentPace || '';
+    document.getElementById('editResolutionMode').value  = resolutionMode || '';
     document.getElementById('editPanelToday').textContent = new Date().toISOString().slice(0, 10);
     document.getElementById('editPathStatus')?.classList.add('hidden');
+
+    // Update warning text to reflect resolution mode if applicable
+    const warningEl = panel.querySelector('.path-edit-warning');
+    if (warningEl) {
+      const modeLabel = {
+        compress:    '🗜️ דחיסה אל תוך התוכנית (פיגור יכוסס)',
+        extend:      '📅 הארכת תאריך הסיום (שמירת קצב)',
+        independent: '🏃 השלמה עצמאית (פיגור מדולג)',
+      }[resolutionMode] || null;
+
+      warningEl.innerHTML = `⚠️ <strong>שים לב:</strong> עריכת המסלול תשפיע רק מתאריך העריכה (<span id="editPanelToday">${new Date().toISOString().slice(0, 10)}</span>) והלאה, ולא תשנה היסטוריית למידה שכבר בוצעה.`
+        + (modeLabel ? `<br><strong>אסטרטגיה:</strong> ${modeLabel}` : '');
+    }
+
     panel.classList.remove('hidden');
     panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -154,10 +236,11 @@ const ActiveChatManager = (() => {
   }
 
   async function _submitEdit() {
-    const id   = document.getElementById('editPathId')?.value;
-    const pace = document.getElementById('editPathPace')?.value.trim();
-    const skipShabbat  = document.getElementById('editPathSkipShabbat')?.checked ?? true;
-    const skipHolidays = document.getElementById('editPathSkipHolidays')?.checked ?? true;
+    const id             = document.getElementById('editPathId')?.value;
+    const pace           = document.getElementById('editPathPace')?.value.trim();
+    const resolutionMode = document.getElementById('editResolutionMode')?.value || undefined;
+    const skipShabbat    = document.getElementById('editPathSkipShabbat')?.checked ?? true;
+    const skipHolidays   = document.getElementById('editPathSkipHolidays')?.checked ?? true;
     if (!id) return;
 
     const btn    = document.getElementById('editPathConfirmBtn');
@@ -168,12 +251,19 @@ const ActiveChatManager = (() => {
     status.classList.remove('hidden');
 
     try {
-      const res = await Api.editStudyPath(id, { pace: pace || undefined, skipShabbat, skipHolidays });
+      const res = await Api.editStudyPath(id, {
+        pace: pace || undefined,
+        skipShabbat,
+        skipHolidays,
+        resolutionMode: resolutionMode || undefined,
+      });
       status.textContent = `✓ ${res.count} משימות חדשות נוצרו מהיום`;
       status.className   = 'save-status save-status--saved';
       setTimeout(async () => {
         _hideEditPanel();
         await _loadStudyPaths();
+        // Trigger calendar refresh if function exists
+        if (typeof loadCalendar === 'function') loadCalendar();
       }, 1800);
     } catch (err) {
       status.textContent = `שגיאה: ${err.message}`;
@@ -185,13 +275,11 @@ const ActiveChatManager = (() => {
 
   // ── Syllabus form ─────────────────────────────────────────────────────────
   function _bindSyllabusForm() {
-    // Default start date to today
     const startEl = document.getElementById('syllabusStartDate');
     if (startEl && !startEl.value) {
       startEl.value = new Date().toISOString().slice(0, 10);
     }
 
-    // Toggle target date picker
     document.querySelectorAll('input[name="syllabusEnd"]').forEach(r => {
       r.addEventListener('change', () => {
         const showDate = document.querySelector('input[name="syllabusEnd"]:checked')?.value === 'date';
@@ -199,7 +287,6 @@ const ActiveChatManager = (() => {
       });
     });
 
-    // Custom-book checkbox: reveal unit-type select + mark fields required
     document.getElementById('syllabusCustomBook')?.addEventListener('change', (e) => {
       const isCustom = e.target.checked;
       document.getElementById('syllabusCustomSection')?.classList.toggle('hidden', !isCustom);
@@ -208,7 +295,6 @@ const ActiveChatManager = (() => {
       document.getElementById('syllabusUnitRequiredHint')?.classList.add('hidden');
     });
 
-    // Generate button
     document.getElementById('syllabusGenerateBtn')?.addEventListener('click', _generateSyllabus);
   }
 
@@ -230,7 +316,6 @@ const ActiveChatManager = (() => {
     const startUnit       = startUnitRaw ? Number(startUnitRaw) : undefined;
     const endUnit         = endUnitRaw   ? Number(endUnitRaw)   : undefined;
 
-    // ── Validation ──────────────────────────────────────────────────────────
     if (!bookName) { alert('יש להזין שם ספר'); return; }
     if (!pace)     { alert('יש להזין קצב התקדמות'); return; }
     if (endCond === 'date' && !targetDate) { alert('יש להזין תאריך יעד'); return; }
@@ -266,8 +351,6 @@ const ActiveChatManager = (() => {
       });
 
       const { count, firstDate, lastDate, tasks } = res;
-
-      // Build preview
       const previewItems = tasks.slice(0, 7)
         .map(t => `<div class="syllabus-day"><span class="badge" style="background:#e0e7ff;color:#4f46e5;margin-left:0.4rem">${t.dueDate}</span>${escHtml(t.title)}</div>`)
         .join('');
@@ -321,14 +404,34 @@ const ActiveChatManager = (() => {
   function init() {
     if (_bound) return;
     _bound = true;
+
     document.getElementById('acChatSendBtn')?.addEventListener('click', _send);
     document.getElementById('acChatInput')?.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') _send();
     });
     document.getElementById('acLearningProgramBtn')?.addEventListener('click', _generateProgram);
     document.getElementById('optimizeBtn')?.addEventListener('click', _runOptimize);
+
+    // Edit panel
     document.getElementById('editPathConfirmBtn')?.addEventListener('click', _submitEdit);
     document.getElementById('editPathCancelBtn')?.addEventListener('click', _hideEditPanel);
+
+    // Backlog modal
+    document.getElementById('backlogModalContinue')?.addEventListener('click', _onBacklogContinue);
+    document.getElementById('backlogModalCancel')?.addEventListener('click', _hideBacklogModal);
+    document.getElementById('backlogModal')?.querySelector('.modal__overlay')
+      ?.addEventListener('click', _hideBacklogModal);
+
+    // Highlight selected option card
+    document.querySelectorAll('input[name="backlogMode"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        document.querySelectorAll('.backlog-option').forEach(el =>
+          el.classList.remove('backlog-option--selected'));
+        radio.closest('.backlog-option')?.classList.add('backlog-option--selected');
+        document.getElementById('backlogModalError')?.classList.add('hidden');
+      });
+    });
+
     _bindTabs();
     _bindSyllabusForm();
   }

@@ -119,12 +119,45 @@ function _validateSchedule(syllabusItems, startUnit, endUnit, isCustomBook) {
   return { valid: true };
 }
 
+// ── Resolution block builder ──────────────────────────────────────────────────
+
+function _buildResolutionBlock({
+  resolutionMode, totalRemainingUnits, effStartUnit, effEndUnit,
+  originalEndDate, safePace, unitType, today,
+}) {
+  if (!resolutionMode || resolutionMode === 'standard') return '';
+  const unitLabel = unitType || 'פריטים';
+
+  switch (resolutionMode) {
+    case 'compress':
+      return `\n\n## ⚠️ אסטרטגיית פיצוי — דחיסה אל תוך התוכנית
+המשתמש נמצא מאחור בלמידה. יש לתזמן את כל ${totalRemainingUnits} ה-${unitLabel} הנותרות (כולל הפיגור) בין היום (${today}) לבין תאריך הסיום המקורי ${originalEndDate}.
+חלק את כל היחידות שנותרו באופן שווה ככל האפשר — העמס היומי יגדל בהתאם.
+חל איסור מוחלט להציע ימים שמעבר לתאריך ${originalEndDate}.`;
+
+    case 'extend':
+      return `\n\n## ⚠️ אסטרטגיית פיצוי — הארכת תאריך הסיום
+המשתמש נמצא מאחור בלמידה. יש לתזמן את כל ${totalRemainingUnits} ה-${unitLabel} הנותרות (כולל הפיגור).
+שמור על קצב ממוצע של "${safePace}" ליום תוך הרחבת תאריך הסיום כפי שנדרש — אין הגבלת תאריך.
+תן עדיפות לשמירת הקצב המקורי על פני שמירת תאריך הסיום.`;
+
+    case 'independent':
+      return `\n\n## ⚠️ אסטרטגיית פיצוי — השלמה עצמאית
+המשתמש יטפל בפיגור בעצמו מחוץ לתוכנית הרשמית. התחל את התזמון ממש מ-${unitLabel} ${effStartUnit} עד ${unitLabel} ${effEndUnit}.
+אל תכלול את יחידות הפיגור — התמקד אך ורק ב-${totalRemainingUnits} היחידות הנותרות מהנקודה הנוכחית (${unitLabel} ${effStartUnit}).`;
+
+    default:
+      return '';
+  }
+}
+
 // ── Prompt builder ────────────────────────────────────────────────────────────
 
 function _buildGeneratePrompt({
   safeBook, safeAuthor, safePace, safePoint, safeHebDate,
   todayIso, todayHeb, endNote,
   isCustomBook, unitType, startUnit, endUnit,
+  resolutionBlock = '',
 }) {
   const startNote = safePoint && safePoint !== 'מההתחלה'
     ? `\nנקודת התחלה בספר: ${safePoint} — הפריט הראשון חייב להתחיל מנקודה זו בדיוק.`
@@ -138,7 +171,7 @@ function _buildGeneratePrompt({
     ? `\n\n## הגבלת יחידות\nסוג יחידה: ${unitType || 'יחידות'}.\nהמשתמש הגדיר טווח מחייב: מ-${unitType || 'יחידה'} ${startUnit} עד ${unitType || 'יחידה'} ${endUnit}.\nחובה להגביל את כל פריטי הלימוד בדיוק לטווח זה. אל תכלול יחידות מחוץ לטווח [${startUnit}–${endUnit}].`
     : '';
 
-  const customBookBlock = isCustomBook
+  const customBookBlock = (isCustomBook && !resolutionBlock)
     ? `\n\n## ⚠️ הוראה קריטית — ספר לא ידוע / מותאם אישית
 הספר שצוין הוא ספר לא ידוע או מותאם אישית שאין לך עליו ידע חיצוני.
 **חל איסור מוחלט** להשתמש בידע קיים על תוכן הספר, שמות פרקיו, נושאיו, או כל מידע שמקורו מחוץ לפרמטרים שסופקו.
@@ -168,7 +201,7 @@ function _buildGeneratePrompt({
 ## בקשת המשתמש
 ספר: "${safeBook}"${safeAuthor ? ` (מאת ${safeAuthor})` : ''}.
 קצב התקדמות: "${safePace}" לכל יום לימוד.
-תנאי סיום: ${endNote}.${startNote}${hebDateNote}${boundsNote}${customBookBlock}
+תנאי סיום: ${endNote}.${startNote}${hebDateNote}${boundsNote}${customBookBlock}${resolutionBlock}
 
 ## משימה
 1. נתח את מבנה הספר (פרקים, דפים, הלכות, חלקים — לפי מה שמתאים).
@@ -442,13 +475,46 @@ async function getStudyPaths(req, res) {
   try {
     const data     = readStudyPaths();
     const schedule = readSchedule();
+    const today    = new Date().toISOString().slice(0, 10);
     const taskMap  = {};
     for (const t of schedule.tasks) taskMap[t.id] = t;
 
     const enriched = data.paths.map(p => {
-      const ids       = p.taskIds || [];
-      const completed = ids.filter(id => taskMap[id]?.completed).length;
-      return { ...p, completedCount: completed, totalCount: ids.length };
+      const ids = p.taskIds || [];
+
+      const completed  = ids.filter(id => taskMap[id]?.completed).length;
+      const backlogIds = ids.filter(id => {
+        const t = taskMap[id];
+        return t && !t.completed && t.dueDate < today;
+      });
+      const futureIds = ids.filter(id => {
+        const t = taskMap[id];
+        return t && !t.completed && t.dueDate >= today;
+      });
+
+      // Sum backlog units (for custom books) or count tasks
+      const backlogUnits = backlogIds.reduce((sum, id) => {
+        const t = taskMap[id];
+        return t?.unitStart != null && t?.unitEnd != null
+          ? sum + (t.unitEnd - t.unitStart + 1)
+          : sum + 1;
+      }, 0);
+      const futureUnits = futureIds.reduce((sum, id) => {
+        const t = taskMap[id];
+        return t?.unitStart != null && t?.unitEnd != null
+          ? sum + (t.unitEnd - t.unitStart + 1)
+          : sum + 1;
+      }, 0);
+
+      return {
+        ...p,
+        completedCount: completed,
+        totalCount:     ids.length,
+        backlogCount:   backlogIds.length,
+        backlogUnits,
+        futureCount:    futureIds.length,
+        futureUnits,
+      };
     });
 
     res.json({ success: true, data: enriched });
@@ -483,7 +549,8 @@ async function deleteStudyPath(req, res) {
 async function editStudyPath(req, res) {
   try {
     const { id } = req.params;
-    const { pace, skipShabbat, skipHolidays } = req.body;
+    const { pace, skipShabbat, skipHolidays, resolutionMode } = req.body;
+    // resolutionMode: 'compress' | 'extend' | 'independent' | undefined
 
     const data       = readStudyPaths();
     const pathRecord = data.paths.find(p => p.id === id);
@@ -493,42 +560,81 @@ async function editStudyPath(req, res) {
     const schedule  = readSchedule();
     const taskIdSet = new Set(pathRecord.taskIds || []);
 
-    const completedTasks = schedule.tasks.filter(
-      t => taskIdSet.has(t.id) && (t.completed || t.dueDate < today)
-    );
-    const futureTasks = schedule.tasks.filter(
-      t => taskIdSet.has(t.id) && !t.completed && t.dueDate >= today
-    );
+    const completedTasks = schedule.tasks.filter(t => taskIdSet.has(t.id) && t.completed);
+    const backlogTasks   = schedule.tasks.filter(t => taskIdSet.has(t.id) && !t.completed && t.dueDate < today);
+    const futureTasks    = schedule.tasks.filter(t => taskIdSet.has(t.id) && !t.completed && t.dueDate >= today);
 
-    if (futureTasks.length === 0) {
-      return res.status(400).json({ success: false, message: 'אין משימות עתידיות לעריכה — המסלול הסתיים' });
-    }
+    const allUncompletedTasks = [...backlogTasks, ...futureTasks]
+      .sort((a, b) => (a.dueDate > b.dueDate ? 1 : -1));
 
-    // Remove future tasks from schedule in memory
-    schedule.tasks = schedule.tasks.filter(
-      t => !(taskIdSet.has(t.id) && !t.completed && t.dueDate >= today)
-    );
-
-    // For custom books: find next unit to continue from
-    let effStartUnit = pathRecord.startUnit;
-    const effEndUnit = pathRecord.endUnit;
-
-    if (pathRecord.isCustomBook && pathRecord.endUnit != null) {
-      const lastWithUnit = completedTasks
-        .filter(t => t.unitEnd != null)
-        .sort((a, b) => (a.dueDate > b.dueDate ? 1 : -1))
-        .pop();
-      effStartUnit = lastWithUnit ? Number(lastWithUnit.unitEnd) + 1 : pathRecord.startUnit;
+    if (allUncompletedTasks.length === 0) {
+      return res.status(400).json({ success: false, message: 'אין משימות לעריכה — המסלול הסתיים' });
     }
 
     const safeBook   = pathRecord.bookName;
     const safeAuthor = pathRecord.authorName || '';
     const safePace   = pace ? String(pace).slice(0, 120) : pathRecord.pace;
 
-    const lastCompletedTask = completedTasks
-      .sort((a, b) => (a.dueDate > b.dueDate ? 1 : -1))
-      .pop();
-    const safePoint = lastCompletedTask?.title || '';
+    // ── Determine effective unit range & total remaining based on mode ────────
+    let effStartUnit        = pathRecord.startUnit;
+    const effEndUnit        = pathRecord.endUnit;
+    let totalRemainingUnits = allUncompletedTasks.length; // default: task count
+
+    if (resolutionMode === 'compress' || resolutionMode === 'extend') {
+      // Include backlog: start from earliest uncompleted task
+      if (pathRecord.isCustomBook && allUncompletedTasks[0]?.unitStart != null) {
+        effStartUnit = Number(allUncompletedTasks[0].unitStart);
+      }
+      totalRemainingUnits = allUncompletedTasks.reduce((sum, t) =>
+        t.unitStart != null && t.unitEnd != null
+          ? sum + (Number(t.unitEnd) - Number(t.unitStart) + 1)
+          : sum + 1
+      , 0);
+    } else {
+      // Mode 'independent' or no mode: skip backlog, start from first future task
+      if (pathRecord.isCustomBook) {
+        const firstFuture = futureTasks.sort((a, b) => (a.dueDate > b.dueDate ? 1 : -1))[0];
+        if (firstFuture?.unitStart != null) {
+          effStartUnit = Number(firstFuture.unitStart);
+        } else {
+          const lastWithUnit = completedTasks.filter(t => t.unitEnd != null)
+            .sort((a, b) => (a.dueDate > b.dueDate ? 1 : -1)).pop();
+          effStartUnit = lastWithUnit ? Number(lastWithUnit.unitEnd) + 1 : pathRecord.startUnit;
+        }
+      }
+      totalRemainingUnits = futureTasks.reduce((sum, t) =>
+        t.unitStart != null && t.unitEnd != null
+          ? sum + (Number(t.unitEnd) - Number(t.unitStart) + 1)
+          : sum + 1
+      , 0) || futureTasks.length;
+    }
+
+    // Starting point hint for non-custom books
+    const refTasksForPoint = resolutionMode === 'compress' || resolutionMode === 'extend'
+      ? backlogTasks : futureTasks;
+    const firstRefTask = [...refTasksForPoint].sort((a, b) => (a.dueDate > b.dueDate ? 1 : -1))[0];
+    const safePoint = firstRefTask?.title || '';
+
+    // ── Remove ALL uncompleted tasks from schedule (in memory) ────────────────
+    schedule.tasks = schedule.tasks.filter(t => !(taskIdSet.has(t.id) && !t.completed));
+
+    // ── Build resolution block ────────────────────────────────────────────────
+    const resolutionBlock = _buildResolutionBlock({
+      resolutionMode, totalRemainingUnits,
+      effStartUnit, effEndUnit,
+      originalEndDate: pathRecord.endDate,
+      safePace, unitType: pathRecord.unitType, today,
+    });
+
+    // ── Build prompt end note based on mode ───────────────────────────────────
+    let promptEndNote;
+    if (resolutionMode === 'compress' && pathRecord.endDate) {
+      promptEndNote = `עד תאריך הסיום המקורי ${pathRecord.endDate} — חלק את כל היחידות הנותרות בתוך חלון זמן זה`;
+    } else if (resolutionMode === 'extend') {
+      promptEndNote = 'עד סוף הספר — הרחב את תאריך הסיום כנדרש לשמירת הקצב';
+    } else {
+      promptEndNote = 'עד סוף הספר (הפק רשימה שלמה)';
+    }
 
     const todayHeb = (() => {
       try {
@@ -542,11 +648,12 @@ async function editStudyPath(req, res) {
     const promptParams = {
       safeBook, safeAuthor, safePace, safePoint, safeHebDate: '',
       todayIso: today, todayHeb,
-      endNote: 'עד סוף הספר (הפק רשימה שלמה)',
+      endNote: promptEndNote,
       isCustomBook: pathRecord.isCustomBook,
       unitType:     pathRecord.unitType,
       startUnit:    effStartUnit,
       endUnit:      effEndUnit,
+      resolutionBlock,
     };
 
     const syllabusItems = await _generateWithRetry(
@@ -554,8 +661,8 @@ async function editStudyPath(req, res) {
     );
 
     if (!syllabusItems) {
-      // Rollback
-      schedule.tasks.push(...futureTasks);
+      // Rollback: restore all uncompleted tasks
+      schedule.tasks.push(...allUncompletedTasks);
       writeSchedule(schedule);
       return res.status(500).json({ success: false, message: 'ה-AI לא הצליח לחשב מחדש. השינויים בוטלו.' });
     }
@@ -563,8 +670,13 @@ async function editStudyPath(req, res) {
     const skipShab = skipShabbat != null ? !!skipShabbat : true;
     const skipHol  = skipHolidays != null ? !!skipHolidays : true;
 
-    const newTasks = _scheduleTasks(syllabusItems.slice(0, 365), {
-      startDate: today, endDateMs: Infinity,
+    // For mode compress: cap at original end date
+    const endDateMs = resolutionMode === 'compress' && pathRecord.endDate
+      ? new Date(pathRecord.endDate + 'T23:59:59').getTime()
+      : Infinity;
+
+    const newTasks = _scheduleTasks(syllabusItems.slice(0, 730), {
+      startDate: today, endDateMs,
       skipShabbat: skipShab, skipHolidays: skipHol,
       safeBook, safeAuthor, today,
     });
@@ -581,10 +693,11 @@ async function editStudyPath(req, res) {
     res.json({
       success: true,
       data: {
-        count:     newTasks.length,
-        firstDate: newTasks[0]?.dueDate,
-        lastDate:  newTasks.length ? newTasks[newTasks.length - 1].dueDate : null,
-        tasks:     newTasks,
+        count:          newTasks.length,
+        firstDate:      newTasks[0]?.dueDate,
+        lastDate:       newTasks.length ? newTasks[newTasks.length - 1].dueDate : null,
+        tasks:          newTasks,
+        resolutionMode: resolutionMode || 'standard',
       },
     });
   } catch (err) {

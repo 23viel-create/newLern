@@ -601,6 +601,7 @@
               ⚠️ <strong>שים לב:</strong> עריכת המסלול תשפיע רק מתאריך העריכה (<span id="editPanelToday"></span>) והלאה, ולא תשנה היסטוריית למידה שכבר בוצעה.
             </div>
             <input type="hidden" id="editPathId" />
+            <input type="hidden" id="editResolutionMode" />
             <div class="form-group" style="margin-top:0.8rem">
               <label class="form-label" for="editPathPace">קצב התקדמות חדש</label>
               <input type="text" id="editPathPace" class="input-field input-field--full"
@@ -1176,6 +1177,59 @@
     </section>
 
   </main>
+
+  <!-- ══════════════════ מודל פתרון פיגורים ══════════════════ -->
+  <div id="backlogModal" class="modal hidden"
+       role="dialog" aria-modal="true" aria-labelledby="backlogModalTitle">
+    <div class="modal__overlay"></div>
+    <div class="modal__box modal__box--wide" dir="rtl">
+      <h2 id="backlogModalTitle">⚠️ זוהה פיגור בלמידה</h2>
+      <p id="backlogModalDesc" class="hint" style="margin-bottom:1.1rem"></p>
+
+      <div class="backlog-options" role="radiogroup" aria-label="בחר אסטרטגיית פיצוי">
+
+        <label class="backlog-option" id="backlogOpt_compress">
+          <input type="radio" name="backlogMode" value="compress" />
+          <div class="backlog-option__content">
+            <div class="backlog-option__title">🗜️ דחס אל תוך התוכנית</div>
+            <div class="backlog-option__desc">
+              פרוס את <strong>כל היחידות שנותרו</strong> (כולל הפיגור) באופן שווה עד לתאריך הסיום המקורי.
+              העומס היומי יגדל, אך התוכנית תסתיים בזמן.
+            </div>
+          </div>
+        </label>
+
+        <label class="backlog-option" id="backlogOpt_extend">
+          <input type="radio" name="backlogMode" value="extend" />
+          <div class="backlog-option__content">
+            <div class="backlog-option__title">📅 הארך את תאריך הסיום</div>
+            <div class="backlog-option__desc">
+              שמור על <strong>הקצב המקורי</strong>, אך הרחב את תאריך הסיום כדי לכסות את כל יחידות הפיגור.
+              העומס היומי נשאר זהה.
+            </div>
+          </div>
+        </label>
+
+        <label class="backlog-option" id="backlogOpt_independent">
+          <input type="radio" name="backlogMode" value="independent" />
+          <div class="backlog-option__content">
+            <div class="backlog-option__title">🏃 השלמה עצמאית</div>
+            <div class="backlog-option__desc">
+              <strong>דלג על הפיגור</strong> — המסלול ימשיך מהנקודה הנוכחית הלאה.
+              יחידות הפיגור יושלמו על ידיך באופן עצמאי, מחוץ לתוכנית הרשמית.
+            </div>
+          </div>
+        </label>
+
+      </div>
+
+      <p id="backlogModalError" class="input-error hidden" style="margin-top:0.6rem">יש לבחור אסטרטגיה לפני המשך</p>
+      <div class="modal__actions" style="margin-top:1rem">
+        <button id="backlogModalContinue" class="btn btn--primary">המשך ▸</button>
+        <button id="backlogModalCancel"   class="btn btn--secondary">ביטול</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ══════════════════ מודל אישור מחיקה ══════════════════ -->
   <div id="confirmModal" class="modal hidden"
