@@ -123,24 +123,58 @@
     <!-- ── עורך סיכום (full-bleed, overrides container) ── -->
     <section id="view-editor" class="view hidden editor-view">
 
-      <!-- כותרת עם ניווט -->
+      <!-- כותרת עם ניווט (2 שורות) -->
       <div class="editor-header">
-        <button id="editorBackBtn" class="btn btn--secondary btn--sm">← חזרה</button>
-        <div class="editor-nav">
-          <button id="editorPrevBtn" class="btn btn--ghost btn--sm" title="סיכום קודם (Alt+←)">הקודם ❯</button>
-          <h2 id="editorTitle" class="editor-title">—</h2>
-          <button id="editorNextBtn" class="btn btn--ghost btn--sm" title="סיכום הבא (Alt+→)">❮ הבא</button>
+        <div class="editor-header-row1">
+          <button id="editorBackBtn" class="btn btn--secondary btn--sm">← חזרה</button>
+          <div class="editor-nav">
+            <button id="editorPrevBtn" class="btn btn--ghost btn--sm" title="סיכום קודם (Alt+←)">הקודם ❯</button>
+            <h2 id="editorTitle" class="editor-title">—</h2>
+            <button id="editorNextBtn" class="btn btn--ghost btn--sm" title="סיכום הבא (Alt+→)">❮ הבא</button>
+          </div>
+          <div class="editor-header-actions">
+            <span id="editorSaveStatus" class="save-status save-status--saved">נשמר ✓</span>
+            <button id="editorQuizBtn"   class="btn btn--ghost btn--sm" title="בחינה על סיכום זה">🎯 בחן</button>
+            <button id="editorQuestionsBtn" class="btn btn--ghost btn--sm" title="ערוך שאלות">📝 שאלות</button>
+            <button id="bulkImportBtn"   class="btn btn--secondary btn--sm">📥 ייבוא בתפזורת</button>
+            <button id="exportDocxBtn"  class="btn btn--ghost btn--sm" title="ייצוא ל-Word">📄 Word</button>
+            <button id="openInWordBtn" class="btn btn--ghost btn--sm" title="פתח ב-Word המקומי">📂 פתח ב-Word</button>
+            <button id="syncWithWordBtn" class="btn btn--ghost btn--sm" title="קרא שינויים שנשמרו ב-Word וטען לעורך">🔄 סנכרן עם Word</button>
+            <button id="historyBtn"     class="btn btn--ghost btn--sm" title="היסטוריית גרסאות">🕐 גרסאות</button>
+            <button id="splitScreenBtn" class="btn btn--ghost btn--sm" title="מסך מפוצל">⇔ מפוצל</button>
+          </div>
         </div>
-        <div class="editor-header-actions">
-          <span id="editorSaveStatus" class="save-status save-status--saved">נשמר ✓</span>
-          <button id="editorQuizBtn"   class="btn btn--ghost btn--sm" title="בחינה על סיכום זה">🎯 בחן</button>
-          <button id="editorQuestionsBtn" class="btn btn--ghost btn--sm" title="ערוך שאלות">📝 שאלות</button>
-          <button id="bulkImportBtn"   class="btn btn--secondary btn--sm">📥 ייבוא בתפזורת</button>
-          <button id="exportDocxBtn"  class="btn btn--ghost btn--sm" title="ייצוא ל-Word">📄 Word</button>
-          <button id="openInWordBtn" class="btn btn--ghost btn--sm" title="פתח ב-Word המקומי">📂 פתח ב-Word</button>
-          <button id="syncWithWordBtn" class="btn btn--ghost btn--sm" title="קרא שינויים שנשמרו ב-Word וטען לעורך">🔄 סנכרן עם Word</button>
-          <button id="historyBtn"     class="btn btn--ghost btn--sm" title="היסטוריית גרסאות">🕐 גרסאות</button>
-          <button id="splitScreenBtn" class="btn btn--ghost btn--sm" title="מסך מפוצל">⇔ מפוצל</button>
+
+        <!-- שורה 2: סרגל עיצוב -->
+        <div class="editor-toolbar" id="editorToolbar">
+          <button class="fmt-btn" data-cmd="bold"               title="מודגש (Ctrl+B)"><b>ב</b></button>
+          <button class="fmt-btn" data-cmd="italic"             title="נטוי (Ctrl+I)"><i>נ</i></button>
+          <button class="fmt-btn" data-cmd="underline"          title="קו תחתון (Ctrl+U)"><u>ק</u></button>
+          <span class="toolbar-sep"></span>
+          <select id="editorFontFamily" class="select-field select-field--sm" title="גופן">
+            <option value="Arial, sans-serif">Arial</option>
+            <option value="'David', serif">David</option>
+            <option value="'Times New Roman', serif">Times</option>
+            <option value="'Courier New', monospace">Courier</option>
+          </select>
+          <select id="editorFontSize" class="select-field select-field--sm" title="גודל גופן">
+            <option value="12px">12</option>
+            <option value="14px">14</option>
+            <option value="16px" selected>16</option>
+            <option value="18px">18</option>
+            <option value="20px">20</option>
+            <option value="24px">24</option>
+            <option value="32px">32</option>
+          </select>
+          <span class="toolbar-sep"></span>
+          <button class="fmt-btn" data-cmd="insertUnorderedList" title="רשימה">•≡</button>
+          <button class="fmt-btn" data-cmd="insertOrderedList"   title="רשימה ממוספרת">1≡</button>
+          <span class="toolbar-sep"></span>
+          <button class="fmt-btn" data-cmd="justifyRight"  title="יישור לימין">⬛R</button>
+          <button class="fmt-btn" data-cmd="justifyCenter" title="מרכוז">⬛C</button>
+          <button class="fmt-btn" data-cmd="justifyLeft"   title="יישור לשמאל">⬛L</button>
+          <span class="toolbar-sep"></span>
+          <button class="fmt-btn" data-cmd="removeFormat" title="נקה עיצוב">✕</button>
         </div>
       </div>
 
@@ -169,36 +203,6 @@
 
         <!-- עמודה אמצע: עורך -->
         <div class="editor-main">
-          <div class="editor-toolbar" id="editorToolbar">
-            <button class="fmt-btn" data-cmd="bold"               title="מודגש (Ctrl+B)"><b>ב</b></button>
-            <button class="fmt-btn" data-cmd="italic"             title="נטוי (Ctrl+I)"><i>נ</i></button>
-            <button class="fmt-btn" data-cmd="underline"          title="קו תחתון (Ctrl+U)"><u>ק</u></button>
-            <span class="toolbar-sep"></span>
-            <select id="editorFontFamily" class="select-field select-field--sm" title="גופן">
-              <option value="Arial, sans-serif">Arial</option>
-              <option value="'David', serif">David</option>
-              <option value="'Times New Roman', serif">Times</option>
-              <option value="'Courier New', monospace">Courier</option>
-            </select>
-            <select id="editorFontSize" class="select-field select-field--sm" title="גודל גופן">
-              <option value="12px">12</option>
-              <option value="14px">14</option>
-              <option value="16px" selected>16</option>
-              <option value="18px">18</option>
-              <option value="20px">20</option>
-              <option value="24px">24</option>
-              <option value="32px">32</option>
-            </select>
-            <span class="toolbar-sep"></span>
-            <button class="fmt-btn" data-cmd="insertUnorderedList" title="רשימה">•≡</button>
-            <button class="fmt-btn" data-cmd="insertOrderedList"   title="רשימה ממוספרת">1≡</button>
-            <span class="toolbar-sep"></span>
-            <button class="fmt-btn" data-cmd="justifyRight"  title="יישור לימין">⬛R</button>
-            <button class="fmt-btn" data-cmd="justifyCenter" title="מרכוז">⬛C</button>
-            <button class="fmt-btn" data-cmd="justifyLeft"   title="יישור לשמאל">⬛L</button>
-            <span class="toolbar-sep"></span>
-            <button class="fmt-btn" data-cmd="removeFormat" title="נקה עיצוב">✕</button>
-          </div>
 
           <div id="editorContent"
                class="editor-content"
@@ -298,6 +302,7 @@
 
         <div class="qe-dock-header">
           <h3 class="qe-dock-title">📝 שאלות: <span id="qdTitle"></span></h3>
+          <button id="qdBulkGenBtn" class="btn btn--secondary btn--sm">🤖 מחולל המוני</button>
           <button id="qdCloseBtn" class="btn btn--ghost btn--sm">✕ סגור</button>
         </div>
 

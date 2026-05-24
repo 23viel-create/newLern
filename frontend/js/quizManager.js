@@ -9,6 +9,9 @@ const QuizManager = (() => {
   let _editingId   = null;  // question id being edited, or null for new
   let _editingType = null;  // 'open' | 'mc'
 
+  // ─── Bulk gen source (set when opening modal from dock or modal editor) ────
+  let _bulkGenSourcePath = null;
+
   // ─── Dock panel state (from editor view) ─────────────────────────────────
   let _ddPath  = null;
   let _ddTitle = null;
@@ -124,6 +127,7 @@ const QuizManager = (() => {
     document.getElementById('qdCloseBtn').onclick   = _closeDock;
     document.getElementById('qdAddOpenBtn').onclick  = () => _showDockForm('open', null);
     document.getElementById('qdAddMcBtn').onclick    = () => _showDockForm('mc',   null);
+    document.getElementById('qdBulkGenBtn').onclick  = () => _openBulkGenModal(_ddPath);
   }
 
   function _closeDock() {
@@ -370,7 +374,7 @@ const QuizManager = (() => {
     document.getElementById('qeModal').querySelector('.modal__overlay').onclick = _closeEditor;
     document.getElementById('qeAddOpenBtn').onclick  = () => _showForm('open',  null);
     document.getElementById('qeAddMcBtn').onclick    = () => _showForm('mc',    null);
-    document.getElementById('qeBulkGenBtn').onclick  = () => _openBulkGenModal();
+    document.getElementById('qeBulkGenBtn').onclick  = () => _openBulkGenModal(_edPath);
   }
 
   function _closeEditor() {
@@ -1643,7 +1647,8 @@ const QuizManager = (() => {
 
   // ─── Bulk AI Generation ───────────────────────────────────────────────────
 
-  function _openBulkGenModal() {
+  function _openBulkGenModal(sourcePath) {
+    _bulkGenSourcePath = sourcePath || null;
     const modal = document.getElementById('bulkGenModal');
     if (!modal) return;
     // Reset to form view
@@ -1671,7 +1676,8 @@ const QuizManager = (() => {
   }
 
   async function _runBulkGenerate() {
-    if (!_edPath) { alert('אין סיכום פתוח'); return; }
+    const activePath = _bulkGenSourcePath || _edPath;
+    if (!activePath) { alert('אין סיכום פתוח'); return; }
     const qty       = Math.min(50, Math.max(1, Number(document.getElementById('bulkGenQty')?.value) || 20));
     const diff      = document.getElementById('bulkGenDiff')?.value  || 'mixed_random';
     const type      = document.getElementById('bulkGenType')?.value  || 'both';
@@ -1683,7 +1689,7 @@ const QuizManager = (() => {
     statusEl.classList.remove('hidden');
 
     try {
-      const questions = await Api.bulkGenerateQuestions(_edPath, qty, diff, type);
+      const questions = await Api.bulkGenerateQuestions(activePath, qty, diff, type);
       _renderBulkStaging(questions);
       document.getElementById('bulkGenForm').classList.add('hidden');
       document.getElementById('bulkGenStaging').classList.remove('hidden');
@@ -1745,7 +1751,8 @@ const QuizManager = (() => {
   }
 
   async function _saveBulkStaged() {
-    if (!_edPath) return;
+    const activePath = _bulkGenSourcePath || _edPath;
+    if (!activePath) return;
     const list = document.getElementById('bulkGenList');
     const allQs = JSON.parse(list?.dataset?.questions || '[]');
     const checked = [...document.querySelectorAll('.bulk-q-cb:checked')].map(cb => Number(cb.dataset.idx));
@@ -1760,12 +1767,17 @@ const QuizManager = (() => {
     saveStatus.classList.remove('hidden');
 
     try {
-      const res = await Api.bulkSaveQuestions(_edPath, toSave);
+      const res = await Api.bulkSaveQuestions(activePath, toSave);
       saveStatus.textContent = `✓ ${res.count} שאלות נשמרו בהצלחה`;
       setTimeout(async () => {
         _closeBulkGenModal();
-        await _loadEditorQuestions();
-        _renderEditorTab();
+        if (_bulkGenSourcePath && _bulkGenSourcePath === _ddPath) {
+          await _loadDockQuestions();
+          _renderDockTab();
+        } else {
+          await _loadEditorQuestions();
+          _renderEditorTab();
+        }
       }, 1400);
     } catch (err) {
       saveStatus.textContent = `שגיאה: ${err.message}`;
