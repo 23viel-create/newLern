@@ -147,6 +147,22 @@ router.post('/appeal-grade', async (req, res) => {
   }
 });
 
+// POST /api/ai/contextual-edit  — AI-assisted in-editor text replacement / insertion
+router.post('/contextual-edit', async (req, res) => {
+  try {
+    const { beforeContext, selectedText, afterContext, instruction, numberOfVariations } = req.body;
+    if (!instruction || !String(instruction).trim()) {
+      return res.status(400).json({ error: 'instruction נדרש' });
+    }
+    const variations = await ctrl.contextualEdit({
+      beforeContext, selectedText, afterContext, instruction, numberOfVariations,
+    });
+    res.json({ ok: true, variations });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/ai/reset-cooldowns — clear all per-key cooldowns and error counts
 router.post('/reset-cooldowns', (_req, res) => {
   try {

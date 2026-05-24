@@ -493,6 +493,51 @@ function updateKeys(keys) {
   saveApiKeys(keys);
 }
 
+// ─── Contextual Edit ──────────────────────────────────────────────────────────
+
+async function contextualEdit({ beforeContext, selectedText, afterContext, instruction, numberOfVariations }) {
+  const n    = Math.min(5, Math.max(1, Number(numberOfVariations) || 3));
+  const mode = selectedText && selectedText.trim() ? 'REPLACE' : 'INSERT';
+
+  const selectedBlock = mode === 'REPLACE'
+    ? `## הטקסט המסומן (יש להחליפו):\n"""\n${String(selectedText).slice(0, 2000)}\n"""\n`
+    : '## הערה: אין טקסט מסומן — הוסף תוכן חדש בנקודת הסמן.\n';
+
+  const prompt = `אתה עוזר כתיבה מומחה. תפקידך: ${mode === 'REPLACE' ? 'לשפר/להחליף קטע טקסט מסומן' : 'להוסיף טקסט חדש'} בתוך מסמך.
+
+## הקשר לפני נקודת הפעולה:
+"""
+${String(beforeContext || '').slice(0, 1200)}
+"""
+
+${selectedBlock}
+## הקשר אחרי נקודת הפעולה:
+"""
+${String(afterContext || '').slice(0, 1200)}
+"""
+
+## הוראת המשתמש:
+${String(instruction).slice(0, 600)}
+
+## כללים:
+1. הפק בדיוק ${n} וריאציות שונות.
+2. כל וריאציה חייבת להשתלב חלק עם הטקסט שלפניה ואחריה.
+3. שמור על אותה שפה, סגנון ורמה של הטקסט שמסביב.
+4. ענה ב-JSON בלבד — מערך של ${n} מחרוזות טקסט.
+5. אל תוסיף הסברים, מספרים, או כל טקסט מחוץ ל-JSON.
+
+## פורמט תגובה (JSON בלבד):
+["וריאציה 1"${n > 1 ? ', "וריאציה 2"' : ''}${n > 2 ? ', ...' : ''}]`;
+
+  const raw = await _callGemini(prompt);
+  const jsonStr = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  let parsed;
+  try { parsed = JSON.parse(jsonStr); }
+  catch { throw new Error('תגובת AI בפורמט לא תקין — נסה שנית'); }
+  if (!Array.isArray(parsed)) throw new Error('תגובת AI בפורמט לא תקין');
+  return parsed.slice(0, n).map(s => String(s));
+}
+
 module.exports = {
   askContextual,
   suggestQuestions,
@@ -510,4 +555,5 @@ module.exports = {
   getLbMode,
   setLbMode,
   resetAllCooldowns,
+  contextualEdit,
 };

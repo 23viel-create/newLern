@@ -141,6 +141,7 @@
           <button id="syncWithWordBtn" class="btn btn--ghost btn--sm" title="קרא שינויים שנשמרו ב-Word וטען לעורך">🔄 סנכרן עם Word</button>
           <button id="historyBtn"     class="btn btn--ghost btn--sm" title="היסטוריית גרסאות">🕐 גרסאות</button>
           <button id="splitScreenBtn" class="btn btn--ghost btn--sm" title="מסך מפוצל">⇔ מפוצל</button>
+          <button id="aiEditToggleBtn" class="btn btn--ghost btn--sm" title="ערוך טקסט בעזרת AI">✏️ ערוך עם AI</button>
         </div>
       </div>
 
@@ -206,6 +207,27 @@
                dir="rtl"
                spellcheck="true"
                data-placeholder="התחל לכתוב את הסיכום כאן..."></div>
+
+          <!-- AI Edit Control Bar — shown when AI edit mode is active -->
+          <div id="aiEditBar" class="ai-edit-bar hidden" dir="rtl">
+            <div class="ai-edit-bar__row">
+              <input id="aiEditInstruction" class="input-field" type="text"
+                     placeholder="הוראה ל-AI (למשל: עשה רשמי יותר, הרחב רעיון זה, תרגם לאנגלית...)"
+                     dir="rtl" autocomplete="off" />
+            </div>
+            <div class="ai-edit-bar__row ai-edit-bar__controls">
+              <span class="ai-edit-bar__label">וריאציות:</span>
+              <select id="aiEditVariations" class="ai-edit-select" dir="rtl">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3" selected>3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+              </select>
+              <button id="aiEditSubmitBtn" class="btn btn--primary btn--sm">🤖 הפעל AI</button>
+              <button id="aiEditCancelBtn" class="btn btn--ghost btn--sm">✕ בטל</button>
+            </div>
+          </div>
         </div>
 
         <!-- עמודה שמאל: מסייע AI -->
@@ -233,6 +255,16 @@
                       placeholder="שאל שאלה..."
                       dir="rtl"></textarea>
             <button id="aiSendBtn" class="btn btn--primary btn--sm ai-send-btn">שלח</button>
+          </div>
+
+          <!-- AI Edit Results — absolute overlay, shown during contextual edit -->
+          <div id="aiEditResultsSection" class="ai-edit-results-overlay hidden">
+            <div class="panel-header ai-panel-header">
+              <h3>✨ הצעות AI</h3>
+              <span id="aiEditModeLabel" class="badge badge--info"></span>
+            </div>
+            <p id="aiEditLoadingMsg" class="hint hidden" style="text-align:center;margin-top:1.2rem">⏳ ה-AI מכין הצעות...</p>
+            <div id="aiEditResultsList" class="ai-edit-results-list"></div>
           </div>
         </aside>
 

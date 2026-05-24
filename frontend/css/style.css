@@ -1943,3 +1943,104 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
 }
 .reset-toast--success { background: var(--color-success); }
 .reset-toast--error   { background: var(--color-danger); }
+
+/* ══════════════════ AI Contextual Edit (Phase 52) ══════════════════ */
+
+/* Position context for the results overlay */
+.editor-panel--ai { position: relative; }
+
+/* When results overlay is active, clip overflow so overlay fills panel cleanly */
+#aiPanel.ai-edit--results { overflow: hidden; }
+
+/* ── Results overlay (absolute, covers the full AI panel) ── */
+.ai-edit-results-overlay {
+  position: absolute; inset: 0;
+  background: var(--color-surface);
+  z-index: 10;
+  display: flex; flex-direction: column;
+  padding: 0.75rem;
+  gap: 0.4rem;
+  overflow-y: auto;
+}
+
+/* ── Variation result cards ── */
+.ai-edit-results-list {
+  display: flex; flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto; flex: 1; min-height: 0;
+}
+
+.ai-edit-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.7rem;
+  background: var(--color-bg);
+  font-size: 0.82rem;
+  display: flex; flex-direction: column; gap: 0.4rem;
+}
+.ai-edit-card:hover { border-color: var(--color-primary); }
+
+.ai-edit-card__num {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.ai-edit-card__text {
+  line-height: 1.65;
+  color: var(--color-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ai-edit-card__actions {
+  display: flex; gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+/* ── Bottom control bar (inside editor-main) ── */
+.ai-edit-bar {
+  flex-shrink: 0;
+  border-top: 2px solid var(--color-primary);
+  background: var(--color-bg);
+  padding: 0.55rem 1rem;
+  display: flex; flex-direction: column; gap: 0.4rem;
+}
+
+.ai-edit-bar__row {
+  display: flex; align-items: center; gap: 0.5rem;
+}
+
+.ai-edit-bar__controls { flex-wrap: wrap; }
+
+.ai-edit-bar__label {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.ai-edit-select {
+  width: 58px;
+  padding: 0.25rem 0.3rem;
+  font-size: 0.82rem; font-family: inherit;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+/* ── Locked editor visual cue ── */
+.editor-content--locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: #f8fafc;
+  user-select: none;
+}
+
+/* ── Active toggle button state ── */
+#aiEditToggleBtn.ai-edit--active {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+  color: var(--color-primary);
+}

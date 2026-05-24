@@ -67,6 +67,7 @@ const EditorManager = (() => {
   // ─── פתיחת עורך ──────────────────────────────────────────────────────────────
 
   async function open(node, list) {
+    _aiEdit.deactivate();
     currentNode = node;
     flatList    = list || [];
 
@@ -129,6 +130,7 @@ const EditorManager = (() => {
     _bindNavEvents();
     _bindAudioEvents();
     _bindBulkImportEvents();
+    _aiEdit.init();
   }
 
   function _bindEditorEvents() {
@@ -527,9 +529,220 @@ const EditorManager = (() => {
     }
   }
 
+  // ─── AI Contextual Edit ───────────────────────────────────────────────────────
+
+  const _aiEdit = (() => {
+    let _savedRange = null;
+    let _editMode   = 'INSERT'; // 'INSERT' | 'REPLACE'
+    let _isActive   = false;
+
+    const _el = {
+      toggle:    () => document.getElementById('aiEditToggleBtn'),
+      bar:       () => document.getElementById('aiEditBar'),
+      results:   () => document.getElementById('aiEditResultsSection'),
+      list:      () => document.getElementById('aiEditResultsList'),
+      loading:   () => document.getElementById('aiEditLoadingMsg'),
+      modeLabel: () => document.getElementById('aiEditModeLabel'),
+      instr:     () => document.getElementById('aiEditInstruction'),
+      vars:      () => document.getElementById('aiEditVariations'),
+      submitBtn: () => document.getElementById('aiEditSubmitBtn'),
+      panel:     () => document.getElementById('aiPanel'),
+    };
+
+    function _showBar() {
+      _isActive = true;
+      _el.toggle()?.classList.add('ai-edit--active');
+      _el.bar()?.classList.remove('hidden');
+      _el.instr()?.focus();
+    }
+
+    function deactivate() {
+      _isActive   = false;
+      _savedRange = null;
+
+      const editor = document.getElementById('editorContent');
+      if (editor) {
+        editor.contentEditable = 'true';
+        editor.classList.remove('editor-content--locked');
+      }
+
+      _el.toggle()?.classList.remove('ai-edit--active');
+      _el.bar()?.classList.add('hidden');
+      _el.results()?.classList.add('hidden');
+      _el.panel()?.classList.remove('ai-edit--results');
+
+      const list = _el.list();
+      if (list) { list.innerHTML = ''; delete list.dataset.variations; }
+      const instr = _el.instr();
+      if (instr) instr.value = '';
+      _el.loading()?.classList.add('hidden');
+    }
+
+    async function _submit() {
+      const instruction = _el.instr()?.value.trim();
+      if (!instruction) { _el.instr()?.focus(); return; }
+
+      const editor = document.getElementById('editorContent');
+      if (!editor) return;
+
+      // ── 1. Capture selection inside the editor ──────────────────────────
+      const sel = window.getSelection();
+      let range;
+      if (sel && sel.rangeCount > 0 &&
+          editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        range = sel.getRangeAt(0).cloneRange();
+      } else {
+        range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+      }
+      _savedRange = range;
+
+      const selectedText = range.toString();
+      _editMode = selectedText.length > 0 ? 'REPLACE' : 'INSERT';
+
+      // ── 2. Extract ±150-word context ────────────────────────────────────
+      let beforeContext = '', afterContext = '';
+      try {
+        const br = document.createRange();
+        br.setStart(editor, 0);
+        br.setEnd(range.startContainer, range.startOffset);
+        beforeContext = br.toString().trim().split(/\s+/).filter(Boolean).slice(-150).join(' ');
+      } catch { /* empty doc */ }
+      try {
+        const ar = document.createRange();
+        ar.setStart(range.endContainer, range.endOffset);
+        ar.setEnd(editor, editor.childNodes.length);
+        afterContext = ar.toString().trim().split(/\s+/).filter(Boolean).slice(0, 150).join(' ');
+      } catch { /* empty doc */ }
+
+      // ── 3. Lock editor ──────────────────────────────────────────────────
+      editor.contentEditable = 'false';
+      editor.classList.add('editor-content--locked');
+
+      // ── 4. Show loading overlay ─────────────────────────────────────────
+      _el.panel()?.classList.add('ai-edit--results');
+      _el.results()?.classList.remove('hidden');
+      const ml = _el.modeLabel();
+      if (ml) ml.textContent = _editMode === 'REPLACE' ? '🔁 החלפה' : '➕ הוספה';
+      _el.loading()?.classList.remove('hidden');
+      const list = _el.list();
+      if (list) list.innerHTML = '';
+
+      const submitBtn = _el.submitBtn();
+      if (submitBtn) submitBtn.disabled = true;
+
+      const numberOfVariations = Number(_el.vars()?.value) || 3;
+
+      // ── 5. Call API ─────────────────────────────────────────────────────
+      try {
+        const data = await Api.aiContextualEdit({
+          beforeContext, selectedText, afterContext, instruction, numberOfVariations,
+        });
+        _el.loading()?.classList.add('hidden');
+        _renderCards(data.variations || []);
+      } catch (err) {
+        _el.loading()?.classList.add('hidden');
+        if (list) {
+          list.innerHTML =
+            `<p class="hint" style="color:var(--color-danger);padding:0.4rem 0">שגיאה: ${esc(err.message)}</p>`;
+        }
+        // Unlock so user can retry or cancel
+        editor.contentEditable = 'true';
+        editor.classList.remove('editor-content--locked');
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    function _renderCards(variations) {
+      const list = _el.list();
+      if (!list) return;
+      list.innerHTML = '';
+      list.dataset.variations = JSON.stringify(variations);
+
+      const actionLabel = _editMode === 'REPLACE' ? 'החלף ✓' : 'הוסף ✓';
+
+      variations.forEach((text, i) => {
+        const card = document.createElement('div');
+        card.className = 'ai-edit-card';
+        card.innerHTML =
+          `<div class="ai-edit-card__num">הצעה ${i + 1}</div>` +
+          `<div class="ai-edit-card__text">${esc(text)}</div>` +
+          `<div class="ai-edit-card__actions">` +
+          `<button class="btn btn--primary btn--sm ai-edit-apply-btn" data-idx="${i}">${actionLabel}</button>` +
+          `</div>`;
+        list.appendChild(card);
+      });
+
+      list.querySelectorAll('.ai-edit-apply-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const vars = JSON.parse(list.dataset.variations || '[]');
+          _inject(vars[Number(btn.dataset.idx)] || '');
+        });
+      });
+    }
+
+    function _inject(text) {
+      const editor = document.getElementById('editorContent');
+      if (!editor || !_savedRange) return;
+
+      // Unlock first
+      editor.contentEditable = 'true';
+      editor.classList.remove('editor-content--locked');
+
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+
+      try {
+        const workRange = _savedRange.cloneRange();
+
+        if (_editMode === 'REPLACE') {
+          workRange.deleteContents();
+        }
+
+        // Build fragment preserving newlines
+        const frag = document.createDocumentFragment();
+        text.split('\n').forEach((line, i) => {
+          if (i > 0) frag.appendChild(document.createElement('br'));
+          if (line)  frag.appendChild(document.createTextNode(line));
+        });
+        workRange.insertNode(frag);
+
+        sel.addRange(workRange);
+        sel.collapseToEnd();
+      } catch (err) {
+        console.error('[aiEdit] injection error:', err);
+      }
+
+      editor.focus();
+      isDirty = true;
+      setSaveStatus('saving');
+      debouncedSave();
+
+      deactivate();
+    }
+
+    function init() {
+      document.getElementById('aiEditToggleBtn')
+        ?.addEventListener('click', () => (_isActive ? deactivate() : _showBar()));
+      document.getElementById('aiEditSubmitBtn')
+        ?.addEventListener('click', _submit);
+      document.getElementById('aiEditCancelBtn')
+        ?.addEventListener('click', deactivate);
+      document.getElementById('aiEditInstruction')
+        ?.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _submit(); }
+        });
+    }
+
+    return { init, deactivate };
+  })();
+
   // ─── ממשק ציבורי ─────────────────────────────────────────────────────────────
 
   function clear() {
+    _aiEdit.deactivate();
     if (isDirty) _save();
     currentNode = null;
     prevNode = null;
