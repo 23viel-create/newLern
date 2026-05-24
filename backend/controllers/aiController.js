@@ -538,6 +538,96 @@ ${String(instruction).slice(0, 600)}
   return parsed.slice(0, n).map(s => String(s));
 }
 
+// ─── Bulk question generation ────────────────────────────────────────────────
+
+async function bulkGenerateQuestions({ summaryContent, summaryTitle, quantity, difficulty, type }) {
+  const n = Math.min(50, Math.max(1, Number(quantity) || 20));
+
+  const diffMap = {
+    basic:        'בסיסי בלבד',
+    easy:         'קל בלבד',
+    medium:       'בינוני בלבד',
+    hard:         'קשה בלבד',
+    mixed_random: 'שילוב אקראי של כל הרמות',
+  };
+  const targetDiff = diffMap[difficulty] || 'שילוב אקראי של כל הרמות';
+
+  const typeInstruction = type === 'multiple_choice'
+    ? 'כל השאלות: אמריקאיות (qtype:"mc") עם 4 אפשרויות.'
+    : type === 'open_ended'
+      ? 'כל השאלות: פתוחות (qtype:"open").'
+      : `כ-${Math.ceil(n/2)} שאלות אמריקאיות (qtype:"mc") וכ-${Math.floor(n/2)} פתוחות (qtype:"open").`;
+
+  const prompt = `אתה מומחה בבניית בחינות. צור בדיוק ${n} שאלות על הסיכום הבא.
+
+## תוכן הסיכום
+כותרת: "${summaryTitle}"
+${summaryContent.slice(0, 5500)}
+
+## רמת קושי: ${targetDiff}
+
+### הגדרות רמות קושי
+
+**בסיסי (basic):**
+- פתוחות: שאל על עובדות יבשות מפורשות מהטקסט בלבד. אין צורך בהבנה. (לדוגמה: "מה שם ה-X?", "כמה Y מוזכרים?")
+- אמריקאיות: תשובה נכונה ברורה, אפשרויות שגויות שונות לחלוטין.
+
+**קל (easy):**
+- פתוחות: הבנה ישירה של מושג המוסבר בטקסט. התשובה מפורשת בטקסט.
+- אמריקאיות: תשובה נכונה ברורה עם מסיחים סבירים.
+
+**בינוני (medium):**
+- פתוחות: סינתזה של מספר מושגים. אין ציטוט ישיר, נדרשת הבנה.
+- אמריקאיות: דורש קריאה קפדנית; המסיחים דומים לתשובה הנכונה.
+
+**קשה (hard):**
+- פתוחות: ניתוח עמוק, השוואה, יישום, או הסקה שאינה מפורשת.
+- אמריקאיות: דורש הבנה דקה; כל האפשרויות נראות נכונות חלקית.
+
+## סוג שאלות
+${typeInstruction}
+
+## פורמט פלט — JSON בלבד (מערך):
+- פתוחה: {"qtype":"open","question":"...","answer":"...","difficulty":"basic|easy|medium|hard"}
+- אמריקאית: {"qtype":"mc","question":"...","options":["...","...","...","..."],"correct_option_index":0,"difficulty":"basic|easy|medium|hard"}
+
+## חוקים
+1. כל שאלה מבוססת אך ורק על תוכן הסיכום.
+2. שדה "difficulty" חייב להיות: basic / easy / medium / hard.
+3. אמריקאיות: בדיוק 4 אפשרויות; correct_option_index 0–3.
+4. פתוחות: "answer" מפורטת ומועילה לתלמיד.
+5. החזר JSON בלבד, ללא markdown, ללא הסברים.`;
+
+  const raw     = await _callGemini(prompt, 'quiz');
+  const jsonStr = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+
+  let parsed;
+  try { parsed = JSON.parse(jsonStr); }
+  catch {
+    const m = jsonStr.match(/\[[\s\S]*\]/);
+    if (!m) throw new Error('AI לא החזיר JSON תקין');
+    parsed = JSON.parse(m[0]);
+  }
+
+  if (!Array.isArray(parsed)) throw new Error('AI לא החזיר מערך שאלות');
+
+  const VALID_DIFF = new Set(['basic', 'easy', 'medium', 'hard']);
+  return parsed
+    .filter(q => q && q.qtype && q.question)
+    .map(q => ({
+      qtype:      q.qtype === 'open' ? 'open' : 'mc',
+      question:   String(q.question).trim(),
+      ...(q.qtype === 'open'
+        ? { answer: String(q.answer || '').trim() }
+        : {
+            options:              (Array.isArray(q.options) ? q.options : []).map(String),
+            correct_option_index: Math.max(0, Number(q.correct_option_index) || 0),
+          }),
+      difficulty: VALID_DIFF.has(q.difficulty) ? q.difficulty : 'medium',
+    }))
+    .slice(0, n);
+}
+
 module.exports = {
   askContextual,
   suggestQuestions,
@@ -556,4 +646,5 @@ module.exports = {
   setLbMode,
   resetAllCooldowns,
   contextualEdit,
+  bulkGenerateQuestions,
 };

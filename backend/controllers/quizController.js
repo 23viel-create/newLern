@@ -235,4 +235,22 @@ function deleteHistory(timestamp) {
   _writeHistory(next);
 }
 
-module.exports = { getQuestions, addQuestion, updateQuestion, deleteQuestion, getBundle, submitResult, getHistory, saveHistory, deleteHistory };
+module.exports = { getQuestions, addQuestion, updateQuestion, deleteQuestion, getBundle, submitResult, getHistory, saveHistory, deleteHistory, getSummaryForBulkGenerate };
+
+function getSummaryForBulkGenerate(nodeRelPath) {
+  const abs  = safePath(nodeRelPath);
+  const meta = readMeta(abs);
+  let content = '';
+  const txtFile  = path.join(abs, 'content.txt');
+  const htmlFile = path.join(abs, 'content.html');
+  if (fs.existsSync(txtFile)) {
+    content = fs.readFileSync(txtFile, 'utf-8');
+  } else if (fs.existsSync(htmlFile)) {
+    content = fs.readFileSync(htmlFile, 'utf-8')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
+  return { content: content.slice(0, 8000), title: meta.title };
+}

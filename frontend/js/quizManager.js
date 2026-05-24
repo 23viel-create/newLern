@@ -187,6 +187,8 @@ const QuizManager = (() => {
     const formEl = document.getElementById('qdForm');
     formEl.classList.remove('hidden');
 
+    const diffOptsD = _difficultySelect(existingQ?.difficulty || 'medium');
+
     if (type === 'open') {
       formEl.innerHTML = `
         <h4 class="qe-form-title">${existingQ ? 'עריכת' : 'הוספת'} שאלה פתוחה</h4>
@@ -199,6 +201,10 @@ const QuizManager = (() => {
           <label class="form-label">תשובה</label>
           <textarea id="qdfOpenA" class="input-field input-field--full" rows="3"
             placeholder="הזן תשובה מפורטת...">${_esc(existingQ?.answer || '')}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">רמת קושי</label>
+          <select id="qdfDifficulty" class="select-field select-field--sm">${diffOptsD}</select>
         </div>
         <div class="form-row-actions">
           <button id="qdfSaveBtn" class="btn btn--primary btn--sm">שמור</button>
@@ -232,6 +238,10 @@ const QuizManager = (() => {
         <div class="form-group">
           <label class="form-label">אפשרויות (● = נכון)</label>
           <div class="mc-opts-form">${optRows}</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">רמת קושי</label>
+          <select id="qdfDifficulty" class="select-field select-field--sm">${diffOptsD}</select>
         </div>
         <div class="form-row-actions">
           <button id="qdfSaveBtn" class="btn btn--primary btn--sm">שמור</button>
@@ -286,14 +296,15 @@ const QuizManager = (() => {
   }
 
   async function _saveDockOpenQ() {
-    const question = document.getElementById('qdfOpenQ').value.trim();
-    const answer   = document.getElementById('qdfOpenA').value.trim();
+    const question   = document.getElementById('qdfOpenQ').value.trim();
+    const answer     = document.getElementById('qdfOpenA').value.trim();
+    const difficulty = document.getElementById('qdfDifficulty')?.value || 'medium';
     if (!question) { alert('יש להזין שאלה'); return; }
     try {
       if (_ddEditingId) {
-        await Api.updateOpenQuestion(_ddPath, _ddEditingId, question, answer);
+        await Api.updateOpenQuestion(_ddPath, _ddEditingId, question, answer, difficulty);
       } else {
-        await Api.addOpenQuestion(_ddPath, question, answer);
+        await Api.addOpenQuestion(_ddPath, question, answer, difficulty);
       }
       await _loadDockQuestions();
       _renderDockTab();
@@ -302,7 +313,8 @@ const QuizManager = (() => {
   }
 
   async function _saveDockMcQ() {
-    const question = document.getElementById('qdfMcQ').value.trim();
+    const question   = document.getElementById('qdfMcQ').value.trim();
+    const difficulty = document.getElementById('qdfDifficulty')?.value || 'medium';
     if (!question) { alert('יש להזין שאלה'); return; }
     const options = [0,1,2,3].map(i => (document.getElementById(`qdfOpt${i}`)?.value || '').trim()).filter(Boolean);
     if (options.length < 2) { alert('יש להזין לפחות 2 אפשרויות'); return; }
@@ -311,9 +323,9 @@ const QuizManager = (() => {
     const corrAdj    = Math.min(correct, options.length - 1);
     try {
       if (_ddEditingId) {
-        await Api.updateMcQuestion(_ddPath, _ddEditingId, question, options, corrAdj);
+        await Api.updateMcQuestion(_ddPath, _ddEditingId, question, options, corrAdj, difficulty);
       } else {
-        await Api.addMcQuestion(_ddPath, question, options, corrAdj);
+        await Api.addMcQuestion(_ddPath, question, options, corrAdj, difficulty);
       }
       await _loadDockQuestions();
       _renderDockTab();
@@ -358,6 +370,7 @@ const QuizManager = (() => {
     document.getElementById('qeModal').querySelector('.modal__overlay').onclick = _closeEditor;
     document.getElementById('qeAddOpenBtn').onclick  = () => _showForm('open',  null);
     document.getElementById('qeAddMcBtn').onclick    = () => _showForm('mc',    null);
+    document.getElementById('qeBulkGenBtn').onclick  = () => _openBulkGenModal();
   }
 
   function _closeEditor() {
@@ -418,6 +431,8 @@ const QuizManager = (() => {
     const formEl = document.getElementById('qeForm');
     formEl.classList.remove('hidden');
 
+    const diffOpts = _difficultySelect(existingQ?.difficulty || 'medium');
+
     if (type === 'open') {
       formEl.innerHTML = `
         <h4 class="qe-form-title">${existingQ ? 'עריכת' : 'הוספת'} שאלה פתוחה</h4>
@@ -430,6 +445,10 @@ const QuizManager = (() => {
           <label class="form-label">תשובה / הנחיות לבודק</label>
           <textarea id="qfOpenA" class="input-field input-field--full" rows="4"
             placeholder="הזן תשובה מפורטת שתוצג לתלמיד בזמן הבחינה...">${_esc(existingQ?.answer || '')}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">רמת קושי</label>
+          <select id="qfDifficulty" class="select-field select-field--sm">${diffOpts}</select>
         </div>
         <div class="form-row-actions">
           <button id="qfSaveBtn" class="btn btn--primary">שמור שאלה</button>
@@ -466,6 +485,10 @@ const QuizManager = (() => {
           <label class="form-label">אפשרויות (סמן ● את התשובה הנכונה)</label>
           <div class="mc-opts-form">${optRows}</div>
           <p class="hint">לפחות 2 אפשרויות נדרשות</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label">רמת קושי</label>
+          <select id="qfDifficulty" class="select-field select-field--sm">${diffOpts}</select>
         </div>
         <div class="form-row-actions">
           <button id="qfSaveBtn" class="btn btn--primary">שמור שאלה</button>
@@ -522,15 +545,16 @@ const QuizManager = (() => {
   }
 
   async function _saveOpenQ() {
-    const question = document.getElementById('qfOpenQ').value.trim();
-    const answer   = document.getElementById('qfOpenA').value.trim();
+    const question   = document.getElementById('qfOpenQ').value.trim();
+    const answer     = document.getElementById('qfOpenA').value.trim();
+    const difficulty = document.getElementById('qfDifficulty')?.value || 'medium';
     if (!question) { alert('יש להזין שאלה'); return; }
 
     try {
       if (_editingId) {
-        await Api.updateOpenQuestion(_edPath, _editingId, question, answer);
+        await Api.updateOpenQuestion(_edPath, _editingId, question, answer, difficulty);
       } else {
-        await Api.addOpenQuestion(_edPath, question, answer);
+        await Api.addOpenQuestion(_edPath, question, answer, difficulty);
       }
       await _loadEditorQuestions();
       _renderEditorTab();
@@ -539,7 +563,8 @@ const QuizManager = (() => {
   }
 
   async function _saveMcQ() {
-    const question = document.getElementById('qfMcQ').value.trim();
+    const question   = document.getElementById('qfMcQ').value.trim();
+    const difficulty = document.getElementById('qfDifficulty')?.value || 'medium';
     if (!question) { alert('יש להזין שאלה'); return; }
 
     const options = [0,1,2,3].map(i => (document.getElementById(`qfOpt${i}`)?.value || '').trim()).filter(Boolean);
@@ -551,9 +576,9 @@ const QuizManager = (() => {
 
     try {
       if (_editingId) {
-        await Api.updateMcQuestion(_edPath, _editingId, question, options, corrAdj);
+        await Api.updateMcQuestion(_edPath, _editingId, question, options, corrAdj, difficulty);
       } else {
-        await Api.addMcQuestion(_edPath, question, options, corrAdj);
+        await Api.addMcQuestion(_edPath, question, options, corrAdj, difficulty);
       }
       await _loadEditorQuestions();
       _renderEditorTab();
@@ -686,11 +711,38 @@ const QuizManager = (() => {
       strictness: strictEl?.value || 'בינונית',
     };
 
+    // ── Difficulty + type filter ──────────────────────────────────────────────
+    const selectedDiffs = [...document.querySelectorAll('input[name="quizDiff"]:checked')]
+      .map(cb => cb.value);
+    const typeFilter    = document.querySelector('input[name="quizTypeFilter"]:checked')?.value || 'both';
+
+    let available = _quizQs.filter(q => {
+      // Type filter
+      if (typeFilter === 'mc'   && q.qtype !== 'mc'  ) return false;
+      if (typeFilter === 'open' && q.qtype !== 'open') return false;
+      // Difficulty filter: questions without difficulty field pass any filter
+      if (q.difficulty && !selectedDiffs.includes(q.difficulty)) return false;
+      return true;
+    });
+
     // Quota: "All" checkbox overrides numeric input
     const useAll     = !quotaAllCb || quotaAllCb.checked;
     const quotaLimit = useAll
-      ? _quizQs.length
-      : Math.max(0, parseInt(quotaInput?.value || '0', 10) || _quizQs.length);
+      ? available.length
+      : Math.max(0, parseInt(quotaInput?.value || '0', 10) || available.length);
+
+    // Inventory validation
+    if (quotaLimit > 0 && quotaLimit > available.length) {
+      alert(`שגיאה: אין מספיק שאלות במאגר. קיימות ${available.length} שאלות התואמות לסינון, אך ביקשת ${quotaLimit}.`);
+      return;
+    }
+    if (!available.length) {
+      alert('אין שאלות התואמות לפילטרים שנבחרו. שנה את הגדרות הסינון.');
+      return;
+    }
+
+    // Apply filter to working set
+    _quizQs = available;
 
     // Shuffle all questions (Fisher-Yates), then apply quota slice
     let shuffled = _shuffle(_quizQs);
@@ -1573,6 +1625,152 @@ const QuizManager = (() => {
 
   function _closeQuiz() {
     WindowManager.showView(_previousView || 'dashboard');
+  }
+
+  // ─── Difficulty helper ────────────────────────────────────────────────────
+
+  function _difficultySelect(selected) {
+    const opts = [
+      { v: 'basic',  l: 'בסיסי' },
+      { v: 'easy',   l: 'קל'    },
+      { v: 'medium', l: 'בינוני' },
+      { v: 'hard',   l: 'קשה'   },
+    ];
+    return opts.map(o => `<option value="${o.v}"${o.v === selected ? ' selected' : ''}>${o.l}</option>`).join('');
+  }
+
+  const DIFF_HE = { basic: 'בסיסי', easy: 'קל', medium: 'בינוני', hard: 'קשה' };
+
+  // ─── Bulk AI Generation ───────────────────────────────────────────────────
+
+  function _openBulkGenModal() {
+    const modal = document.getElementById('bulkGenModal');
+    if (!modal) return;
+    // Reset to form view
+    document.getElementById('bulkGenForm').classList.remove('hidden');
+    document.getElementById('bulkGenStaging').classList.add('hidden');
+    const status = document.getElementById('bulkGenStatus');
+    if (status) { status.textContent = ''; status.classList.add('hidden'); }
+    modal.classList.remove('hidden');
+
+    // Bind events (idempotent — replace each time modal opens)
+    document.getElementById('bulkGenCloseBtn').onclick  = _closeBulkGenModal;
+    document.getElementById('bulkGenCancelBtn').onclick = _closeBulkGenModal;
+    modal.querySelector('.modal__overlay').onclick      = _closeBulkGenModal;
+    document.getElementById('bulkGenRunBtn').onclick    = _runBulkGenerate;
+    document.getElementById('bulkSelectAll').onchange   = _syncBulkSelectAll;
+    document.getElementById('bulkBackBtn').onclick      = () => {
+      document.getElementById('bulkGenForm').classList.remove('hidden');
+      document.getElementById('bulkGenStaging').classList.add('hidden');
+    };
+    document.getElementById('bulkSaveBtn').onclick = _saveBulkStaged;
+  }
+
+  function _closeBulkGenModal() {
+    document.getElementById('bulkGenModal')?.classList.add('hidden');
+  }
+
+  async function _runBulkGenerate() {
+    if (!_edPath) { alert('אין סיכום פתוח'); return; }
+    const qty       = Math.min(50, Math.max(1, Number(document.getElementById('bulkGenQty')?.value) || 20));
+    const diff      = document.getElementById('bulkGenDiff')?.value  || 'mixed_random';
+    const type      = document.getElementById('bulkGenType')?.value  || 'both';
+    const runBtn    = document.getElementById('bulkGenRunBtn');
+    const statusEl  = document.getElementById('bulkGenStatus');
+
+    runBtn.disabled      = true;
+    statusEl.textContent = '⏳ ה-AI מייצר שאלות...';
+    statusEl.classList.remove('hidden');
+
+    try {
+      const questions = await Api.bulkGenerateQuestions(_edPath, qty, diff, type);
+      _renderBulkStaging(questions);
+      document.getElementById('bulkGenForm').classList.add('hidden');
+      document.getElementById('bulkGenStaging').classList.remove('hidden');
+      statusEl.classList.add('hidden');
+    } catch (err) {
+      statusEl.textContent = `שגיאה: ${err.message}`;
+    } finally {
+      runBtn.disabled = false;
+    }
+  }
+
+  function _renderBulkStaging(questions) {
+    const list = document.getElementById('bulkGenList');
+    if (!list) return;
+    document.getElementById('bulkStagingTitle').textContent = `${questions.length} שאלות שנוצרו`;
+    document.getElementById('bulkSelectAll').checked = true;
+    const saveStatus = document.getElementById('bulkSaveStatus');
+    if (saveStatus) { saveStatus.textContent = ''; saveStatus.classList.add('hidden'); }
+
+    list.innerHTML = questions.map((q, i) => {
+      const typeLabel = q.qtype === 'open' ? 'פתוחה' : 'אמריקאית';
+      const diffLabel = DIFF_HE[q.difficulty] || q.difficulty || 'בינוני';
+      const body = q.qtype === 'open'
+        ? `<div class="bulk-q-answer"><strong>תשובה:</strong> ${_esc(q.answer || '')}</div>`
+        : `<ul class="bulk-q-opts">${(q.options || []).map((o, oi) =>
+            `<li class="${oi === q.correct_option_index ? 'bulk-q-correct' : ''}">${_esc(o)}</li>`
+          ).join('')}</ul>`;
+      return `
+        <div class="bulk-q-card" data-idx="${i}">
+          <div class="bulk-q-header">
+            <label class="check-label">
+              <input type="checkbox" class="bulk-q-cb" data-idx="${i}" checked />
+            </label>
+            <span class="badge badge--sm">${typeLabel}</span>
+            <span class="badge badge--sm badge--diff">${diffLabel}</span>
+            <span class="bulk-q-text">${_esc(q.question)}</span>
+          </div>
+          <div class="bulk-q-body">${body}</div>
+        </div>`;
+    }).join('');
+
+    // Store questions in list dataset for save step
+    list.dataset.questions = JSON.stringify(questions);
+
+    // Checkbox change → update select-all state
+    list.querySelectorAll('.bulk-q-cb').forEach(cb => {
+      cb.onchange = _updateSelectAllState;
+    });
+  }
+
+  function _syncBulkSelectAll() {
+    const checked = document.getElementById('bulkSelectAll').checked;
+    document.querySelectorAll('.bulk-q-cb').forEach(cb => { cb.checked = checked; });
+  }
+
+  function _updateSelectAllState() {
+    const all = [...document.querySelectorAll('.bulk-q-cb')];
+    document.getElementById('bulkSelectAll').checked = all.every(cb => cb.checked);
+  }
+
+  async function _saveBulkStaged() {
+    if (!_edPath) return;
+    const list = document.getElementById('bulkGenList');
+    const allQs = JSON.parse(list?.dataset?.questions || '[]');
+    const checked = [...document.querySelectorAll('.bulk-q-cb:checked')].map(cb => Number(cb.dataset.idx));
+    const toSave  = checked.map(i => allQs[i]).filter(Boolean);
+
+    if (!toSave.length) { alert('לא נבחרו שאלות לשמירה'); return; }
+
+    const saveBtn    = document.getElementById('bulkSaveBtn');
+    const saveStatus = document.getElementById('bulkSaveStatus');
+    saveBtn.disabled      = true;
+    saveStatus.textContent = '⏳ שומר שאלות...';
+    saveStatus.classList.remove('hidden');
+
+    try {
+      const res = await Api.bulkSaveQuestions(_edPath, toSave);
+      saveStatus.textContent = `✓ ${res.count} שאלות נשמרו בהצלחה`;
+      setTimeout(async () => {
+        _closeBulkGenModal();
+        await _loadEditorQuestions();
+        _renderEditorTab();
+      }, 1400);
+    } catch (err) {
+      saveStatus.textContent = `שגיאה: ${err.message}`;
+      saveBtn.disabled = false;
+    }
   }
 
   // ─── Public ───────────────────────────────────────────────────────────────

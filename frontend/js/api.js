@@ -114,19 +114,24 @@ const Api = {
   getQuizQuestions: (nodePath) =>
     apiFetch(`/quizzes/questions?path=${encodeURIComponent(nodePath)}`),
 
-  addOpenQuestion: (nodePath, question, answer) =>
-    apiFetch('/quizzes/questions/open', { method: 'POST', body: { nodePath, question, answer } }),
-  updateOpenQuestion: (nodePath, id, question, answer) =>
-    apiFetch(`/quizzes/questions/open/${encodeURIComponent(id)}`, { method: 'PUT', body: { nodePath, question, answer } }),
+  addOpenQuestion: (nodePath, question, answer, difficulty) =>
+    apiFetch('/quizzes/questions/open', { method: 'POST', body: { nodePath, question, answer, difficulty } }),
+  updateOpenQuestion: (nodePath, id, question, answer, difficulty) =>
+    apiFetch(`/quizzes/questions/open/${encodeURIComponent(id)}`, { method: 'PUT', body: { nodePath, question, answer, difficulty } }),
   deleteOpenQuestion: (nodePath, id) =>
     apiFetch('/quizzes/questions/open', { method: 'DELETE', body: { nodePath, id } }),
 
-  addMcQuestion: (nodePath, question, options, correct_option_index) =>
-    apiFetch('/quizzes/questions/mc', { method: 'POST', body: { nodePath, question, options, correct_option_index } }),
-  updateMcQuestion: (nodePath, id, question, options, correct_option_index) =>
-    apiFetch(`/quizzes/questions/mc/${encodeURIComponent(id)}`, { method: 'PUT', body: { nodePath, question, options, correct_option_index } }),
+  addMcQuestion: (nodePath, question, options, correct_option_index, difficulty) =>
+    apiFetch('/quizzes/questions/mc', { method: 'POST', body: { nodePath, question, options, correct_option_index, difficulty } }),
+  updateMcQuestion: (nodePath, id, question, options, correct_option_index, difficulty) =>
+    apiFetch(`/quizzes/questions/mc/${encodeURIComponent(id)}`, { method: 'PUT', body: { nodePath, question, options, correct_option_index, difficulty } }),
   deleteMcQuestion: (nodePath, id) =>
     apiFetch('/quizzes/questions/mc', { method: 'DELETE', body: { nodePath, id } }),
+
+  bulkGenerateQuestions: (nodePath, quantity, difficulty, type) =>
+    apiFetch('/quizzes/bulk-generate', { method: 'POST', body: { nodePath, quantity, difficulty, type } }),
+  bulkSaveQuestions: (nodePath, questions) =>
+    apiFetch('/quizzes/bulk-save', { method: 'POST', body: { nodePath, questions } }),
 
   getQuizBundle:    (paths) =>
     apiFetch('/quizzes/bundle', { method: 'POST', body: { paths } }),

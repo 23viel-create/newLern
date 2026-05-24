@@ -423,6 +423,25 @@
             </div>
           </div>
 
+          <div class="form-group">
+            <label class="form-label">רמת קושי (סנן):</label>
+            <div class="check-group" dir="rtl">
+              <label class="check-label"><input type="checkbox" name="quizDiff" value="basic"  checked />בסיסי</label>
+              <label class="check-label"><input type="checkbox" name="quizDiff" value="easy"   checked />קל</label>
+              <label class="check-label"><input type="checkbox" name="quizDiff" value="medium" checked />בינוני</label>
+              <label class="check-label"><input type="checkbox" name="quizDiff" value="hard"   checked />קשה</label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">סוג שאלות:</label>
+            <div class="radio-group" dir="rtl">
+              <label class="radio-label"><input type="radio" name="quizTypeFilter" value="both" checked />גם וגם</label>
+              <label class="radio-label"><input type="radio" name="quizTypeFilter" value="mc" />רק אמריקאיות</label>
+              <label class="radio-label"><input type="radio" name="quizTypeFilter" value="open" />רק פתוחות</label>
+            </div>
+          </div>
+
           <div class="modal__actions">
             <button id="quizCancelBtn" class="btn btn--secondary">ביטול</button>
             <button id="quizStartBtn"  class="btn btn--primary">התחל בחינה ▶</button>
@@ -1426,6 +1445,7 @@
 
       <div class="qe-header">
         <h2 id="qeModalTitle">📝 שאלות: <span id="qeTitle"></span></h2>
+        <button id="qeBulkGenBtn" class="btn btn--secondary btn--sm">🤖 מחולל המוני</button>
         <button id="qeCloseBtn" class="btn btn--ghost btn--sm">✕ סגור</button>
       </div>
 
@@ -1457,6 +1477,68 @@
 
       <!-- Dynamic add/edit form (filled by JS) -->
       <div id="qeForm" class="qe-form hidden"></div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════ מחולל שאלות המוני ══════════════════ -->
+  <div id="bulkGenModal" class="modal hidden" role="dialog" aria-modal="true" dir="rtl">
+    <div class="modal__overlay"></div>
+    <div class="modal__box" style="max-width:580px;max-height:85vh;display:flex;flex-direction:column">
+
+      <div class="modal__header" style="flex-shrink:0">
+        <h3 style="margin:0">🤖 מחולל שאלות המוני</h3>
+        <button id="bulkGenCloseBtn" class="btn btn--ghost btn--sm">✕</button>
+      </div>
+
+      <!-- Generation form -->
+      <div id="bulkGenForm" style="padding:1rem;flex-shrink:0">
+        <div class="form-group">
+          <label class="form-label">כמות שאלות</label>
+          <input type="number" id="bulkGenQty" class="input-field" value="20" min="1" max="50"
+                 style="width:80px;text-align:center;direction:ltr" />
+          <span class="hint" style="margin-right:0.5rem">(עד 50)</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">רמת קושי</label>
+          <select id="bulkGenDiff" class="select-field select-field--sm">
+            <option value="mixed_random">שילוב אקראי</option>
+            <option value="basic">בסיסי</option>
+            <option value="easy">קל</option>
+            <option value="medium" selected>בינוני</option>
+            <option value="hard">קשה</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">סוג שאלות</label>
+          <select id="bulkGenType" class="select-field select-field--sm">
+            <option value="both">גם וגם</option>
+            <option value="multiple_choice">אמריקאיות בלבד</option>
+            <option value="open_ended">פתוחות בלבד</option>
+          </select>
+        </div>
+        <div class="modal__actions">
+          <button id="bulkGenRunBtn" class="btn btn--primary">🤖 צור שאלות</button>
+          <button id="bulkGenCancelBtn" class="btn btn--secondary">ביטול</button>
+        </div>
+        <div id="bulkGenStatus" class="hint hidden" style="margin-top:0.5rem"></div>
+      </div>
+
+      <!-- Staging / review area -->
+      <div id="bulkGenStaging" class="hidden" style="display:flex;flex-direction:column;flex:1;min-height:0;padding:1rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-shrink:0;margin-bottom:0.6rem">
+          <h4 id="bulkStagingTitle" style="margin:0">שאלות שנוצרו</h4>
+          <label class="check-label" style="font-size:0.85rem">
+            <input type="checkbox" id="bulkSelectAll" checked /> בחר הכל
+          </label>
+        </div>
+        <div id="bulkGenList" class="bulk-gen-list" style="overflow-y:auto;flex:1;min-height:0"></div>
+        <div style="flex-shrink:0;margin-top:0.8rem;display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap">
+          <button id="bulkSaveBtn" class="btn btn--primary">📥 אשר והוסף למאגר</button>
+          <button id="bulkBackBtn" class="btn btn--secondary">← חזור</button>
+          <span id="bulkSaveStatus" class="hint hidden"></span>
+        </div>
+      </div>
 
     </div>
   </div>
