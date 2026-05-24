@@ -141,6 +141,8 @@ const ActiveChatManager = (() => {
     try {
       await Api.deleteStudyPath(id);
       await _loadStudyPaths();
+      _resetSyllabusForm();
+      if (typeof loadCalendar === 'function') loadCalendar();
     } catch (err) {
       alert(`שגיאה במחיקה: ${err.message}`);
     }
@@ -332,8 +334,9 @@ const ActiveChatManager = (() => {
     const status = document.getElementById('syllabusStatus');
     const result = document.getElementById('syllabusResult');
     btn.disabled = true;
-    status.textContent = '⏳ ה-AI מכין את תוכנית הלימוד...';
-    status.className   = 'save-status';
+    status.textContent  = '⏳ ה-AI מכין את תוכנית הלימוד...';
+    status.className    = 'save-status';
+    status.style.color  = '';
     status.classList.remove('hidden');
     result.classList.add('hidden');
 
@@ -398,7 +401,8 @@ const ActiveChatManager = (() => {
     document.getElementById('syllabusTargetDateRow')?.classList.add('hidden');
     document.getElementById('syllabusUnitRequiredHint')?.classList.add('hidden');
     document.getElementById('syllabusResult')?.classList.add('hidden');
-    document.getElementById('syllabusStatus')?.classList.add('hidden');
+    const statusEl = document.getElementById('syllabusStatus');
+    if (statusEl) { statusEl.classList.add('hidden'); statusEl.style.color = ''; }
   }
 
   async function _runOptimize() {

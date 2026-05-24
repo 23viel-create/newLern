@@ -337,33 +337,53 @@ function _generateCustomBookItems(startUnit, endUnit, unitsPerDay, unitType) {
   return items;
 }
 
-function _expandMetadataToItems(chapters) {
-  const items = [];
+function _expandMetadataToItems(chapters, unitsPerDay = 1) {
+  const perDay = Math.max(1, Math.round(unitsPerDay));
+  const items  = [];
   for (const ch of chapters) {
-    const sessions = Math.max(1, Math.round(Number(ch.sessions) || 1));
-    if (sessions === 1) {
+    const total = Math.max(1, Math.round(Number(ch.sessions) || 1));
+    if (total <= perDay) {
+      // Entire section fits within one study day
       items.push({ title: ch.title });
     } else {
-      for (let i = 1; i <= sessions; i++) {
-        items.push({ title: `${ch.title} (${i}/${sessions})` });
+      // Split into daily chunks
+      const days = Math.ceil(total / perDay);
+      for (let d = 1; d <= days; d++) {
+        const start = (d - 1) * perDay + 1;
+        const end   = Math.min(d * perDay, total);
+        const suffix = start === end ? ` (${start})` : ` (${start}–${end})`;
+        items.push({ title: ch.title + suffix });
       }
     }
   }
   return items;
 }
 
-function _buildMetadataPrompt({ safeBook, safeAuthor, safePace, safePoint, safeHebDate, todayIso, todayHeb, endNote }) {
+function _buildMetadataPrompt({ safeBook, safeAuthor, safePace, safePoint, safeHebDate, todayIso, todayHeb, endNote, unitType }) {
   const startNote = safePoint && safePoint !== 'מההתחלה'
     ? `\nנקודת התחלה: "${safePoint}" — פתח מנקודה זו.`
     : '';
   const hebNote = safeHebDate
     ? `\n\n## תאריך עברי\n"${safeHebDate}" — פרש לתאריך לועזי והחזר כ-"resolvedStartDate" באובייקט הראשון.`
     : '';
+
+  const granularNote = unitType
+    ? `\n\n## ⚠️ חובת גרנולריות ביחידת "${unitType}" (קריטי ביותר)
+המשתמש ביקש לחלק את הלימוד ביחידת "${unitType}".
+שדה "sessions" בכל פריט חייב להכיל את מספר ה-${unitType} הכלולים בפריט זה — לא את מספר ימי הלימוד.
+עבור טקסטים היררכיים (משנה, תלמוד, ספרים עם מסכתות/חלקים/פרקים):
+  • אל תחזיר פריט ברמת סדר/ספר כולל — פרק לפי ${unitType}.
+  • כל מסכת/חלק מקבל פריט נפרד עם sessions = מספר ה-${unitType} שבו.
+  • דוגמה (משנה, יחידה=פרקים): [{"title":"מסכת ברכות","sessions":9},{"title":"מסכת פאה","sessions":8},{"title":"מסכת דמאי","sessions":7}, ...]
+  • ה-sessions של כל הפריטים יחד = סך כל ה-${unitType} בספר.
+חריג: אם ${unitType} = 'ספרים' או דומה (יחידה גסה) — אפשר לקבץ.`
+    : '';
+
   return `אתה מומחה בספרות תורנית ואקדמית. עוגן תאריך: ${todayIso}${todayHeb ? ` (${todayHeb})` : ''}.
 
 ספר: "${safeBook}"${safeAuthor ? ` / ${safeAuthor}` : ''}.
 קצב: "${safePace}" לכל יום לימוד.
-תנאי סיום: ${endNote}.${startNote}${hebNote}
+תנאי סיום: ${endNote}.${startNote}${hebNote}${granularNote}
 
 ## משימה
 החזר מטא-דאטה בלבד: מערך JSON של הפרקים/חלקים המרכזיים בספר עם מספר ימי לימוד לכל פרק.
@@ -443,7 +463,7 @@ async function generateLearningPlan(req, res) {
       syllabusItems = _generateCustomBookItems(effStartUnit, effEndUnit, Math.max(1, Math.round(unitsPerDay)), unitType);
     } else {
       // Metadata architecture: ask AI for chapter structure only, expand locally
-      const metaPrompt = _buildMetadataPrompt({ safeBook, safeAuthor, safePace, safePoint, safeHebDate, todayIso, todayHeb, endNote });
+      const metaPrompt = _buildMetadataPrompt({ safeBook, safeAuthor, safePace, safePoint, safeHebDate, todayIso, todayHeb, endNote, unitType: unitType || null });
       const metadata = await _generateMetadataWithRetry(metaPrompt);
       if (!metadata) {
         return res.status(500).json({ success: false, message: 'ה-AI לא הצליח ליצור תוכנית לימוד. נסה שנית.' });
@@ -452,7 +472,8 @@ async function generateLearningPlan(req, res) {
           /^\d{4}-\d{2}-\d{2}$/.test(metadata[0].resolvedStartDate)) {
         resolvedStartDate = metadata[0].resolvedStartDate;
       }
-      syllabusItems = _expandMetadataToItems(metadata);
+      const metaUnitsPerDay = unitType ? _parsePaceToUnits(safePace) : 1;
+      syllabusItems = _expandMetadataToItems(metadata, metaUnitsPerDay);
     }
 
     if (!syllabusItems || !syllabusItems.length) {
