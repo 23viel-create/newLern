@@ -381,7 +381,12 @@ const ActiveChatManager = (() => {
     const ids = ['syllabusBook','syllabusAuthor','syllabusPace','syllabusStartingPoint',
                  'syllabusStartDate','syllabusHebrewDate','syllabusTargetDate',
                  'syllabusStartUnit','syllabusEndUnit'];
-    ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.value = ''; el.disabled = false; el.readOnly = false; }
+    });
+    const genBtn = document.getElementById('syllabusGenerateBtn');
+    if (genBtn) genBtn.disabled = false;
     const bookEnd = document.querySelector('input[name="syllabusEnd"][value="book"]');
     if (bookEnd) bookEnd.checked = true;
     const shabbat = document.getElementById('syllabusSkipShabbat');

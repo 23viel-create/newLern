@@ -951,9 +951,11 @@ const CalendarManager = (() => {
       // ── Complete ──
       panel.querySelectorAll('.task-done-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
+          const snapYear = currentYear, snapMonth = currentMonth, snapDate = selectedDate;
           try {
             btn.disabled = true;
             await Api.completeTask(btn.dataset.id, 3);
+            currentYear = snapYear; currentMonth = snapMonth; selectedDate = snapDate;
             _monthCache = {};
             loadCalendar();
           } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
@@ -963,9 +965,11 @@ const CalendarManager = (() => {
       // ── Undo complete ──
       panel.querySelectorAll('.task-undo-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
+          const snapYear = currentYear, snapMonth = currentMonth, snapDate = selectedDate;
           try {
             btn.disabled = true;
             await Api.uncompleteTask(btn.dataset.id);
+            currentYear = snapYear; currentMonth = snapMonth; selectedDate = snapDate;
             _monthCache = {};
             loadCalendar();
           } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
@@ -975,9 +979,11 @@ const CalendarManager = (() => {
       // ── Postpone (+1 day cascade) ──
       panel.querySelectorAll('.task-postpone-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
+          const snapYear = currentYear, snapMonth = currentMonth, snapDate = selectedDate;
           try {
             btn.disabled = true;
             await Api.postponeTask(btn.dataset.id);
+            currentYear = snapYear; currentMonth = snapMonth; selectedDate = snapDate;
             _monthCache = {};
             loadCalendar();
           } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
@@ -991,9 +997,11 @@ const CalendarManager = (() => {
             'האם אתה בטוח? כל המשימות הבאות שקשורות לרצף לימוד זה יידחו למחר, וימשיכו ישירות לאחר הלימוד הנוכחי שסיימת. פעולה זו אינה הפיכה.'
           );
           if (!confirmed) return;
+          const snapYear = currentYear, snapMonth = currentMonth, snapDate = selectedDate;
           try {
             btn.disabled = true;
             await Api.learnYesterday(btn.dataset.id);
+            currentYear = snapYear; currentMonth = snapMonth; selectedDate = snapDate;
             _monthCache = {};
             loadCalendar();
           } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
