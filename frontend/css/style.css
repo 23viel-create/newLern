@@ -340,7 +340,9 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
 
 /* ── Formatting Toolbar ── */
 .editor-toolbar {
-  display: flex;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;

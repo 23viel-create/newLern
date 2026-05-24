@@ -78,6 +78,7 @@ const EditorManager = (() => {
 
     document.body.classList.add('editor-open');
     WindowManager.showView('editor');
+    if (typeof AiManager !== 'undefined') AiManager.setContext('editor');
     _updateNav();
 
     // טען תוכן

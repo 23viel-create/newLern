@@ -137,6 +137,7 @@ const QuizManager = (() => {
     _ddPath        = null;
     _ddEditingId   = null;
     _ddEditingType = null;
+    if (typeof AiManager !== 'undefined') AiManager.setContext('editor');
   }
 
   function _renderDockTab() {

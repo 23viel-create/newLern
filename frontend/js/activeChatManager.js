@@ -142,6 +142,9 @@ const ActiveChatManager = (() => {
       await Api.deleteStudyPath(id);
       await _loadStudyPaths();
       _resetSyllabusForm();
+      // Brute-force unlock — catches any field not listed in _resetSyllabusForm's ids array
+      document.querySelectorAll('#syllabusForm input, #syllabusForm textarea, #syllabusForm select, #syllabusGenerateBtn')
+        .forEach(el => { el.disabled = false; el.readOnly = false; });
       if (typeof loadCalendar === 'function') loadCalendar();
     } catch (err) {
       alert(`שגיאה במחיקה: ${err.message}`);
