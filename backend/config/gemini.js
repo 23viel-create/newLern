@@ -155,6 +155,14 @@ function recordQuotaExhausted(key) {
   keyStats[key].quotaExhausted = true;
 }
 
+function resetAllCooldowns() {
+  for (const key of Object.keys(keyStats)) {
+    delete keyStats[key].cooldownUntil;
+    delete keyStats[key].quotaExhausted;
+    keyStats[key].errors = 0;
+  }
+}
+
 function getKeyStatus() {
   const keys = getApiKeys();
   const now  = Date.now();
@@ -177,5 +185,6 @@ function getKeyStatus() {
 module.exports = {
   getApiKeys, saveApiKeys,
   getNextKey, recordUsage, recordError, recordQuotaExhausted, getKeyStatus,
+  resetAllCooldowns,
   getLbMode, setLbMode,
 };

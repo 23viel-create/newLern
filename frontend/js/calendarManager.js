@@ -713,7 +713,6 @@ const CalendarManager = (() => {
   function _attachGridClicks(grid) {
     grid.querySelectorAll('.cal-cell[data-date]').forEach(cell => {
       cell.addEventListener('click', () => {
-        if (cell.classList.contains('cal-cell--blocked')) return;
         selectedDate = cell.dataset.date;
         grid.querySelectorAll('.cal-cell--selected')
             .forEach(c => c.classList.remove('cal-cell--selected'));
@@ -722,7 +721,6 @@ const CalendarManager = (() => {
       });
       // Double-click → quick event entry
       cell.addEventListener('dblclick', () => {
-        if (cell.classList.contains('cal-cell--blocked')) return;
         _openQuickEventModal(cell.dataset.date);
       });
     });
@@ -775,7 +773,6 @@ const CalendarManager = (() => {
       day.isToday   ? 'cal-cell--today'   : '',
       day.isShabbat ? 'cal-cell--shabbat' : '',
       day.isHoliday ? 'cal-cell--holiday' : '',
-      (day.isShabbat || day.isHoliday) ? 'cal-cell--blocked' : '',
     ].filter(Boolean).join(' ');
 
     const gregDay     = Number(day.date.split('-')[2]);

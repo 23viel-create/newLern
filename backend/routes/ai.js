@@ -147,6 +147,16 @@ router.post('/appeal-grade', async (req, res) => {
   }
 });
 
+// POST /api/ai/reset-cooldowns — clear all per-key cooldowns and error counts
+router.post('/reset-cooldowns', (_req, res) => {
+  try {
+    ctrl.resetAllCooldowns();
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET  /api/ai/lb-mode        — returns current load-balancing mode
 router.get('/lb-mode', (_req, res) => {
   try { res.json({ mode: ctrl.getLbMode() }); }

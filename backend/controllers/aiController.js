@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const { getNextKey, recordUsage, recordError, recordQuotaExhausted, getKeyStatus, getApiKeys, saveApiKeys, getLbMode, setLbMode } = require('../config/gemini');
+const { getNextKey, recordUsage, recordError, recordQuotaExhausted, getKeyStatus, getApiKeys, saveApiKeys, getLbMode, setLbMode, resetAllCooldowns } = require('../config/gemini');
 const { MAX_PROMPT_CHARS, MAX_CONTEXT_CHARS, ARTICLES_DIR } = require('../config/limits');
 const { getSettings } = require('./srController');
 
@@ -509,4 +509,5 @@ module.exports = {
   updateKeys,
   getLbMode,
   setLbMode,
+  resetAllCooldowns,
 };

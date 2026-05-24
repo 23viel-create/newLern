@@ -281,6 +281,21 @@ const AiManager = (() => {
     }
   }
 
+  async function _resetCooldowns() {
+    const btn = document.getElementById('resetCooldownsBtn');
+    if (btn) btn.disabled = true;
+    try {
+      await Api.aiResetCooldowns();
+      await _refreshBattery();
+      const msg = el.keysSavedMsg();
+      if (msg) { msg.textContent = 'סטטוס מפתחות אופס ✓'; msg.classList.remove('hidden'); setTimeout(() => { msg.classList.add('hidden'); msg.textContent = 'נשמר ✓'; }, 3000); }
+    } catch (err) {
+      alert(`שגיאה: ${err.message}`);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   async function _refreshBattery() {
     try {
       const status = await Api.aiKeyStatus();
@@ -412,6 +427,7 @@ const AiManager = (() => {
 
     // Settings keys
     el.saveKeysBtn()?.addEventListener('click', _saveKeys);
+    document.getElementById('resetCooldownsBtn')?.addEventListener('click', _resetCooldowns);
     el.articlesSend()?.addEventListener('click', _sendArticlesChat);
     el.articlesInput()?.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') _sendArticlesChat();

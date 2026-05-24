@@ -27,7 +27,7 @@ async function _callGemini(prompt) {
 
 // ── Study Paths persistence ──────────────────────────────────────────────────
 
-const { SCHEDULE_FILE, STUDY_PATHS_FILE, ensureJsonFile } = require('../config/limits');
+const { STUDY_PATHS_FILE, ensureJsonFile } = require('../config/limits');
 
 function readStudyPaths() {
   try {
@@ -315,6 +315,84 @@ async function _generateWithRetry(promptParams, startUnit, endUnit, isCustomBook
   return null;
 }
 
+// ── Metadata architecture helpers ────────────────────────────────────────────
+
+function _parsePaceToUnits(pace) {
+  const m = String(pace).match(/(\d+(?:\.\d+)?)/);
+  return m ? parseFloat(m[1]) : 1;
+}
+
+function _generateCustomBookItems(startUnit, endUnit, unitsPerDay, unitType) {
+  const items = [];
+  let cur = startUnit;
+  while (cur <= endUnit) {
+    const end = Math.min(cur + unitsPerDay - 1, endUnit);
+    items.push({
+      title: `${unitType || 'יחידות'} ${cur}–${end}`,
+      unitStart: cur,
+      unitEnd: end,
+    });
+    cur = end + 1;
+  }
+  return items;
+}
+
+function _expandMetadataToItems(chapters) {
+  const items = [];
+  for (const ch of chapters) {
+    const sessions = Math.max(1, Math.round(Number(ch.sessions) || 1));
+    if (sessions === 1) {
+      items.push({ title: ch.title });
+    } else {
+      for (let i = 1; i <= sessions; i++) {
+        items.push({ title: `${ch.title} (${i}/${sessions})` });
+      }
+    }
+  }
+  return items;
+}
+
+function _buildMetadataPrompt({ safeBook, safeAuthor, safePace, safePoint, safeHebDate, todayIso, todayHeb, endNote }) {
+  const startNote = safePoint && safePoint !== 'מההתחלה'
+    ? `\nנקודת התחלה: "${safePoint}" — פתח מנקודה זו.`
+    : '';
+  const hebNote = safeHebDate
+    ? `\n\n## תאריך עברי\n"${safeHebDate}" — פרש לתאריך לועזי והחזר כ-"resolvedStartDate" באובייקט הראשון.`
+    : '';
+  return `אתה מומחה בספרות תורנית ואקדמית. עוגן תאריך: ${todayIso}${todayHeb ? ` (${todayHeb})` : ''}.
+
+ספר: "${safeBook}"${safeAuthor ? ` / ${safeAuthor}` : ''}.
+קצב: "${safePace}" לכל יום לימוד.
+תנאי סיום: ${endNote}.${startNote}${hebNote}
+
+## משימה
+החזר מטא-דאטה בלבד: מערך JSON של הפרקים/חלקים המרכזיים בספר עם מספר ימי לימוד לכל פרק.
+מקסימום 60 פריטים. קצר וממוקד.
+
+## פורמט — JSON בלבד:
+[{"title":"שם הפרק","sessions":N}, ...]
+${safeHebDate ? '\nבאובייקט הראשון הוסף: "resolvedStartDate":"YYYY-MM-DD"' : ''}
+
+ענה ב-JSON בלבד, ללא טקסט נוסף.`;
+}
+
+async function _generateMetadataWithRetry(prompt) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    let raw;
+    try { raw = await _callGemini(prompt); }
+    catch (err) {
+      if (attempt < 3) continue;
+      throw err;
+    }
+    const jsonStr = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+    try {
+      const parsed = JSON.parse(jsonStr);
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    } catch { /* retry */ }
+  }
+  return null;
+}
+
 // ── Syllabus generator ────────────────────────────────────────────────────────
 
 async function generateLearningPlan(req, res) {
@@ -323,7 +401,6 @@ async function generateLearningPlan(req, res) {
       bookName, authorName, pace,
       endCondition, targetDate, startDate, hebrewStartDate,
       startingPoint, skipShabbat, skipHolidays,
-      clearExisting,
       isCustomBook, unitType, startUnit, endUnit,
     } = req.body;
 
@@ -357,26 +434,37 @@ async function generateLearningPlan(req, res) {
     const effStartUnit = isCustomBook ? Number(startUnit) : null;
     const effEndUnit   = isCustomBook ? Number(endUnit)   : null;
 
-    const promptParams = {
-      safeBook, safeAuthor, safePace, safePoint, safeHebDate,
-      todayIso, todayHeb, endNote,
-      isCustomBook: !!isCustomBook, unitType,
-      startUnit: effStartUnit, endUnit: effEndUnit,
-    };
+    let syllabusItems;
+    let resolvedStartDate = null;
 
-    const syllabusItems = await _generateWithRetry(promptParams, effStartUnit, effEndUnit, !!isCustomBook);
+    if (isCustomBook) {
+      // Pure local generation — no AI needed for custom books
+      const unitsPerDay = _parsePaceToUnits(safePace);
+      syllabusItems = _generateCustomBookItems(effStartUnit, effEndUnit, Math.max(1, Math.round(unitsPerDay)), unitType);
+    } else {
+      // Metadata architecture: ask AI for chapter structure only, expand locally
+      const metaPrompt = _buildMetadataPrompt({ safeBook, safeAuthor, safePace, safePoint, safeHebDate, todayIso, todayHeb, endNote });
+      const metadata = await _generateMetadataWithRetry(metaPrompt);
+      if (!metadata) {
+        return res.status(500).json({ success: false, message: 'ה-AI לא הצליח ליצור תוכנית לימוד. נסה שנית.' });
+      }
+      if (safeHebDate && metadata[0]?.resolvedStartDate &&
+          /^\d{4}-\d{2}-\d{2}$/.test(metadata[0].resolvedStartDate)) {
+        resolvedStartDate = metadata[0].resolvedStartDate;
+      }
+      syllabusItems = _expandMetadataToItems(metadata);
+    }
 
-    if (!syllabusItems) {
+    if (!syllabusItems || !syllabusItems.length) {
       return res.status(500).json({ success: false, message: 'ה-AI לא הצליח ליצור תוכנית לימוד. נסה שנית.' });
     }
 
-    // Resolve Hebrew start date if AI returned one
+    // Resolve start date
     let cursor = startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)
       ? startDate
       : todayIso;
-    if (safeHebDate && syllabusItems[0]?.resolvedStartDate &&
-        /^\d{4}-\d{2}-\d{2}$/.test(syllabusItems[0].resolvedStartDate)) {
-      cursor = syllabusItems[0].resolvedStartDate;
+    if (resolvedStartDate) {
+      cursor = resolvedStartDate;
     }
 
     const endDateMs = endCondition === 'date' && targetDate
@@ -394,19 +482,6 @@ async function generateLearningPlan(req, res) {
     }
 
     const schedule = readSchedule();
-
-    if (clearExisting) {
-      // Mop-up both data files before wiping, so we never write onto a directory
-      for (const fp of [SCHEDULE_FILE, STUDY_PATHS_FILE]) {
-        if (fs.existsSync(fp) && fs.statSync(fp).isDirectory()) {
-          fs.rmSync(fp, { recursive: true, force: true });
-        }
-        fs.mkdirSync(path.dirname(fp), { recursive: true });
-      }
-      // Wipe all existing tasks and all study paths so the manager stays in sync
-      schedule.tasks = [];
-      writeStudyPaths({ paths: [] });
-    }
 
     schedule.tasks.push(...newTasks);
     writeSchedule(schedule);

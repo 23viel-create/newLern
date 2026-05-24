@@ -204,6 +204,7 @@ const Api = {
     apiFetchPlain('/ai/system-help', { method: 'POST', body: { userMessage } }),
   aiGetLbMode:  () => apiFetchPlain('/ai/lb-mode', {}),
   aiSetLbMode:  (mode) => apiFetchPlain('/ai/lb-mode', { method: 'PUT', body: { mode } }),
+  aiResetCooldowns: () => apiFetchPlain('/ai/reset-cooldowns', { method: 'POST' }),
   calendarExtendParashot: () =>
     apiFetch('/calendar/extend-parashot', { method: 'POST' }),
   learningPlanGenerate: (params) =>

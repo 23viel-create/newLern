@@ -504,11 +504,10 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
   transition: border-color 0.12s;
   background: var(--color-surface);
 }
-.cal-cell:hover:not(.cal-cell--empty):not(.cal-cell--blocked) {
+.cal-cell:hover:not(.cal-cell--empty) {
   border-color: var(--color-primary);
 }
-.cal-cell--empty   { cursor: default; background: transparent; }
-.cal-cell--blocked { cursor: default; }
+.cal-cell--empty { cursor: default; background: transparent; }
 .cal-cell--today   { box-shadow: 0 0 0 2px var(--color-primary); }
 .cal-cell--selected { border-color: var(--color-primary) !important; background: #eef2ff !important; }
 

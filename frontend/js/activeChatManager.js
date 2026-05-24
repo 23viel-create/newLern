@@ -295,11 +295,8 @@ const ActiveChatManager = (() => {
       document.getElementById('syllabusUnitRequiredHint')?.classList.add('hidden');
     });
 
-    document.getElementById('syllabusClearExisting')?.addEventListener('change', (e) => {
-      document.getElementById('syllabusClearHint')?.classList.toggle('hidden', !e.target.checked);
-    });
-
     document.getElementById('syllabusGenerateBtn')?.addEventListener('click', _generateSyllabus);
+    document.getElementById('syllabusResetFormBtn')?.addEventListener('click', _resetSyllabusForm);
   }
 
   async function _generateSyllabus() {
@@ -313,7 +310,6 @@ const ActiveChatManager = (() => {
     const targetDate      = document.getElementById('syllabusTargetDate')?.value || '';
     const skipShabbat     = document.getElementById('syllabusSkipShabbat')?.checked ?? true;
     const skipHolidays    = document.getElementById('syllabusSkipHolidays')?.checked ?? true;
-    const clearExisting   = document.getElementById('syllabusClearExisting')?.checked ?? false;
     const isCustomBook    = document.getElementById('syllabusCustomBook')?.checked ?? false;
     const unitType        = document.getElementById('syllabusUnitType')?.value || 'עמודים';
     const startUnitRaw    = document.getElementById('syllabusStartUnit')?.value;
@@ -349,7 +345,6 @@ const ActiveChatManager = (() => {
         hebrewStartDate:  hebrewStartDate || undefined,
         startingPoint:    startingPoint   || undefined,
         skipShabbat, skipHolidays,
-        clearExisting,
         isCustomBook,
         unitType:   isCustomBook ? unitType : undefined,
         startUnit,
@@ -380,6 +375,25 @@ const ActiveChatManager = (() => {
     } finally {
       btn.disabled = false;
     }
+  }
+
+  function _resetSyllabusForm() {
+    const ids = ['syllabusBook','syllabusAuthor','syllabusPace','syllabusStartingPoint',
+                 'syllabusStartDate','syllabusHebrewDate','syllabusTargetDate',
+                 'syllabusStartUnit','syllabusEndUnit'];
+    ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const bookEnd = document.querySelector('input[name="syllabusEnd"][value="book"]');
+    if (bookEnd) bookEnd.checked = true;
+    const shabbat = document.getElementById('syllabusSkipShabbat');
+    const holidays = document.getElementById('syllabusSkipHolidays');
+    if (shabbat)  shabbat.checked  = true;
+    if (holidays) holidays.checked = true;
+    const customBook = document.getElementById('syllabusCustomBook');
+    if (customBook) { customBook.checked = false; customBook.dispatchEvent(new Event('change')); }
+    document.getElementById('syllabusTargetDateRow')?.classList.add('hidden');
+    document.getElementById('syllabusUnitRequiredHint')?.classList.add('hidden');
+    document.getElementById('syllabusResult')?.classList.add('hidden');
+    document.getElementById('syllabusStatus')?.classList.add('hidden');
   }
 
   async function _runOptimize() {
