@@ -2044,3 +2044,11 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
   border-color: #a5b4fc;
   color: var(--color-primary);
 }
+
+/* ── AI temp selection highlight (persists when editor loses focus) ── */
+mark.ai-temp-highlight {
+  background: #fde68a;
+  color: inherit;
+  border-radius: 2px;
+  outline: 1px dashed #d97706;
+}

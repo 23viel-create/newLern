@@ -532,9 +532,10 @@ const EditorManager = (() => {
   // ─── AI Contextual Edit ───────────────────────────────────────────────────────
 
   const _aiEdit = (() => {
-    let _savedRange = null;
-    let _editMode   = 'INSERT'; // 'INSERT' | 'REPLACE'
-    let _isActive   = false;
+    let _savedRange    = null;
+    let _highlightMark = null; // <mark> element wrapping the user's selection
+    let _editMode      = 'INSERT'; // 'INSERT' | 'REPLACE'
+    let _isActive      = false;
 
     const _el = {
       toggle:    () => document.getElementById('aiEditToggleBtn'),
@@ -550,6 +551,37 @@ const EditorManager = (() => {
     };
 
     function _showBar() {
+      const editor = document.getElementById('editorContent');
+
+      // Capture selection BEFORE focus is stolen by the instruction input
+      const sel = window.getSelection();
+      if (editor && sel && sel.rangeCount > 0 &&
+          editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        const range = sel.getRangeAt(0).cloneRange();
+        if (!range.collapsed) {
+          // Wrap the selected text in a persistent visual highlight
+          const mark = document.createElement('mark');
+          mark.className = 'ai-temp-highlight';
+          try {
+            range.surroundContents(mark);
+          } catch {
+            // Range spans multiple block elements — extract then rewrap
+            const frag = range.extractContents();
+            mark.appendChild(frag);
+            range.insertNode(mark);
+          }
+          _highlightMark = mark;
+          _savedRange = document.createRange();
+          _savedRange.selectNodeContents(mark);
+        } else {
+          _savedRange = range; // cursor-only INSERT position
+          _highlightMark = null;
+        }
+      } else {
+        _savedRange = null;
+        _highlightMark = null;
+      }
+
       _isActive = true;
       _el.toggle()?.classList.add('ai-edit--active');
       _el.bar()?.classList.remove('hidden');
@@ -557,8 +589,19 @@ const EditorManager = (() => {
     }
 
     function deactivate() {
-      _isActive   = false;
-      _savedRange = null;
+      _isActive = false;
+
+      // Unwrap highlight mark, restoring the original text nodes
+      if (_highlightMark && _highlightMark.parentNode) {
+        const parent = _highlightMark.parentNode;
+        while (_highlightMark.firstChild) {
+          parent.insertBefore(_highlightMark.firstChild, _highlightMark);
+        }
+        parent.removeChild(_highlightMark);
+        parent.normalize();
+      }
+      _highlightMark = null;
+      _savedRange    = null;
 
       const editor = document.getElementById('editorContent');
       if (editor) {
@@ -585,20 +628,22 @@ const EditorManager = (() => {
       const editor = document.getElementById('editorContent');
       if (!editor) return;
 
-      // ── 1. Capture selection inside the editor ──────────────────────────
-      const sel = window.getSelection();
+      // ── 1. Use the range captured at toggle-time (mark or cursor) ──────
       let range;
-      if (sel && sel.rangeCount > 0 &&
-          editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
-        range = sel.getRangeAt(0).cloneRange();
+      if (_highlightMark && _highlightMark.parentNode) {
+        range = document.createRange();
+        range.selectNodeContents(_highlightMark);
+        _savedRange = range;
+      } else if (_savedRange) {
+        range = _savedRange;
       } else {
         range = document.createRange();
         range.selectNodeContents(editor);
         range.collapse(false);
+        _savedRange = range;
       }
-      _savedRange = range;
 
-      const selectedText = range.toString();
+      const selectedText = _highlightMark ? _highlightMark.textContent : range.toString();
       _editMode = selectedText.length > 0 ? 'REPLACE' : 'INSERT';
 
       // ── 2. Extract ±150-word context ────────────────────────────────────
@@ -685,7 +730,7 @@ const EditorManager = (() => {
 
     function _inject(text) {
       const editor = document.getElementById('editorContent');
-      if (!editor || !_savedRange) return;
+      if (!editor) return;
 
       // Unlock first
       editor.contentEditable = 'true';
@@ -695,10 +740,20 @@ const EditorManager = (() => {
       sel.removeAllRanges();
 
       try {
-        const workRange = _savedRange.cloneRange();
-
-        if (_editMode === 'REPLACE') {
+        let workRange;
+        if (_highlightMark && _highlightMark.parentNode) {
+          // Select and delete the highlight mark (replaces its entire content)
+          workRange = document.createRange();
+          workRange.selectNode(_highlightMark);
           workRange.deleteContents();
+          _highlightMark = null; // prevent deactivate() from double-unwrapping
+        } else if (_savedRange) {
+          workRange = _savedRange.cloneRange();
+          if (_editMode === 'REPLACE') workRange.deleteContents();
+        } else {
+          workRange = document.createRange();
+          workRange.selectNodeContents(editor);
+          workRange.collapse(false);
         }
 
         // Build fragment preserving newlines

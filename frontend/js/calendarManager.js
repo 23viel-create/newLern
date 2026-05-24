@@ -948,69 +948,97 @@ const CalendarManager = (() => {
 
       panel.innerHTML = tasks.map(_renderTaskItem).join('');
 
-      // ── Complete ──
-      panel.querySelectorAll('.task-done-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const snapYear = currentYear, snapMonth = currentMonth, snapDate = selectedDate;
-          try {
-            btn.disabled = true;
-            await Api.completeTask(btn.dataset.id, 3);
-            currentYear = snapYear; currentMonth = snapMonth; selectedDate = snapDate;
-            _monthCache = {};
-            loadCalendar();
-          } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
-        });
-      });
-
-      // ── Undo complete ──
-      panel.querySelectorAll('.task-undo-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const snapYear = currentYear, snapMonth = currentMonth, snapDate = selectedDate;
-          try {
-            btn.disabled = true;
-            await Api.uncompleteTask(btn.dataset.id);
-            currentYear = snapYear; currentMonth = snapMonth; selectedDate = snapDate;
-            _monthCache = {};
-            loadCalendar();
-          } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
-        });
-      });
-
-      // ── Postpone (+1 day cascade) ──
-      panel.querySelectorAll('.task-postpone-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const snapYear = currentYear, snapMonth = currentMonth, snapDate = selectedDate;
-          try {
-            btn.disabled = true;
-            await Api.postponeTask(btn.dataset.id);
-            currentYear = snapYear; currentMonth = snapMonth; selectedDate = snapDate;
-            _monthCache = {};
-            loadCalendar();
-          } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
-        });
-      });
-
-      // ── "סיימתי עד לכאן היום" — cascade −1 day with irreversible-action warning ──
-      panel.querySelectorAll('.task-yesterday-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const confirmed = await WindowManager.confirm(
-            'האם אתה בטוח? כל המשימות הבאות שקשורות לרצף לימוד זה יידחו למחר, וימשיכו ישירות לאחר הלימוד הנוכחי שסיימת. פעולה זו אינה הפיכה.'
-          );
-          if (!confirmed) return;
-          const snapYear = currentYear, snapMonth = currentMonth, snapDate = selectedDate;
-          try {
-            btn.disabled = true;
-            await Api.learnYesterday(btn.dataset.id);
-            currentYear = snapYear; currentMonth = snapMonth; selectedDate = snapDate;
-            _monthCache = {};
-            loadCalendar();
-          } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
-        });
-      });
+      panel.querySelectorAll('.task-done-btn').forEach(_bindDoneBtn);
+      panel.querySelectorAll('.task-undo-btn').forEach(_bindUndoBtn);
+      panel.querySelectorAll('.task-postpone-btn').forEach(_bindPostponeBtn);
+      panel.querySelectorAll('.task-yesterday-btn').forEach(_bindYesterdayBtn);
     } catch (err) {
       panel.innerHTML =
         `<p class="placeholder-text error-text">שגיאה: ${_esc(err.message)}</p>`;
     }
+  }
+
+  // ── Task action helpers ───────────────────────────────────────────────────
+
+  function _patchTaskDone(taskItem, id) {
+    taskItem.classList.add('task-item--done');
+    const actions = taskItem.querySelector('.task-item__actions');
+    if (!actions) return;
+    actions.innerHTML =
+      `<span class="task-item__status">✓ הושלם</span>` +
+      `<button class="btn btn--xs btn--ghost task-undo-btn" data-id="${_esc(id)}" title="בטל השלמה">↩</button>`;
+    _bindUndoBtn(actions.querySelector('.task-undo-btn'));
+  }
+
+  function _patchTaskUndone(taskItem, id) {
+    taskItem.classList.remove('task-item--done');
+    const actions = taskItem.querySelector('.task-item__actions');
+    if (!actions) return;
+    actions.innerHTML =
+      `<button class="btn btn--xs btn--primary task-done-btn" data-id="${_esc(id)}">סיימתי ✓</button>` +
+      `<button class="btn btn--xs btn--ghost task-postpone-btn" data-id="${_esc(id)}" title="דחה יום קדימה">דחה ←</button>` +
+      `<button class="btn btn--xs btn--ghost task-yesterday-btn" data-id="${_esc(id)}" title="סיימתי עד לכאן היום — כל המשימות הבאות ידחו">סיימתי עד לכאן היום</button>`;
+    _bindDoneBtn(actions.querySelector('.task-done-btn'));
+    _bindPostponeBtn(actions.querySelector('.task-postpone-btn'));
+    _bindYesterdayBtn(actions.querySelector('.task-yesterday-btn'));
+  }
+
+  function _bindDoneBtn(btn) {
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      try {
+        btn.disabled = true;
+        await Api.completeTask(btn.dataset.id, 3);
+        _monthCache = {};
+        const taskItem = btn.closest('.task-item');
+        if (taskItem) _patchTaskDone(taskItem, btn.dataset.id);
+      } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
+    });
+  }
+
+  function _bindUndoBtn(btn) {
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      try {
+        btn.disabled = true;
+        await Api.uncompleteTask(btn.dataset.id);
+        _monthCache = {};
+        const taskItem = btn.closest('.task-item');
+        if (taskItem) _patchTaskUndone(taskItem, btn.dataset.id);
+      } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
+    });
+  }
+
+  function _bindPostponeBtn(btn) {
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const snapYear = currentYear, snapMonth = currentMonth, snapDate = selectedDate;
+      try {
+        btn.disabled = true;
+        await Api.postponeTask(btn.dataset.id);
+        currentYear = snapYear; currentMonth = snapMonth; selectedDate = snapDate;
+        _monthCache = {};
+        loadCalendar();
+      } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
+    });
+  }
+
+  function _bindYesterdayBtn(btn) {
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const confirmed = await WindowManager.confirm(
+        'האם אתה בטוח? כל המשימות הבאות שקשורות לרצף לימוד זה יידחו למחר, וימשיכו ישירות לאחר הלימוד הנוכחי שסיימת. פעולה זו אינה הפיכה.'
+      );
+      if (!confirmed) return;
+      const snapYear = currentYear, snapMonth = currentMonth, snapDate = selectedDate;
+      try {
+        btn.disabled = true;
+        await Api.learnYesterday(btn.dataset.id);
+        currentYear = snapYear; currentMonth = snapMonth; selectedDate = snapDate;
+        _monthCache = {};
+        loadCalendar();
+      } catch (err) { btn.disabled = false; alert(`שגיאה: ${err.message}`); }
+    });
   }
 
   function _renderTaskItem(task) {
