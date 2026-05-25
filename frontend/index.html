@@ -22,14 +22,14 @@
       <a href="#" data-view="help"        class="nav-link">❓ עזרה</a>
     </nav>
     <div class="navbar__status">
-      <button id="appGuideToggleBtn" class="btn btn--ghost btn--sm" title="מדריך AI">🤖 מדריך</button>
       <button id="globalRefreshBtn" class="btn btn--ghost btn--sm" onclick="window.location.reload()" title="רענן מסך">🔄</button>
       <span id="offlineIndicator" class="badge badge--offline hidden">אין חיבור לאינטרנט</span>
       <span id="aiKeysBattery"    class="badge badge--info">מפתחות AI: <strong id="keyCount">0</strong></span>
     </div>
   </header>
 
-  <!-- ══════════════════ מדריך AI — פאנל תחתון ══════════════════ -->
+  <!-- ══════════════════ מדריך AI — כפתור עגון תחתון + פאנל ══════════════════ -->
+  <button id="appGuideToggleBtn" class="app-guide-dock-btn" title="מדריך AI">🤖 מדריך</button>
   <div id="appGuidePanel" class="app-guide-panel" dir="rtl" aria-label="מדריך AI">
     <div class="app-guide-panel__header">
       <span id="appGuideScreenLabel" class="app-guide-screen-label">📍 כללי</span>

@@ -368,22 +368,30 @@ function _buildMetadataPrompt({ safeBook, safeAuthor, safePace, safePoint, safeH
     : '';
 
   const granularNote = unitType
-    ? `\n\n## ⚠️ CRITICAL HIERARCHY RULE — חובת גרנולריות ביחידת "${unitType}" (קריטי ביותר)
-המשתמש ביקש לחלק את הלימוד ביחידת "${unitType}".
+    ? `\n\n## ══ CRITICAL ALGORITHM RULE — YOU MUST READ THIS CAREFULLY ══
+UNIT REQUESTED: "${unitType}"
 
-CRITICAL: If the unit is granular like פרקים/chapters/דפים/עמודים — YOU MUST FLATTEN the hierarchy completely.
-DO NOT return groupings by Tractate/Book/Section. Return EVERY individual unit as its own item.
+IF THE UNIT IS פרקים (chapters) OR ANY GRANULAR UNIT (דפים, עמודים, הלכות) FOR COMPLEX TEXTS
+(Mishna / Talmud / multi-tractate works):
 
-כלל מחייב — פלטן (Flatten) מוחלט:
-  • אל תחזיר פריט ברמת סדר, מסכת, ספר, או חלק — פרט לפי ${unitType} בלבד.
-  • כל ${unitType} בודד מקבל פריט נפרד עם sessions=1 (אלא אם המשתמש ביקש אחרת).
-  • דוגמה נכונה (משנה סדר זרעים, יחידה=פרקים):
-    [{"title":"ברכות פרק א","sessions":1},{"title":"ברכות פרק ב","sessions":1},...,{"title":"בכורים פרק ד","sessions":1}]
-  • דוגמה שגויה (אסורה לחלוטין):
-    [{"title":"מסכת ברכות","sessions":9}] ← זו שגיאה חמורה!
-  • סך כל הפריטים במערך = סך כל ה-${unitType} בטקסט כולו.
-  • מגבלה טכנית: עד 60 פריטים — אם יש יותר, קבץ לפרקים רצופים קצרים (2–3 ${unitType} לפריט).
-חריג בלבד: אם ${unitType} = 'ספרים' או 'מסכתות' (יחידה גסה) — מותר לקבץ.`
+YOU ARE STRICTLY FORBIDDEN from aggregating or grouping multiple chapters into a single array item.
+YOU ARE STRICTLY FORBIDDEN from returning items like {"title":"מסכת ברכות","sessions":9}.
+YOU MUST return a 100% FLAT array where EVERY SINGLE ITEM represents EXACTLY ONE ${unitType}.
+
+MANDATORY FORMAT — each chapter as its own object with sessions:1:
+  {"title":"מסכת ברכות פרק א","sessions":1},
+  {"title":"מסכת ברכות פרק ב","sessions":1},
+  {"title":"מסכת ברכות פרק ג","sessions":1},
+  ...continue for ALL chapters in ALL tractates...
+  {"title":"מסכת בכורים פרק ד","sessions":1}
+
+THE ARRAY LENGTH MUST EXACTLY EQUAL THE TOTAL NUMBER OF ${unitType} IN THE ENTIRE TEXT.
+If the total exceeds 60, group consecutive ${unitType} in pairs (פרק א–ב, פרק ג–ד) to stay ≤60 items.
+
+DO NOT OUTPUT: [{"title":"מסכת ברכות","sessions":9}]  ← THIS IS WRONG. FORBIDDEN.
+DO OUTPUT:     [{"title":"מסכת ברכות פרק א","sessions":1}, {"title":"מסכת ברכות פרק ב","sessions":1}, ...]
+
+Exception (only): if ${unitType} = 'ספרים' or 'מסכתות' (coarse unit) — grouping is allowed.`
     : '';
 
   return `אתה מומחה בספרות תורנית ואקדמית. עוגן תאריך: ${todayIso}${todayHeb ? ` (${todayHeb})` : ''}.
@@ -393,8 +401,9 @@ DO NOT return groupings by Tractate/Book/Section. Return EVERY individual unit a
 תנאי סיום: ${endNote}.${startNote}${hebNote}${granularNote}
 
 ## משימה
-החזר מטא-דאטה בלבד: מערך JSON של הפרקים/חלקים המרכזיים בספר עם מספר ימי לימוד לכל פרק.
-מקסימום 60 פריטים. קצר וממוקד.
+החזר מטא-דאטה בלבד: מערך JSON.
+${unitType ? `⚠️ יחידת הלימוד: "${unitType}" — כל פריט = יחידה אחת בלבד. ראה כלל CRITICAL ALGORITHM RULE למעלה.` : 'מערך של הפרקים/חלקים המרכזיים עם מספר ימי לימוד לכל אחד.'}
+מקסימום 60 פריטים.
 
 ## פורמט — JSON בלבד:
 [{"title":"שם הפרק","sessions":N}, ...]
