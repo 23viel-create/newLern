@@ -426,6 +426,19 @@ const SYSTEM_GUIDE = `מדריך למשתמש — מערכת למידה פעיל
 11. מצב אופליין: כל פונקציות הסיכומים עובדות ללא אינטרנט. רק ה-AI דורש חיבור.
 12. מפתחות Gemini: הוסף מפתחות חינמיים מ-aistudio.google.com בהגדרות → מפתחות API.`;
 
+async function appGuideChat(userMessage, currentScreen) {
+  const safeMsg    = _sanitize(userMessage);
+  const safeScreen = _sanitize(String(currentScreen || 'כללי')).slice(0, 80);
+  if (!safeMsg) throw new Error('הודעה ריקה');
+  const prompt = `אתה מדריך AI מוטמע באפליקציית הלמידה הפעילה.
+המשתמש נמצא כרגע במסך: "${safeScreen}".
+ענה על שאלות לגבי אופן השימוש באפליקציה, היכן למצוא פיצ'רים, ומה ניתן לעשות במסך הנוכחי.
+אל תמציא מידע. ענה בעברית, בגובה העיניים, ובקצרה (עד 5 משפטים).
+
+שאלת המשתמש: ${safeMsg}`;
+  return await _callGemini(prompt, 'general');
+}
+
 async function systemHelpChat(userMessage) {
   const safeMsg = _sanitize(userMessage);
   if (!safeMsg) throw new Error('הודעה ריקה');
@@ -639,6 +652,7 @@ module.exports = {
   generateLearningProgram,
   parseSrProgramFromText,
   systemHelpChat,
+  appGuideChat,
   getKeyStatus,
   getKeys,
   updateKeys,

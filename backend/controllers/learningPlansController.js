@@ -368,15 +368,22 @@ function _buildMetadataPrompt({ safeBook, safeAuthor, safePace, safePoint, safeH
     : '';
 
   const granularNote = unitType
-    ? `\n\n## ⚠️ חובת גרנולריות ביחידת "${unitType}" (קריטי ביותר)
+    ? `\n\n## ⚠️ CRITICAL HIERARCHY RULE — חובת גרנולריות ביחידת "${unitType}" (קריטי ביותר)
 המשתמש ביקש לחלק את הלימוד ביחידת "${unitType}".
-שדה "sessions" בכל פריט חייב להכיל את מספר ה-${unitType} הכלולים בפריט זה — לא את מספר ימי הלימוד.
-עבור טקסטים היררכיים (משנה, תלמוד, ספרים עם מסכתות/חלקים/פרקים):
-  • אל תחזיר פריט ברמת סדר/ספר כולל — פרק לפי ${unitType}.
-  • כל מסכת/חלק מקבל פריט נפרד עם sessions = מספר ה-${unitType} שבו.
-  • דוגמה (משנה, יחידה=פרקים): [{"title":"מסכת ברכות","sessions":9},{"title":"מסכת פאה","sessions":8},{"title":"מסכת דמאי","sessions":7}, ...]
-  • ה-sessions של כל הפריטים יחד = סך כל ה-${unitType} בספר.
-חריג: אם ${unitType} = 'ספרים' או דומה (יחידה גסה) — אפשר לקבץ.`
+
+CRITICAL: If the unit is granular like פרקים/chapters/דפים/עמודים — YOU MUST FLATTEN the hierarchy completely.
+DO NOT return groupings by Tractate/Book/Section. Return EVERY individual unit as its own item.
+
+כלל מחייב — פלטן (Flatten) מוחלט:
+  • אל תחזיר פריט ברמת סדר, מסכת, ספר, או חלק — פרט לפי ${unitType} בלבד.
+  • כל ${unitType} בודד מקבל פריט נפרד עם sessions=1 (אלא אם המשתמש ביקש אחרת).
+  • דוגמה נכונה (משנה סדר זרעים, יחידה=פרקים):
+    [{"title":"ברכות פרק א","sessions":1},{"title":"ברכות פרק ב","sessions":1},...,{"title":"בכורים פרק ד","sessions":1}]
+  • דוגמה שגויה (אסורה לחלוטין):
+    [{"title":"מסכת ברכות","sessions":9}] ← זו שגיאה חמורה!
+  • סך כל הפריטים במערך = סך כל ה-${unitType} בטקסט כולו.
+  • מגבלה טכנית: עד 60 פריטים — אם יש יותר, קבץ לפרקים רצופים קצרים (2–3 ${unitType} לפריט).
+חריג בלבד: אם ${unitType} = 'ספרים' או 'מסכתות' (יחידה גסה) — מותר לקבץ.`
     : '';
 
   return `אתה מומחה בספרות תורנית ואקדמית. עוגן תאריך: ${todayIso}${todayHeb ? ` (${todayHeb})` : ''}.

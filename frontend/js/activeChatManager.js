@@ -142,9 +142,11 @@ const ActiveChatManager = (() => {
       await Api.deleteStudyPath(id);
       await _loadStudyPaths();
       _resetSyllabusForm();
-      // Brute-force unlock — catches any field not listed in _resetSyllabusForm's ids array
-      document.querySelectorAll('#syllabusForm input, #syllabusForm textarea, #syllabusForm select, #syllabusGenerateBtn')
-        .forEach(el => { el.disabled = false; el.readOnly = false; });
+      // Delayed brute-force unlock — runs after any re-render that might re-disable fields
+      setTimeout(() => {
+        document.querySelectorAll('#syllabusForm input, #syllabusForm select, #syllabusForm textarea, .syllabus-generator-modal input, #syllabusGenerateBtn')
+          .forEach(el => { el.disabled = false; el.readOnly = false; });
+      }, 200);
       if (typeof loadCalendar === 'function') loadCalendar();
     } catch (err) {
       alert(`שגיאה במחיקה: ${err.message}`);

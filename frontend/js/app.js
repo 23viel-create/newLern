@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
   WindowManager.initOfflineDetection((isOffline) => AiManager.setOffline(isOffline));
   EditorManager.init();
   AiManager.init();
+  AppGuideManager.init();
   BackupManager.init();
   PlanProgramModal.init();
   SplitScreenManager.init();
