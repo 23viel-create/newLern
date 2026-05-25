@@ -436,6 +436,10 @@ const ActiveChatManager = (() => {
 
   // ── Init ──────────────────────────────────────────────────────────────────
   function init() {
+    // Always unlock form on every view activation — clears any stuck disabled state
+    document.querySelectorAll('#syllabusForm input, #syllabusForm select, #syllabusForm textarea, #syllabusGenerateBtn')
+      .forEach(el => { el.disabled = false; el.readOnly = false; });
+
     if (_bound) return;
     _bound = true;
 

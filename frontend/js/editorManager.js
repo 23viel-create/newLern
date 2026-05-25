@@ -81,6 +81,10 @@ const EditorManager = (() => {
     if (typeof AiManager !== 'undefined') AiManager.setContext('editor');
     _updateNav();
 
+    // Failsafe: ensure toolbar is always visible regardless of CSS state
+    const tb = document.getElementById('editorToolbar');
+    if (tb) tb.style.display = 'flex';
+
     // טען תוכן
     const editor = document.getElementById('editorContent');
     editor.innerHTML = '<p class="placeholder-text">טוען...</p>';

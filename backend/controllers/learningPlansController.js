@@ -339,24 +339,80 @@ function _generateCustomBookItems(startUnit, endUnit, unitsPerDay, unitType) {
 
 function _expandMetadataToItems(chapters, unitsPerDay = 1) {
   const perDay = Math.max(1, Math.round(unitsPerDay));
-  const items  = [];
+
+  // Expand every chapter into individual unit slots so cross-chapter batching works
+  const units = [];
   for (const ch of chapters) {
     const total = Math.max(1, Math.round(Number(ch.sessions) || 1));
-    if (total <= perDay) {
-      // Entire section fits within one study day
-      items.push({ title: ch.title });
-    } else {
-      // Split into daily chunks
-      const days = Math.ceil(total / perDay);
-      for (let d = 1; d <= days; d++) {
-        const start = (d - 1) * perDay + 1;
-        const end   = Math.min(d * perDay, total);
-        const suffix = start === end ? ` (${start})` : ` (${start}–${end})`;
-        items.push({ title: ch.title + suffix });
-      }
+    for (let u = 1; u <= total; u++) {
+      units.push({ parent: ch.title, idx: u, total });
     }
   }
+  if (units.length === 0) return [];
+
+  // Batch into daily chunks of perDay units each
+  const items = [];
+  for (let i = 0; i < units.length; i += perDay) {
+    const chunk = units.slice(i, i + perDay);
+    items.push({ title: _buildDayTitle(chunk) });
+  }
   return items;
+}
+
+// Build a human-readable title for a daily chunk of unit slots
+function _buildDayTitle(chunk) {
+  // Group consecutive slots by parent chapter
+  const groups = [];
+  for (const u of chunk) {
+    const prev = groups[groups.length - 1];
+    if (prev && prev.parent === u.parent) {
+      prev.last = u.idx;
+    } else {
+      groups.push({ parent: u.parent, first: u.idx, last: u.idx, total: u.total });
+    }
+  }
+
+  const rawParts = groups.map(g => {
+    if (g.total === 1) return g.parent;                        // flat chapter (sessions=1)
+    if (g.first === 1 && g.last === g.total) return g.parent; // whole chapter covered
+    return g.first === g.last
+      ? `${g.parent} (${g.first})`
+      : `${g.parent} (${g.first}–${g.last})`;
+  });
+
+  return _compressPerekRanges(groups, rawParts);
+}
+
+// Compress adjacent flat chapters of the same tractate into range notation
+// e.g. ["מסכת ברכות פרק א","מסכת ברכות פרק ב"] → "מסכת ברכות פרקים א–ב"
+const _PEREK_RE = /^(.+?)\s+פרק\s+(.+)$/;
+
+function _compressPerekRanges(groups, rawParts) {
+  // Only compress when all groups are flat (sessions=1) chapters
+  if (!groups.every(g => g.total === 1)) return rawParts.join(', ');
+
+  const parsed = rawParts.map(part => {
+    const m = part.match(_PEREK_RE);
+    return m ? { tractate: m[1], chapter: m[2] } : { tractate: null, raw: part };
+  });
+
+  const compressed = [];
+  let ti = 0;
+  while (ti < parsed.length) {
+    const cur = parsed[ti];
+    if (!cur.tractate) { compressed.push(cur.raw); ti++; continue; }
+
+    // Find run of consecutive items with same tractate
+    let tj = ti + 1;
+    while (tj < parsed.length && parsed[tj].tractate === cur.tractate) tj++;
+    const batch = parsed.slice(ti, tj);
+
+    compressed.push(batch.length === 1
+      ? `${cur.tractate} פרק ${cur.chapter}`
+      : `${cur.tractate} פרקים ${batch[0].chapter}–${batch[batch.length - 1].chapter}`);
+    ti = tj;
+  }
+  return compressed.join(', ');
 }
 
 function _buildMetadataPrompt({ safeBook, safeAuthor, safePace, safePoint, safeHebDate, todayIso, todayHeb, endNote, unitType }) {
