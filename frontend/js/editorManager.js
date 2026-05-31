@@ -158,12 +158,27 @@ const EditorManager = (() => {
     <button class="fmt-btn" data-cmd="removeFormat" title="נקה עיצוב">✕</button>`;
 
   function _ensureToolbar() {
-    const tb = document.getElementById('editorToolbar');
-    if (!tb) return;
-    // Rebuild if toolbar was wiped (no fmt-btn children)
+    let tb = document.getElementById('editorToolbar');
+
+    // Nuclear option: create and insert the toolbar if it was removed from DOM entirely
+    if (!tb) {
+      tb = document.createElement('div');
+      tb.id = 'editorToolbar';
+      tb.className = 'editor-toolbar';
+      const header = document.querySelector('.editor-header');
+      if (header) {
+        header.appendChild(tb);
+      } else {
+        // Last resort: insert right before the editor body
+        const body = document.getElementById('editorBody');
+        if (body) body.parentNode.insertBefore(tb, body);
+      }
+    }
+
+    // Rebuild buttons if toolbar was wiped empty
     if (!tb.querySelector('.fmt-btn')) {
       tb.innerHTML = _TOOLBAR_HTML;
-      // Re-bind font selectors that now exist in the new DOM
+      // Re-bind font selectors for the freshly injected DOM
       const ffSel = document.getElementById('editorFontFamily');
       const fsSel = document.getElementById('editorFontSize');
       if (ffSel) ffSel.addEventListener('change', (e) => {
@@ -176,7 +191,9 @@ const EditorManager = (() => {
         document.getElementById('editorContent')?.focus();
       });
     }
-    tb.style.display = 'flex';
+
+    // Force visibility with both inline style and CSS class regardless of cascade
+    tb.style.cssText = 'display:flex !important; flex-wrap:wrap; gap:8px; padding:8px; background-color:#eef1f6; border-bottom:1px solid #ccc; width:100%; min-height:45px; z-index:100; box-sizing:border-box; visibility:visible; opacity:1;';
   }
 
   // ─── אתחול אירועים ───────────────────────────────────────────────────────────
@@ -191,8 +208,9 @@ const EditorManager = (() => {
 
   function _bindEditorEvents() {
     const editor  = document.getElementById('editorContent');
+    if (!editor) return;
+    // toolbar lookup is deferred — _ensureToolbar() in open() guarantees it exists
     const toolbar = document.getElementById('editorToolbar');
-    if (!editor || !toolbar) return;
 
     // הפעלת styleWithCSS לשימוש ב-span style במקום תגי font ישנים
     document.addEventListener('selectionchange', () => {

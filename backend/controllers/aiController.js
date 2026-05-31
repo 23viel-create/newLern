@@ -584,6 +584,55 @@ ${String(instruction).slice(0, 600)}
 
 // ─── Bulk question generation ────────────────────────────────────────────────
 
+// Build chunked text with section markers and per-chunk quotas for uniform coverage
+function _buildChunkedContent(rawText, n) {
+  const MAX_CHARS = 5500;
+  const text = rawText.slice(0, MAX_CHARS);
+
+  // Only chunk if text is long enough and enough questions to distribute
+  if (text.length <= 1000 || n <= 3) {
+    return { chunkedText: text, chunkInstruction: '', numChunks: 1 };
+  }
+
+  const numChunks = n >= 20 ? 4 : n >= 8 ? 3 : 2;
+  const chunkSize = Math.ceil(text.length / numChunks);
+
+  // Split on whitespace boundaries to avoid cutting mid-word
+  const chunks = [];
+  let pos = 0;
+  for (let i = 0; i < numChunks; i++) {
+    const end = i === numChunks - 1 ? text.length : Math.min(pos + chunkSize, text.length);
+    // Walk back to nearest whitespace so we don't split a word
+    let cutAt = end;
+    if (cutAt < text.length) {
+      while (cutAt > pos && !/\s/.test(text[cutAt])) cutAt--;
+      if (cutAt === pos) cutAt = end; // no whitespace found — hard cut
+    }
+    chunks.push(text.slice(pos, cutAt).trim());
+    pos = cutAt;
+  }
+
+  // Build section-marked text
+  const chunkedText = chunks
+    .map((c, i) => `[--- מקטע ${i + 1} ---]\n${c}`)
+    .join('\n\n');
+
+  // Calculate per-chunk quotas (distribute remainder to first chunks)
+  const base = Math.floor(n / numChunks);
+  const rem  = n % numChunks;
+  const quotas = chunks.map((_, i) => base + (i < rem ? 1 : 0));
+
+  const chunkInstruction =
+    `\n## ══ SMART CHUNKING — חלוקה מדויקת לפי מקטעים ══\n` +
+    `הטקסט מחולק ל-${numChunks} מקטעים פיזיים ([--- מקטע 1 ---] עד [--- מקטע ${numChunks} ---]).\n` +
+    `עליך לייצר שאלות בדיוק לפי הקצאה זו (סה"כ ${n} שאלות):\n` +
+    quotas.map((q, i) => `  • מקטע ${i + 1}: בדיוק ${q} שאלות`).join('\n') + '\n' +
+    `חל עליך איסור מוחלט לחרוג מהקצאה — לא יותר ולא פחות מכל מקטע.\n` +
+    `ה-JSON הסופי חייב להכיל בדיוק ${n} שאלות בסדר המקטעים.`;
+
+  return { chunkedText, chunkInstruction, numChunks };
+}
+
 async function bulkGenerateQuestions({ summaryContent, summaryTitle, quantity, difficulty, type }) {
   const n = Math.min(50, Math.max(1, Number(quantity) || 20));
 
@@ -602,11 +651,13 @@ async function bulkGenerateQuestions({ summaryContent, summaryTitle, quantity, d
       ? 'כל השאלות: פתוחות (qtype:"open").'
       : `כ-${Math.ceil(n/2)} שאלות אמריקאיות (qtype:"mc") וכ-${Math.floor(n/2)} פתוחות (qtype:"open").`;
 
+  const { chunkedText, chunkInstruction } = _buildChunkedContent(summaryContent, n);
+
   const prompt = `אתה מומחה בבניית בחינות. צור בדיוק ${n} שאלות על הסיכום הבא.
 
 ## תוכן הסיכום
 כותרת: "${summaryTitle}"
-${summaryContent.slice(0, 5500)}
+${chunkedText}
 
 ## רמת קושי: ${targetDiff}
 
@@ -634,12 +685,7 @@ ${typeInstruction}
 ## פורמט פלט — JSON בלבד (מערך):
 - פתוחה: {"qtype":"open","question":"...","answer":"...","difficulty":"basic|easy|medium|hard"}
 - אמריקאית: {"qtype":"mc","question":"...","options":["...","...","...","..."],"correct_option_index":0,"difficulty":"basic|easy|medium|hard"}
-
-## ══ כלל חלוקה אחידה — CRITICAL DISTRIBUTION RULE ══
-סרוק את הטקסט כולו מהתחלה ועד הסוף.
-חל עליך איסור מוחלט לרכז שאלות בפסקאות הראשונות בלבד.
-עליך לפזר את ${n} השאלות באופן שווה על פני כל אורך הטקסט — כל נושא, קטע ומושג יבחן בצורה שווה.
-אם הטקסט מחולק ל-${n} חלקים שווים, כל חלק חייב לקבל לפחות שאלה אחת.
+${chunkInstruction}
 
 ## חוקים
 1. כל שאלה מבוססת אך ורק על תוכן הסיכום.
