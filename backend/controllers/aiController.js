@@ -585,16 +585,27 @@ ${String(instruction).slice(0, 600)}
 // ─── Bulk question generation ────────────────────────────────────────────────
 
 // Build chunked text with section markers and per-chunk quotas for uniform coverage
-function _buildChunkedContent(rawText, n) {
+// forcedChunks: 'auto' (default) | 1..5 (user override)
+function _buildChunkedContent(rawText, n, forcedChunks = 'auto') {
   const MAX_CHARS = 5500;
   const text = rawText.slice(0, MAX_CHARS);
 
-  // Only chunk if text is long enough and enough questions to distribute
-  if (text.length <= 1000 || n <= 3) {
-    return { chunkedText: text, chunkInstruction: '', numChunks: 1 };
+  // Resolve number of chunks
+  let numChunks;
+  if (forcedChunks !== 'auto' && Number.isInteger(Number(forcedChunks))) {
+    numChunks = Math.min(5, Math.max(1, Number(forcedChunks)));
+  } else {
+    // Auto: only chunk if text is long enough and enough questions to distribute
+    if (text.length <= 1000 || n <= 3) {
+      return { chunkedText: text, chunkInstruction: '', numChunks: 1 };
+    }
+    numChunks = n >= 20 ? 4 : n >= 8 ? 3 : 2;
   }
 
-  const numChunks = n >= 20 ? 4 : n >= 8 ? 3 : 2;
+  // With explicit chunk=1 there is nothing to split
+  if (numChunks === 1) {
+    return { chunkedText: text, chunkInstruction: '', numChunks: 1 };
+  }
   const chunkSize = Math.ceil(text.length / numChunks);
 
   // Split on whitespace boundaries to avoid cutting mid-word
@@ -633,7 +644,7 @@ function _buildChunkedContent(rawText, n) {
   return { chunkedText, chunkInstruction, numChunks };
 }
 
-async function bulkGenerateQuestions({ summaryContent, summaryTitle, quantity, difficulty, type }) {
+async function bulkGenerateQuestions({ summaryContent, summaryTitle, quantity, difficulty, type, chunkCount }) {
   const n = Math.min(50, Math.max(1, Number(quantity) || 20));
 
   const diffMap = {
@@ -651,7 +662,7 @@ async function bulkGenerateQuestions({ summaryContent, summaryTitle, quantity, d
       ? 'כל השאלות: פתוחות (qtype:"open").'
       : `כ-${Math.ceil(n/2)} שאלות אמריקאיות (qtype:"mc") וכ-${Math.floor(n/2)} פתוחות (qtype:"open").`;
 
-  const { chunkedText, chunkInstruction } = _buildChunkedContent(summaryContent, n);
+  const { chunkedText, chunkInstruction } = _buildChunkedContent(summaryContent, n, chunkCount || 'auto');
 
   const prompt = `אתה מומחה בבניית בחינות. צור בדיוק ${n} שאלות על הסיכום הבא.
 

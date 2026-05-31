@@ -1691,18 +1691,20 @@ const QuizManager = (() => {
   async function _runBulkGenerate() {
     const activePath = _bulkGenSourcePath || _edPath;
     if (!activePath) { alert('אין סיכום פתוח'); return; }
-    const qty       = Math.min(50, Math.max(1, Number(document.getElementById('bulkGenQty')?.value) || 20));
-    const diff      = document.getElementById('bulkGenDiff')?.value  || 'mixed_random';
-    const type      = document.getElementById('bulkGenType')?.value  || 'both';
-    const runBtn    = document.getElementById('bulkGenRunBtn');
-    const statusEl  = document.getElementById('bulkGenStatus');
+    const qty        = Math.min(50, Math.max(1, Number(document.getElementById('bulkGenQty')?.value) || 20));
+    const diff       = document.getElementById('bulkGenDiff')?.value   || 'mixed_random';
+    const type       = document.getElementById('bulkGenType')?.value   || 'both';
+    const chunksRaw  = document.getElementById('bulkGenChunks')?.value || 'auto';
+    const chunkCount = chunksRaw === 'auto' ? 'auto' : Math.min(5, Math.max(1, Number(chunksRaw)));
+    const runBtn     = document.getElementById('bulkGenRunBtn');
+    const statusEl   = document.getElementById('bulkGenStatus');
 
     runBtn.disabled      = true;
     statusEl.textContent = '⏳ ה-AI מייצר שאלות...';
     statusEl.classList.remove('hidden');
 
     try {
-      const questions = await Api.bulkGenerateQuestions(activePath, qty, diff, type);
+      const questions = await Api.bulkGenerateQuestions(activePath, qty, diff, type, chunkCount);
       _renderBulkStaging(questions);
       document.getElementById('bulkGenForm').classList.add('hidden');
       document.getElementById('bulkGenStaging').classList.remove('hidden');

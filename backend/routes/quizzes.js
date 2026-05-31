@@ -151,7 +151,7 @@ router.post('/open-questions', async (req, res) => {
 
 router.post('/bulk-generate', async (req, res) => {
   try {
-    const { nodePath, quantity, difficulty, type } = req.body;
+    const { nodePath, quantity, difficulty, type, chunkCount } = req.body;
     if (!nodePath) return res.status(400).json({ success: false, message: 'nodePath נדרש' });
     const { content, title } = getSummaryForBulkGenerate(nodePath);
     if (!content) return res.status(400).json({ success: false, message: 'הסיכום ריק — אין תוכן ליצירת שאלות' });
@@ -161,6 +161,7 @@ router.post('/bulk-generate', async (req, res) => {
       quantity:       Math.min(50, Math.max(1, Number(quantity) || 20)),
       difficulty:     difficulty || 'mixed_random',
       type:           type       || 'both',
+      chunkCount:     chunkCount,
     });
     res.json({ success: true, data: questions });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }

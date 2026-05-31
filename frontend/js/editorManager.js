@@ -80,6 +80,7 @@ const EditorManager = (() => {
     WindowManager.showView('editor');
     if (typeof AiManager !== 'undefined') AiManager.setContext('editor');
     _updateNav();
+    document.getElementById('editorToolbar')?.classList.remove('hidden');
     _ensureToolbar();
 
     // טען תוכן
@@ -199,6 +200,7 @@ const EditorManager = (() => {
   // ─── אתחול אירועים ───────────────────────────────────────────────────────────
 
   function init() {
+    document.getElementById('editorToolbar')?.classList.remove('hidden');
     _bindEditorEvents();
     _bindNavEvents();
     _bindAudioEvents();
