@@ -729,6 +729,9 @@ const CalendarManager = (() => {
   function _openQuickEventModal(dateStr) {
     const modal = document.getElementById('quickEventModal');
     if (!modal) return;
+    // Always unlock fields before showing — prevents stuck disabled state
+    modal.querySelectorAll('input, textarea, select')
+      .forEach(el => { el.disabled = false; el.readOnly = false; });
     document.getElementById('quickEventDate').textContent = dateStr;
     document.getElementById('quickEventInput').value = '';
     modal.classList.remove('hidden');
@@ -745,6 +748,8 @@ const CalendarManager = (() => {
         newConfirm.disabled = true;
         await Api.addCalendarEvent(dateStr, title);
         _monthCache = {};
+        modal.querySelectorAll('input, textarea, select')
+          .forEach(el => { el.disabled = false; el.readOnly = false; });
         modal.classList.add('hidden');
         loadCalendar();
       } catch (err) {
@@ -756,7 +761,11 @@ const CalendarManager = (() => {
     const cancelBtn = document.getElementById('quickEventCancelBtn');
     const newCancel = cancelBtn.cloneNode(true);
     cancelBtn.replaceWith(newCancel);
-    newCancel.addEventListener('click', () => modal.classList.add('hidden'));
+    newCancel.addEventListener('click', () => {
+      modal.querySelectorAll('input, textarea, select')
+        .forEach(el => { el.disabled = false; el.readOnly = false; });
+      modal.classList.add('hidden');
+    });
   }
 
   function _restoreSelection(grid) {

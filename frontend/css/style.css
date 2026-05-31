@@ -343,6 +343,30 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
   background: var(--color-surface);
 }
 
+/* ── RTL lists & checklists inside editor ── */
+#editorContent ul,
+#editorContent ol {
+  direction: rtl !important;
+  text-align: right !important;
+  padding-right: 1.5rem !important;
+  padding-left: 0 !important;
+  margin-right: 0.25rem !important;
+}
+#editorContent li {
+  direction: rtl !important;
+  text-align: right !important;
+}
+#editorContent li[data-list="checked"],
+#editorContent li[data-list="unchecked"],
+#editorContent input[type="checkbox"] {
+  direction: rtl !important;
+  text-align: right !important;
+}
+#editorContent input[type="checkbox"] {
+  margin-left: 0.4rem !important;
+  margin-right: 0 !important;
+}
+
 /* ── Formatting Toolbar ── */
 .editor-toolbar {
   display: flex !important;

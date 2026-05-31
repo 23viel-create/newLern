@@ -80,10 +80,7 @@ const EditorManager = (() => {
     WindowManager.showView('editor');
     if (typeof AiManager !== 'undefined') AiManager.setContext('editor');
     _updateNav();
-
-    // Failsafe: ensure toolbar is always visible regardless of CSS state
-    const tb = document.getElementById('editorToolbar');
-    if (tb) tb.style.display = 'flex';
+    _ensureToolbar();
 
     // טען תוכן
     const editor = document.getElementById('editorContent');
@@ -128,6 +125,60 @@ const EditorManager = (() => {
     }
   }
 
+  // ─── שחזור סרגל עיצוב אם נמחק ───────────────────────────────────────────────
+
+  const _TOOLBAR_HTML = `
+    <button class="fmt-btn" data-cmd="bold"               title="מודגש (Ctrl+B)"><b>ב</b></button>
+    <button class="fmt-btn" data-cmd="italic"             title="נטוי (Ctrl+I)"><i>נ</i></button>
+    <button class="fmt-btn" data-cmd="underline"          title="קו תחתון (Ctrl+U)"><u>ק</u></button>
+    <span class="toolbar-sep"></span>
+    <select id="editorFontFamily" class="select-field select-field--sm" title="גופן">
+      <option value="Arial, sans-serif">Arial</option>
+      <option value="'David', serif">David</option>
+      <option value="'Times New Roman', serif">Times</option>
+      <option value="'Courier New', monospace">Courier</option>
+    </select>
+    <select id="editorFontSize" class="select-field select-field--sm" title="גודל גופן">
+      <option value="12px">12</option>
+      <option value="14px">14</option>
+      <option value="16px" selected>16</option>
+      <option value="18px">18</option>
+      <option value="20px">20</option>
+      <option value="24px">24</option>
+      <option value="32px">32</option>
+    </select>
+    <span class="toolbar-sep"></span>
+    <button class="fmt-btn" data-cmd="insertUnorderedList" title="רשימה">•≡</button>
+    <button class="fmt-btn" data-cmd="insertOrderedList"   title="רשימה ממוספרת">1≡</button>
+    <span class="toolbar-sep"></span>
+    <button class="fmt-btn" data-cmd="justifyRight"  title="יישור לימין">⬛R</button>
+    <button class="fmt-btn" data-cmd="justifyCenter" title="מרכוז">⬛C</button>
+    <button class="fmt-btn" data-cmd="justifyLeft"   title="יישור לשמאל">⬛L</button>
+    <span class="toolbar-sep"></span>
+    <button class="fmt-btn" data-cmd="removeFormat" title="נקה עיצוב">✕</button>`;
+
+  function _ensureToolbar() {
+    const tb = document.getElementById('editorToolbar');
+    if (!tb) return;
+    // Rebuild if toolbar was wiped (no fmt-btn children)
+    if (!tb.querySelector('.fmt-btn')) {
+      tb.innerHTML = _TOOLBAR_HTML;
+      // Re-bind font selectors that now exist in the new DOM
+      const ffSel = document.getElementById('editorFontFamily');
+      const fsSel = document.getElementById('editorFontSize');
+      if (ffSel) ffSel.addEventListener('change', (e) => {
+        try { document.execCommand('styleWithCSS', false, true); } catch {}
+        document.execCommand('fontName', false, e.target.value);
+        document.getElementById('editorContent')?.focus();
+      });
+      if (fsSel) fsSel.addEventListener('change', (e) => {
+        _applyFontSize(e.target.value);
+        document.getElementById('editorContent')?.focus();
+      });
+    }
+    tb.style.display = 'flex';
+  }
+
   // ─── אתחול אירועים ───────────────────────────────────────────────────────────
 
   function init() {
@@ -141,6 +192,7 @@ const EditorManager = (() => {
   function _bindEditorEvents() {
     const editor  = document.getElementById('editorContent');
     const toolbar = document.getElementById('editorToolbar');
+    if (!editor || !toolbar) return;
 
     // הפעלת styleWithCSS לשימוש ב-span style במקום תגי font ישנים
     document.addEventListener('selectionchange', () => {
@@ -185,8 +237,9 @@ const EditorManager = (() => {
       if (clean) document.execCommand('insertHTML', false, clean);
     });
 
-    // סרגל עיצוב — כפתורי פורמט
-    toolbar.addEventListener('mousedown', (e) => {
+    // סרגל עיצוב — delegation on static header so it survives toolbar re-injection
+    const editorHeader = document.querySelector('.editor-header');
+    (editorHeader || toolbar).addEventListener('mousedown', (e) => {
       const btn = e.target.closest('.fmt-btn');
       if (!btn) return;
       e.preventDefault(); // שמור selection

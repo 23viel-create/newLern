@@ -1673,7 +1673,19 @@ const QuizManager = (() => {
   }
 
   function _closeBulkGenModal() {
-    document.getElementById('bulkGenModal')?.classList.add('hidden');
+    const modal = document.getElementById('bulkGenModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    // Reset staged state so next open → generate → save cycle is pristine
+    const list = document.getElementById('bulkGenList');
+    if (list) { list.innerHTML = ''; list.dataset.questions = '[]'; }
+    const saveBtn    = document.getElementById('bulkSaveBtn');
+    const saveStatus = document.getElementById('bulkSaveStatus');
+    if (saveBtn)    saveBtn.disabled = false;
+    if (saveStatus) { saveStatus.textContent = ''; saveStatus.classList.add('hidden'); }
+    document.getElementById('bulkGenForm')?.classList.remove('hidden');
+    document.getElementById('bulkGenStaging')?.classList.add('hidden');
+    _bulkGenSourcePath = null;
   }
 
   async function _runBulkGenerate() {
@@ -1770,9 +1782,11 @@ const QuizManager = (() => {
     try {
       const res = await Api.bulkSaveQuestions(activePath, toSave);
       saveStatus.textContent = `✓ ${res.count} שאלות נשמרו בהצלחה`;
+      const refreshPath = _bulkGenSourcePath;
+      const refreshDock = refreshPath && refreshPath === _ddPath;
       setTimeout(async () => {
         _closeBulkGenModal();
-        if (_bulkGenSourcePath && _bulkGenSourcePath === _ddPath) {
+        if (refreshDock) {
           await _loadDockQuestions();
           _renderDockTab();
         } else {
