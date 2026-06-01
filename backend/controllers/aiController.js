@@ -426,10 +426,23 @@ const SYSTEM_GUIDE = `מדריך למשתמש — מערכת למידה פעיל
 11. מצב אופליין: כל פונקציות הסיכומים עובדות ללא אינטרנט. רק ה-AI דורש חיבור.
 12. מפתחות Gemini: הוסף מפתחות חינמיים מ-aistudio.google.com בהגדרות → מפתחות API.`;
 
-async function appGuideChat(userMessage, currentScreen) {
+async function appGuideChat(userMessage, currentScreen, history) {
   const safeMsg    = _sanitize(userMessage);
   const safeScreen = _sanitize(String(currentScreen || 'כללי')).slice(0, 80);
   if (!safeMsg) throw new Error('הודעה ריקה');
+
+  // Build conversation history block (last 10 turns max, truncated for safety)
+  let historyBlock = '';
+  if (Array.isArray(history) && history.length > 0) {
+    const recent = history.slice(-10);
+    historyBlock = '\n## היסטוריית השיחה\n' +
+      recent.map(m =>
+        m.role === 'user'
+          ? `משתמש: ${_sanitize(String(m.text || '')).slice(0, 400)}`
+          : `מדריך: ${_sanitize(String(m.text || '')).slice(0, 600)}`
+      ).join('\n') + '\n';
+  }
+
   const prompt = `אתה מדריך AI מוטמע באפליקציית הלמידה הפעילה — אפליקציית ווב פנימית בלבד.
 המשתמש נמצא כרגע במסך: "${safeScreen}".
 
@@ -445,8 +458,8 @@ async function appGuideChat(userMessage, currentScreen) {
 
 ### עורך סיכום (נפתח בלחיצה על קובץ בעיון)
 - **שורה ראשונה של הכותרת**: כפתור חזרה ← | ניווט קודם/הבא | כותרת | כפתורי פעולה: בחינה, שאלות, ייבוא בתפזורת, ייצוא Word, פתח ב-Word, סנכרן עם Word, גרסאות, מסך מפוצל
-- **שורה שנייה — סרגל עיצוב**: מודגש, נטוי, קו תחתון | בחירת גופן | בחירת גודל | רשימות | יישור | נקה עיצוב
-- **אזור כתיבה**: contenteditable — טקסט חופשי, RTL עברית
+- **סרגל עיצוב** (מעל אזור הכתיבה): מודגש, נטוי, קו תחתון | בחירת גופן | בחירת גודל | רשימות | יישור | נקה עיצוב
+- **אזור כתיבה**: contenteditable — טקסט חופשי, RTL עברית; כשמסמנים טקסט מופיע מיני-סרגל עם כפתורי "תרגם" ו"שאלות"
 - **לוח שמאל**: הקלטות שמע
 - **לוח ימין**: עוזר AI (הסבר, מקורות, שאלות, עריכת AI)
 
@@ -459,7 +472,7 @@ async function appGuideChat(userMessage, currentScreen) {
 - אין Word, Excel, PowerPoint או יישומי Office — אין כפתורים של Office בתוך אזור הכתיבה עצמו
 - אין plugins, addons, או חנות אפליקציות
 - אין שיתוף ענן (Google Drive, OneDrive) — הכול מקומי
-
+${historyBlock}
 ## כללים
 1. ענה אך ורק על פי מפת הממשק לעיל.
 2. אם פיצ'ר אינו קיים — אמור זאת בפירוש: "פיצ'ר זה אינו קיים באפליקציה".

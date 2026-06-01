@@ -128,9 +128,9 @@ router.post('/system-help', async (req, res) => {
 // POST /api/ai/app-guide  { userMessage, currentScreen }
 router.post('/app-guide', async (req, res) => {
   try {
-    const { userMessage, currentScreen } = req.body;
+    const { userMessage, currentScreen, history } = req.body;
     if (!userMessage) return res.status(400).json({ error: 'userMessage נדרש' });
-    const answer = await ctrl.appGuideChat(userMessage, currentScreen);
+    const answer = await ctrl.appGuideChat(userMessage, currentScreen, history);
     res.json({ answer });
   } catch (err) {
     res.status(500).json({ error: err.message });

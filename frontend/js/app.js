@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       document.body.classList.remove('editor-open');
       WindowManager.showView(view);
+      AppGuideManager.updateScreen(view);
       if (view === 'summaries')    SummariesManager.init();
       if (view === 'notes-full')   NotesManager.initFullView();
       if (view === 'books')        BooksManager.init();

@@ -79,6 +79,7 @@ const EditorManager = (() => {
     document.body.classList.add('editor-open');
     WindowManager.showView('editor');
     if (typeof AiManager !== 'undefined') AiManager.setContext('editor');
+    if (typeof AppGuideManager !== 'undefined') AppGuideManager.updateScreen('editor');
     _updateNav();
     document.getElementById('editorToolbar')?.classList.remove('hidden');
     _ensureToolbar();
@@ -166,9 +167,11 @@ const EditorManager = (() => {
       tb = document.createElement('div');
       tb.id = 'editorToolbar';
       tb.className = 'editor-toolbar';
-      const header = document.querySelector('.editor-header');
-      if (header) {
-        header.appendChild(tb);
+      // Toolbar now lives inside .editor-main, above #editorContent
+      const editorMain = document.querySelector('.editor-main');
+      if (editorMain) {
+        const content = document.getElementById('editorContent');
+        editorMain.insertBefore(tb, content || editorMain.firstChild);
       } else {
         // Last resort: insert right before the editor body
         const body = document.getElementById('editorBody');
@@ -283,7 +286,52 @@ const EditorManager = (() => {
     });
 
     editor.addEventListener('keyup',    _updateToolbarState);
-    editor.addEventListener('mouseup',  _updateToolbarState);
+    editor.addEventListener('mouseup',  (e) => { _updateToolbarState(); _onEditorMouseUp(e); });
+
+    // ─── מיני-סרגל AI לטקסט מסומן ─────────────────────────────────────────────
+    let _miniBar = null;
+    function _ensureMiniBar() {
+      if (_miniBar) return _miniBar;
+      _miniBar = document.createElement('div');
+      _miniBar.className = 'ai-selection-bar';
+      _miniBar.setAttribute('dir', 'rtl');
+      _miniBar.innerHTML =
+        `<button type="button" class="ai-sel-btn" data-instr="תרגם לעברית">🌐 תרגם</button>` +
+        `<button type="button" class="ai-sel-btn" data-instr="צור שאלות בחינה מהקטע המסומן">❓ שאלות</button>`;
+      document.body.appendChild(_miniBar);
+      _miniBar.querySelectorAll('.ai-sel-btn').forEach(btn => {
+        btn.addEventListener('mousedown', e => e.preventDefault()); // preserve selection
+        btn.addEventListener('click', () => {
+          _hideMiniBar();
+          _aiEdit.activateWithInstruction(btn.dataset.instr);
+        });
+      });
+      return _miniBar;
+    }
+    function _hideMiniBar() {
+      if (_miniBar) _miniBar.style.display = 'none';
+    }
+    function _onEditorMouseUp() {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
+        const rect = sel.getRangeAt(0).getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) { _hideMiniBar(); return; }
+        const bar = _ensureMiniBar();
+        const barW = 170; // approximate width
+        let left = rect.left + rect.width / 2 - barW / 2;
+        left = Math.max(8, Math.min(left, window.innerWidth - barW - 8));
+        const top = Math.max(8, rect.top - 48);
+        bar.style.left = `${left}px`;
+        bar.style.top  = `${top}px`;
+        bar.style.display = 'flex';
+      } else {
+        _hideMiniBar();
+      }
+    }
+    // Hide mini-bar when clicking elsewhere
+    document.addEventListener('mousedown', (e) => {
+      if (_miniBar && !_miniBar.contains(e.target)) _hideMiniBar();
+    });
 
     // כפתור חזרה
     document.getElementById('editorBackBtn').addEventListener('click', async () => {
@@ -869,7 +917,13 @@ const EditorManager = (() => {
         });
     }
 
-    return { init, deactivate };
+    function activateWithInstruction(instruction) {
+      _showBar();
+      const instrEl = document.getElementById('aiEditInstruction');
+      if (instrEl) instrEl.value = instruction;
+    }
+
+    return { init, deactivate, activateWithInstruction };
   })();
 
   // ─── ממשק ציבורי ─────────────────────────────────────────────────────────────

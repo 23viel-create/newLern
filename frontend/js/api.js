@@ -207,8 +207,8 @@ const Api = {
     apiFetchPlain('/ai/appeal-grade', { method: 'POST', body: params }),
   aiSystemHelp: (userMessage) =>
     apiFetchPlain('/ai/system-help', { method: 'POST', body: { userMessage } }),
-  aiAppGuide: (userMessage, currentScreen) =>
-    apiFetchPlain('/ai/app-guide', { method: 'POST', body: { userMessage, currentScreen } }),
+  aiAppGuide: (userMessage, currentScreen, history) =>
+    apiFetchPlain('/ai/app-guide', { method: 'POST', body: { userMessage, currentScreen, history } }),
   aiGetLbMode:  () => apiFetchPlain('/ai/lb-mode', {}),
   aiSetLbMode:  (mode) => apiFetchPlain('/ai/lb-mode', { method: 'PUT', body: { mode } }),
   aiResetCooldowns: () => apiFetchPlain('/ai/reset-cooldowns', { method: 'POST' }),

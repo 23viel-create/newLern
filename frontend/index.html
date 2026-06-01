@@ -34,6 +34,7 @@
     <div class="app-guide-panel__header">
       <span id="appGuideScreenLabel" class="app-guide-screen-label">📍 כללי</span>
       <h3 class="app-guide-panel__title">🤖 מדריך AI</h3>
+      <button id="appGuideClearBtn" class="btn btn--ghost btn--xs" title="נקה שיחה">🗑️</button>
       <button id="appGuideCloseBtn" class="btn btn--ghost btn--xs">✕</button>
     </div>
     <div id="appGuideMsgs" class="app-guide-msgs"></div>
@@ -161,37 +162,6 @@
           </div>
         </div>
 
-        <!-- שורה 2: סרגל עיצוב -->
-        <div class="editor-toolbar" id="editorToolbar">
-          <button class="fmt-btn" data-cmd="bold"               title="מודגש (Ctrl+B)"><b>ב</b></button>
-          <button class="fmt-btn" data-cmd="italic"             title="נטוי (Ctrl+I)"><i>נ</i></button>
-          <button class="fmt-btn" data-cmd="underline"          title="קו תחתון (Ctrl+U)"><u>ק</u></button>
-          <span class="toolbar-sep"></span>
-          <select id="editorFontFamily" class="select-field select-field--sm" title="גופן">
-            <option value="Arial, sans-serif">Arial</option>
-            <option value="'David', serif">David</option>
-            <option value="'Times New Roman', serif">Times</option>
-            <option value="'Courier New', monospace">Courier</option>
-          </select>
-          <select id="editorFontSize" class="select-field select-field--sm" title="גודל גופן">
-            <option value="12px">12</option>
-            <option value="14px">14</option>
-            <option value="16px" selected>16</option>
-            <option value="18px">18</option>
-            <option value="20px">20</option>
-            <option value="24px">24</option>
-            <option value="32px">32</option>
-          </select>
-          <span class="toolbar-sep"></span>
-          <button class="fmt-btn" data-cmd="insertUnorderedList" title="רשימה">•≡</button>
-          <button class="fmt-btn" data-cmd="insertOrderedList"   title="רשימה ממוספרת">1≡</button>
-          <span class="toolbar-sep"></span>
-          <button class="fmt-btn" data-cmd="justifyRight"  title="יישור לימין">⬛R</button>
-          <button class="fmt-btn" data-cmd="justifyCenter" title="מרכוז">⬛C</button>
-          <button class="fmt-btn" data-cmd="justifyLeft"   title="יישור לשמאל">⬛L</button>
-          <span class="toolbar-sep"></span>
-          <button class="fmt-btn" data-cmd="removeFormat" title="נקה עיצוב">✕</button>
-        </div>
       </div>
 
       <!-- גוף 3 עמודות -->
@@ -220,6 +190,37 @@
         <!-- עמודה אמצע: עורך -->
         <div class="editor-main">
 
+          <!-- סרגל עיצוב — מחוץ לכותרת, ישירות מעל אזור הכתיבה -->
+          <div class="editor-toolbar" id="editorToolbar">
+            <button class="fmt-btn" data-cmd="bold"               title="מודגש (Ctrl+B)"><b>ב</b></button>
+            <button class="fmt-btn" data-cmd="italic"             title="נטוי (Ctrl+I)"><i>נ</i></button>
+            <button class="fmt-btn" data-cmd="underline"          title="קו תחתון (Ctrl+U)"><u>ק</u></button>
+            <span class="toolbar-sep"></span>
+            <select id="editorFontFamily" class="select-field select-field--sm" title="גופן">
+              <option value="Arial, sans-serif">Arial</option>
+              <option value="'David', serif">David</option>
+              <option value="'Times New Roman', serif">Times</option>
+              <option value="'Courier New', monospace">Courier</option>
+            </select>
+            <select id="editorFontSize" class="select-field select-field--sm" title="גודל גופן">
+              <option value="12px">12</option>
+              <option value="14px">14</option>
+              <option value="16px" selected>16</option>
+              <option value="18px">18</option>
+              <option value="20px">20</option>
+              <option value="24px">24</option>
+              <option value="32px">32</option>
+            </select>
+            <span class="toolbar-sep"></span>
+            <button class="fmt-btn" data-cmd="insertUnorderedList" title="רשימה">•≡</button>
+            <button class="fmt-btn" data-cmd="insertOrderedList"   title="רשימה ממוספרת">1≡</button>
+            <span class="toolbar-sep"></span>
+            <button class="fmt-btn" data-cmd="justifyRight"  title="יישור לימין">⬛R</button>
+            <button class="fmt-btn" data-cmd="justifyCenter" title="מרכוז">⬛C</button>
+            <button class="fmt-btn" data-cmd="justifyLeft"   title="יישור לשמאל">⬛L</button>
+            <span class="toolbar-sep"></span>
+            <button class="fmt-btn" data-cmd="removeFormat" title="נקה עיצוב">✕</button>
+          </div>
           <div id="editorContent"
                class="editor-content"
                contenteditable="true"

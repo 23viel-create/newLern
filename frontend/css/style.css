@@ -242,7 +242,7 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
   display: flex;
   flex-direction: column;
   height: auto;
-  min-height: 90px;
+  min-height: var(--editor-header-h);
   overflow: visible;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
@@ -367,12 +367,13 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
   margin-right: 0 !important;
 }
 
-/* ── Formatting Toolbar ── */
+/* ── Formatting Toolbar — lives inside .editor-main, above #editorContent ── */
 #editorToolbar,
 .editor-toolbar {
   display: flex !important;
   visibility: visible !important;
   opacity: 1 !important;
+  position: relative !important;
   height: auto !important;
   min-height: 40px !important;
   z-index: 9999 !important;
@@ -384,11 +385,35 @@ h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
   width: 100%;
   margin: 0;
   border: none;
-  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
   background-color: #eef1f6;
-  border-radius: 0 0 6px 6px;
   box-sizing: border-box;
 }
+
+/* Selection mini-bar (floating, appears over selected text) */
+.ai-selection-bar {
+  position: fixed;
+  z-index: 99999;
+  display: none;
+  align-items: center;
+  gap: 4px;
+  background: #1e293b;
+  border-radius: 6px;
+  padding: 4px 8px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  pointer-events: auto;
+}
+.ai-sel-btn {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #f1f5f9;
+  font-size: 0.78rem;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ai-sel-btn:hover { background: rgba(255,255,255,0.12); }
 .fmt-btn {
   min-width: 28px; height: 28px;
   flex-shrink: 0;
