@@ -151,9 +151,11 @@ router.post('/open-questions', async (req, res) => {
 
 router.post('/bulk-generate', async (req, res) => {
   try {
-    const { nodePath, quantity, difficulty, type, chunkCount } = req.body;
+    const { nodePath, quantity, difficulty, type, chunkCount, overrideContent } = req.body;
     if (!nodePath) return res.status(400).json({ success: false, message: 'nodePath נדרש' });
-    const { content, title } = getSummaryForBulkGenerate(nodePath);
+    const { content: fileContent, title } = getSummaryForBulkGenerate(nodePath);
+    // Use override (text selection from editor) if provided; fallback to full file
+    const content = (overrideContent && overrideContent.trim()) ? overrideContent.trim() : fileContent;
     if (!content) return res.status(400).json({ success: false, message: 'הסיכום ריק — אין תוכן ליצירת שאלות' });
     const questions = await aiCtrl.bulkGenerateQuestions({
       summaryContent: content,

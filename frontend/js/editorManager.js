@@ -157,6 +157,14 @@ const EditorManager = (() => {
     <button class="fmt-btn" data-cmd="justifyCenter" title="מרכוז">⬛C</button>
     <button class="fmt-btn" data-cmd="justifyLeft"   title="יישור לשמאל">⬛L</button>
     <span class="toolbar-sep"></span>
+    <button class="fmt-btn fmt-btn--hl" data-cmd="hiliteColor" data-value="#FFFF66" title="הדגשה צהובה" style="background:#FFFF66;min-width:22px">A</button>
+    <button class="fmt-btn fmt-btn--hl" data-cmd="hiliteColor" data-value="#90EE90" title="הדגשה ירוקה" style="background:#90EE90;min-width:22px">A</button>
+    <button class="fmt-btn fmt-btn--hl" data-cmd="hiliteColor" data-value="#ADD8E6" title="הדגשה כחולה" style="background:#ADD8E6;min-width:22px">A</button>
+    <button class="fmt-btn fmt-btn--hl" data-cmd="hiliteColor" data-value="transparent" title="הסר הדגשה">✕HL</button>
+    <span class="toolbar-sep"></span>
+    <button class="fmt-btn" id="insertImageBtn" title="הוסף תמונה">🖼️</button>
+    <input type="file" id="imageUploadInput" accept="image/*" hidden />
+    <span class="toolbar-sep"></span>
     <button class="fmt-btn" data-cmd="removeFormat" title="נקה עיצוב">✕</button>`;
 
   function _ensureToolbar() {
@@ -260,16 +268,38 @@ const EditorManager = (() => {
       if (clean) document.execCommand('insertHTML', false, clean);
     });
 
-    // סרגל עיצוב — delegation on static header so it survives toolbar re-injection
-    const editorHeader = document.querySelector('.editor-header');
-    (editorHeader || toolbar).addEventListener('mousedown', (e) => {
+    // סרגל עיצוב — delegate on .editor-main (static ancestor of toolbar's new location).
+    // e.preventDefault() on mousedown is CRITICAL: prevents focus theft so selection survives.
+    const editorMain = document.querySelector('.editor-main');
+    (editorMain || toolbar || document).addEventListener('mousedown', (e) => {
       const btn = e.target.closest('.fmt-btn');
       if (!btn) return;
-      e.preventDefault(); // שמור selection
+      e.preventDefault(); // שמור selection — בלי זה execCommand נכשל
       try { document.execCommand('styleWithCSS', false, true); } catch {}
-      document.execCommand(btn.dataset.cmd, false, null);
+      // Support data-value for commands like hiliteColor that need a parameter
+      const cmdValue = btn.hasAttribute('data-value') ? btn.dataset.value : null;
+      document.execCommand(btn.dataset.cmd, false, cmdValue);
       editor.focus();
       _updateToolbarState();
+    });
+
+    // תמונה — קרא קובץ כ-DataURL והכנס ל-editor
+    document.getElementById('insertImageBtn')?.addEventListener('click', () => {
+      document.getElementById('imageUploadInput')?.click();
+    });
+    document.getElementById('imageUploadInput')?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) { alert('קובץ גדול מדי — מקסימום 5MB'); return; }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        editor.focus();
+        document.execCommand('insertHTML', false,
+          `<img src="${dataUrl}" style="max-width:100%;height:auto;display:block;margin:4px 0" alt="תמונה" />`);
+      };
+      reader.readAsDataURL(file);
+      e.target.value = ''; // allow re-upload of same file
     });
 
     // גופן
@@ -296,14 +326,24 @@ const EditorManager = (() => {
       _miniBar.className = 'ai-selection-bar';
       _miniBar.setAttribute('dir', 'rtl');
       _miniBar.innerHTML =
-        `<button type="button" class="ai-sel-btn" data-instr="תרגם לעברית">🌐 תרגם</button>` +
-        `<button type="button" class="ai-sel-btn" data-instr="צור שאלות בחינה מהקטע המסומן">❓ שאלות</button>`;
+        `<button type="button" class="ai-sel-btn" data-action="translate">🌐 תרגם</button>` +
+        `<button type="button" class="ai-sel-btn" data-action="questions">❓ שאלות</button>`;
       document.body.appendChild(_miniBar);
       _miniBar.querySelectorAll('.ai-sel-btn').forEach(btn => {
         btn.addEventListener('mousedown', e => e.preventDefault()); // preserve selection
         btn.addEventListener('click', () => {
+          const selText = window.getSelection().toString().trim();
           _hideMiniBar();
-          _aiEdit.activateWithInstruction(btn.dataset.instr);
+          if (btn.dataset.action === 'translate') {
+            _aiEdit.activateWithInstruction('תרגם לעברית');
+          } else if (btn.dataset.action === 'questions') {
+            // Pipeline: selection → bulk question bank directly
+            if (selText && typeof QuizManager !== 'undefined') {
+              QuizManager.openBulkGenWithSelection(currentNode?.path || null, selText);
+            } else {
+              _aiEdit.activateWithInstruction('צור שאלות בחינה מהקטע המסומן');
+            }
+          }
         });
       });
       return _miniBar;

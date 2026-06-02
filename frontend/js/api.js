@@ -128,8 +128,8 @@ const Api = {
   deleteMcQuestion: (nodePath, id) =>
     apiFetch('/quizzes/questions/mc', { method: 'DELETE', body: { nodePath, id } }),
 
-  bulkGenerateQuestions: (nodePath, quantity, difficulty, type, chunkCount) =>
-    apiFetch('/quizzes/bulk-generate', { method: 'POST', body: { nodePath, quantity, difficulty, type, chunkCount } }),
+  bulkGenerateQuestions: (nodePath, quantity, difficulty, type, chunkCount, overrideContent) =>
+    apiFetch('/quizzes/bulk-generate', { method: 'POST', body: { nodePath, quantity, difficulty, type, chunkCount, overrideContent } }),
   bulkSaveQuestions: (nodePath, questions) =>
     apiFetch('/quizzes/bulk-save', { method: 'POST', body: { nodePath, questions } }),
 

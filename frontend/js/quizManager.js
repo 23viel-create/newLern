@@ -10,7 +10,8 @@ const QuizManager = (() => {
   let _editingType = null;  // 'open' | 'mc'
 
   // ─── Bulk gen source (set when opening modal from dock or modal editor) ────
-  let _bulkGenSourcePath = null;
+  let _bulkGenSourcePath  = null;
+  let _bulkSelectionContent = null; // overrides file content when set from selection pipeline
 
   // ─── Dock panel state (from editor view) ─────────────────────────────────
   let _ddPath  = null;
@@ -1648,6 +1649,20 @@ const QuizManager = (() => {
 
   // ─── Bulk AI Generation ───────────────────────────────────────────────────
 
+  // Opens bulk gen modal with an optional text selection as the strict content source
+  function openBulkGenWithSelection(sourcePath, selectedText) {
+    _bulkSelectionContent = selectedText && selectedText.trim() ? selectedText.trim() : null;
+    _openBulkGenModal(sourcePath);
+    // Show a visual hint so the user knows generation is scoped to the selection
+    if (_bulkSelectionContent) {
+      const status = document.getElementById('bulkGenStatus');
+      if (status) {
+        status.textContent = `📌 יוצר שאלות מהקטע המסומן (${_bulkSelectionContent.slice(0, 60)}…)`;
+        status.classList.remove('hidden');
+      }
+    }
+  }
+
   function _openBulkGenModal(sourcePath) {
     _bulkGenSourcePath = sourcePath || null;
     const modal = document.getElementById('bulkGenModal');
@@ -1685,7 +1700,8 @@ const QuizManager = (() => {
     if (saveStatus) { saveStatus.textContent = ''; saveStatus.classList.add('hidden'); }
     document.getElementById('bulkGenForm')?.classList.remove('hidden');
     document.getElementById('bulkGenStaging')?.classList.add('hidden');
-    _bulkGenSourcePath = null;
+    _bulkGenSourcePath    = null;
+    _bulkSelectionContent = null;
   }
 
   async function _runBulkGenerate() {
@@ -1704,7 +1720,7 @@ const QuizManager = (() => {
     statusEl.classList.remove('hidden');
 
     try {
-      const questions = await Api.bulkGenerateQuestions(activePath, qty, diff, type, chunkCount);
+      const questions = await Api.bulkGenerateQuestions(activePath, qty, diff, type, chunkCount, _bulkSelectionContent);
       _renderBulkStaging(questions);
       document.getElementById('bulkGenForm').classList.add('hidden');
       document.getElementById('bulkGenStaging').classList.remove('hidden');
@@ -1804,5 +1820,5 @@ const QuizManager = (() => {
 
   // ─── Public ───────────────────────────────────────────────────────────────
 
-  return { openEditor, openEditorDocked, startQuiz };
+  return { openEditor, openEditorDocked, startQuiz, openBulkGenWithSelection };
 })();

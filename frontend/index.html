@@ -219,6 +219,14 @@
             <button class="fmt-btn" data-cmd="justifyCenter" title="מרכוז">⬛C</button>
             <button class="fmt-btn" data-cmd="justifyLeft"   title="יישור לשמאל">⬛L</button>
             <span class="toolbar-sep"></span>
+            <button class="fmt-btn fmt-btn--hl" data-cmd="hiliteColor" data-value="#FFFF66" title="הדגשה צהובה" style="background:#FFFF66;min-width:22px">A</button>
+            <button class="fmt-btn fmt-btn--hl" data-cmd="hiliteColor" data-value="#90EE90" title="הדגשה ירוקה" style="background:#90EE90;min-width:22px">A</button>
+            <button class="fmt-btn fmt-btn--hl" data-cmd="hiliteColor" data-value="#ADD8E6" title="הדגשה כחולה" style="background:#ADD8E6;min-width:22px">A</button>
+            <button class="fmt-btn fmt-btn--hl" data-cmd="hiliteColor" data-value="transparent" title="הסר הדגשה">✕HL</button>
+            <span class="toolbar-sep"></span>
+            <button class="fmt-btn" id="insertImageBtn" title="הוסף תמונה">🖼️</button>
+            <input type="file" id="imageUploadInput" accept="image/*" hidden />
+            <span class="toolbar-sep"></span>
             <button class="fmt-btn" data-cmd="removeFormat" title="נקה עיצוב">✕</button>
           </div>
           <div id="editorContent"
@@ -849,7 +857,7 @@
       <!-- מפתחות API -->
       <div class="settings-panel card">
         <h2>מפתחות Gemini API</h2>
-        <p class="hint">הוסף עד 5 מפתחות API להגדלת המכסה הזמינה. המפתחות נשמרים מקומית בלבד.</p>
+        <p class="hint">מומלץ להכניס לפחות 5 מפתחות לשימוש נוח. המפתחות נשמרים מקומית בלבד.</p>
         <a id="generateApiKeyLink" class="api-key-gen-link" href="#" dir="rtl">🔑 לחץ כאן להפקת מפתח API חינמי מ-Google</a>
 
         <!-- "סוללת" מפתחות -->
