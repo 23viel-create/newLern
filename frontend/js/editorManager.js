@@ -424,22 +424,31 @@ const EditorManager = (() => {
   }
 
   function _applyFontSize(px) {
-    // execCommand fontSize uses 1-7 scale; we wrap the selection in a span with inline style
     const sel = window.getSelection();
-    if (!sel.rangeCount) return;
+    if (!sel || !sel.rangeCount) return;
     const range = sel.getRangeAt(0);
     if (range.collapsed) return;
-    try {
-      document.execCommand('styleWithCSS', false, true);
-      document.execCommand('fontSize', false, '7'); // placeholder
-      // Replace the giant font7 spans with our desired px size
-      document.getElementById('editorContent')
-        .querySelectorAll('[size="7"], font[size="7"]')
-        .forEach(el => {
-          el.removeAttribute('size');
-          el.style.fontSize = px;
-        });
-    } catch {}
+
+    const editor = document.getElementById('editorContent');
+    // Snapshot pre-existing size="7" elements so we only touch NEW ones
+    const existingFontSz7 = new Set(editor.querySelectorAll('font[size="7"]'));
+
+    try { document.execCommand('styleWithCSS', false, false); } catch {}
+    document.execCommand('fontSize', false, '7'); // placeholder — browser wraps selection
+
+    editor.querySelectorAll('font[size="7"]').forEach(font => {
+      if (existingFontSz7.has(font)) return; // pre-existing, skip
+      font.removeAttribute('size');
+      font.style.fontSize = px;
+      // Walk ancestors inside the editor and clear any cascading font-size that
+      // would override our newly applied size (happens when decreasing after a prior increase)
+      let anc = font.parentElement;
+      while (anc && anc !== editor) {
+        if (anc.style && anc.style.fontSize) anc.style.removeProperty('font-size');
+        if (anc.tagName === 'FONT' && anc.getAttribute('size')) anc.removeAttribute('size');
+        anc = anc.parentElement;
+      }
+    });
   }
 
   function _updateToolbarState() {

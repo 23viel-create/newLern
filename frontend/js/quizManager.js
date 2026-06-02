@@ -1663,6 +1663,13 @@ const QuizManager = (() => {
     }
   }
 
+  function _lockEditorToolbar(lock) {
+    document.querySelectorAll('#editorToolbar button, #editorToolbar select').forEach(el => {
+      el.disabled = lock;
+      el.style.opacity = lock ? '0.45' : '';
+    });
+  }
+
   function _openBulkGenModal(sourcePath) {
     _bulkGenSourcePath = sourcePath || null;
     const modal = document.getElementById('bulkGenModal');
@@ -1673,6 +1680,7 @@ const QuizManager = (() => {
     const status = document.getElementById('bulkGenStatus');
     if (status) { status.textContent = ''; status.classList.add('hidden'); }
     modal.classList.remove('hidden');
+    _lockEditorToolbar(true);
 
     // Bind events (idempotent — replace each time modal opens)
     document.getElementById('bulkGenCloseBtn').onclick  = _closeBulkGenModal;
@@ -1691,6 +1699,7 @@ const QuizManager = (() => {
     const modal = document.getElementById('bulkGenModal');
     if (!modal) return;
     modal.classList.add('hidden');
+    _lockEditorToolbar(false);
     // Reset staged state so next open → generate → save cycle is pristine
     const list = document.getElementById('bulkGenList');
     if (list) { list.innerHTML = ''; list.dataset.questions = '[]'; }

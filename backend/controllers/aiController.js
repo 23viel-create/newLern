@@ -65,7 +65,7 @@ function _sanitize(text) {
     .slice(0, MAX_CONTEXT_CHARS);
 }
 
-async function _callGemini(prompt, taskType = 'general') {
+async function _callGemini(prompt, taskType = 'general', genConfig = null) {
   const totalChars = prompt.length;
   if (totalChars > MAX_PROMPT_CHARS) throw new Error(`הפרומפט ארוך מדי (${totalChars} תווים, מקסימום ${MAX_PROMPT_CHARS})`);
 
@@ -90,7 +90,10 @@ async function _callGemini(prompt, taskType = 'general') {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     try {
-      const result = await model.generateContent(prompt);
+      const request = genConfig
+        ? { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: genConfig }
+        : prompt;
+      const result = await model.generateContent(request);
       const text   = result.response.text();
       recordUsage(key, totalChars + (text?.length || 0));
       return text;
@@ -476,15 +479,25 @@ async function appGuideChat(userMessage, currentScreen, history) {
 
   // ── Step 1: Router (lightweight — picks relevant section) ────────────────
   const sectionNames = Object.keys(_GUIDE_SECTIONS).join(' / ');
-  const routerPrompt = `בהינתן שאלה על אפליקציית לימוד ומסך נוכחי, החזר שם קטגוריה אחת בלבד.
-קטגוריות אפשריות: ${sectionNames}
+  const topicDictionary = `
+מילון נושאים (השתמש בו לסיווג מדויק):
+- settings: מפתחות API, Gemini, גיבויים, אלגוריתם חזרה מרווחת, עומס כבד, היקף AI, ניהול מפתחות, איפוס נתונים
+- dashboard: לוח שנה, משימות יומיות, אירועים, ניווט תאריכים
+- editor: עיצוב טקסט, גופן, הדגשה, תמונות, תרגום, סיכומים, Word, סנכרון, גרסאות
+- quizzes: בחינות, שאלות, בנק שאלות, מחולל שאלות, ציון, ערעור
+- general: ניווט, תפריט, מסכים, למידה פעילה, מסלולים, פתקים, ספרים`;
+
+  const routerPrompt = `סווג שאלה זו לקטגוריה אחת בלבד.
+${topicDictionary}
+קטגוריות: ${sectionNames}
 מסך נוכחי: "${safeScreen}"
 שאלה: "${safeMsg}"
-ענה במילה אחת בלבד — שם הקטגוריה המדויק מהרשימה. אין הסבר, אין פיסוק נוסף.`;
+החזר מילה אחת בלבד — שם הקטגוריה המדויק.`;
 
   let sectionKey = 'general';
   try {
-    const rawSection = (await _callGemini(routerPrompt, 'general')).trim().toLowerCase().split(/\s/)[0];
+    const rawSection = (await _callGemini(routerPrompt, 'general', { maxOutputTokens: 10 }))
+      .trim().toLowerCase().split(/\s/)[0];
     if (_GUIDE_SECTIONS[rawSection]) sectionKey = rawSection;
   } catch { /* fall back to general */ }
 

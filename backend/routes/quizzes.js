@@ -89,7 +89,8 @@ router.delete('/questions/mc', (req, res) => {
 router.post('/bundle', (req, res) => {
   try {
     const { paths } = req.body;
-    if (!Array.isArray(paths) || !paths.length) return res.status(400).json({ success: false, message: 'paths נדרש' });
+    if (!Array.isArray(paths)) return res.status(400).json({ success: false, message: 'paths חייב להיות מערך' });
+    if (!paths.length) return res.json({ success: true, data: [] }); // empty paths → empty bundle (used by diagnostics)
     res.json({ success: true, data: getBundle(paths) });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 });
