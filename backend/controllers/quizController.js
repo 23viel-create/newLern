@@ -1,10 +1,11 @@
 'use strict';
 const fs   = require('fs');
 const path = require('path');
-const { SUMMARIES_DIR, SCHEDULE_FILE } = require('../config/limits');
+const { SUMMARIES_DIR, SCHEDULE_FILE, QUIZ_HISTORY_FILE, ensureJsonFile } = require('../config/limits');
 
-const summariesRoot = path.resolve(__dirname, SUMMARIES_DIR, 'root');
-const scheduleFile  = path.resolve(__dirname, SCHEDULE_FILE);
+const summariesRoot = path.join(SUMMARIES_DIR, 'root');
+const scheduleFile  = SCHEDULE_FILE;
+const HISTORY_FILE  = QUIZ_HISTORY_FILE;
 
 // ── Security ──────────────────────────────────────────────────────────────────
 
@@ -199,4 +200,57 @@ function _addDays(dateStr, n) {
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 }
 
-module.exports = { getQuestions, addQuestion, updateQuestion, deleteQuestion, getBundle, submitResult };
+// ── Quiz History ──────────────────────────────────────────────────────────────
+
+function _readHistory() {
+  try {
+    ensureJsonFile(HISTORY_FILE, []);
+    return JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf-8')) || [];
+  } catch { return []; }
+}
+
+function _writeHistory(arr) {
+  ensureJsonFile(HISTORY_FILE, []);
+  fs.writeFileSync(HISTORY_FILE, JSON.stringify(arr, null, 2));
+}
+
+function getHistory() {
+  return _readHistory().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+}
+
+function saveHistory(entry) {
+  const arr = _readHistory();
+  const idx = arr.findIndex(e => e.timestamp === entry.timestamp);
+  if (idx >= 0) arr[idx] = entry; // overwrite same timestamp (appeal update)
+  else          arr.push(entry);
+  _writeHistory(arr);
+}
+
+function deleteHistory(timestamp) {
+  const arr  = _readHistory();
+  const next = arr.filter(e => e.timestamp !== timestamp);
+  if (next.length === arr.length) {
+    const err = new Error('רשומה לא נמצאה'); err.status = 404; throw err;
+  }
+  _writeHistory(next);
+}
+
+module.exports = { getQuestions, addQuestion, updateQuestion, deleteQuestion, getBundle, submitResult, getHistory, saveHistory, deleteHistory, getSummaryForBulkGenerate };
+
+function getSummaryForBulkGenerate(nodeRelPath) {
+  const abs  = safePath(nodeRelPath);
+  const meta = readMeta(abs);
+  let content = '';
+  const txtFile  = path.join(abs, 'content.txt');
+  const htmlFile = path.join(abs, 'content.html');
+  if (fs.existsSync(txtFile)) {
+    content = fs.readFileSync(txtFile, 'utf-8');
+  } else if (fs.existsSync(htmlFile)) {
+    content = fs.readFileSync(htmlFile, 'utf-8')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
+  return { content: content.slice(0, 8000), title: meta.title };
+}

@@ -87,35 +87,65 @@ const Api = {
   getSchedule:      ()              => apiFetch('/schedule'),
   getTodayTasks:    ()              => apiFetch('/schedule/today'),
   completeTask:     (id, quality)   => apiFetch(`/schedule/${id}/complete`, { method: 'PATCH', body: { quality } }),
+  uncompleteTask:   (id)            => apiFetch(`/schedule/${id}/uncomplete`, { method: 'PATCH' }),
+  postponeTask:     (id)            => apiFetch(`/schedule/${id}/postpone`, { method: 'POST' }),
+  learnYesterday:   (id)            => apiFetch(`/schedule/${id}/learn-yesterday`, { method: 'POST' }),
+  addCalendarEvent: (dateStr, title)=> apiFetch('/schedule/event', { method: 'POST', body: { dateStr, title } }),
   getCalendarData:  (month)         => apiFetch(`/schedule/calendar?month=${encodeURIComponent(month)}`),
-  planSummary:      (summaryPath, title) => apiFetch('/schedule/plan', { method: 'POST', body: { summaryPath, title } }),
+  planSummary:      (summaryPath, title, programId) =>
+    apiFetch('/schedule/plan', { method: 'POST', body: { summaryPath, title, programId } }),
   getScheduleSettings:  ()          => apiFetch('/schedule/settings'),
   saveScheduleSettings: (settings)  => apiFetch('/schedule/settings', { method: 'PUT', body: settings }),
+
+  // ── תוכניות חזרה ─────────────────────────────────────────────────────────
+  getPrograms:    ()                                            => apiFetch('/schedule/programs'),
+  createProgram:  (name, sequence, periodic, intervalDays)     => apiFetch('/schedule/programs', { method: 'POST', body: { name, sequence, periodic, intervalDays } }),
+  deleteProgram:  (id)                                         => apiFetch(`/schedule/programs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  // ── ייבוא קובץ לתיקייה ───────────────────────────────────────────────────
+  importFileToFolder: (folderPath, file) => {
+    const fd = new FormData();
+    fd.append('folderPath', folderPath);
+    fd.append('file', file);
+    return apiFormFetch('/summaries/import-file', fd);
+  },
 
   // ── שאלות (CRUD ידני) ─────────────────────────────────────────────────────
   getQuizQuestions: (nodePath) =>
     apiFetch(`/quizzes/questions?path=${encodeURIComponent(nodePath)}`),
 
-  addOpenQuestion: (nodePath, question, answer) =>
-    apiFetch('/quizzes/questions/open', { method: 'POST', body: { nodePath, question, answer } }),
-  updateOpenQuestion: (nodePath, id, question, answer) =>
-    apiFetch(`/quizzes/questions/open/${encodeURIComponent(id)}`, { method: 'PUT', body: { nodePath, question, answer } }),
+  addOpenQuestion: (nodePath, question, answer, difficulty) =>
+    apiFetch('/quizzes/questions/open', { method: 'POST', body: { nodePath, question, answer, difficulty } }),
+  updateOpenQuestion: (nodePath, id, question, answer, difficulty) =>
+    apiFetch(`/quizzes/questions/open/${encodeURIComponent(id)}`, { method: 'PUT', body: { nodePath, question, answer, difficulty } }),
   deleteOpenQuestion: (nodePath, id) =>
     apiFetch('/quizzes/questions/open', { method: 'DELETE', body: { nodePath, id } }),
 
-  addMcQuestion: (nodePath, question, options, correct_option_index) =>
-    apiFetch('/quizzes/questions/mc', { method: 'POST', body: { nodePath, question, options, correct_option_index } }),
-  updateMcQuestion: (nodePath, id, question, options, correct_option_index) =>
-    apiFetch(`/quizzes/questions/mc/${encodeURIComponent(id)}`, { method: 'PUT', body: { nodePath, question, options, correct_option_index } }),
+  addMcQuestion: (nodePath, question, options, correct_option_index, difficulty) =>
+    apiFetch('/quizzes/questions/mc', { method: 'POST', body: { nodePath, question, options, correct_option_index, difficulty } }),
+  updateMcQuestion: (nodePath, id, question, options, correct_option_index, difficulty) =>
+    apiFetch(`/quizzes/questions/mc/${encodeURIComponent(id)}`, { method: 'PUT', body: { nodePath, question, options, correct_option_index, difficulty } }),
   deleteMcQuestion: (nodePath, id) =>
     apiFetch('/quizzes/questions/mc', { method: 'DELETE', body: { nodePath, id } }),
+
+  bulkGenerateQuestions: (nodePath, quantity, difficulty, type, chunkCount, overrideContent) =>
+    apiFetch('/quizzes/bulk-generate', { method: 'POST', body: { nodePath, quantity, difficulty, type, chunkCount, overrideContent } }),
+  bulkSaveQuestions: (nodePath, questions) =>
+    apiFetch('/quizzes/bulk-save', { method: 'POST', body: { nodePath, questions } }),
 
   getQuizBundle:    (paths) =>
     apiFetch('/quizzes/bundle', { method: 'POST', body: { paths } }),
   submitQuizResult: (summaryPath, totalScore, questionResults) =>
     apiFetch('/quizzes/submit', { method: 'POST', body: { summaryPath, totalScore, questionResults } }),
+  getQuizHistory:    () => apiFetch('/quizzes/history'),
+  saveQuizHistory:   (entry) => apiFetch('/quizzes/history', { method: 'POST', body: entry }),
+  deleteQuizHistory: (timestamp) => apiFetch('/quizzes/history', { method: 'DELETE', body: { timestamp } }),
 
   // ── גיבוי וייצוא ────────────────────────────────────────────────────────
+  /** Returns a download URL for a specific node's ZIP */
+  exportNodeZipUrl: (targetPath) =>
+    `${API_BASE}/backup/export-node-zip?targetPath=${encodeURIComponent(targetPath)}`,
+
   /** Returns a download URL for the ZIP — open in tab or anchor */
   backupZipUrl: (subPath, save) => {
     let url = `${API_BASE}/backup/zip`;
@@ -139,14 +169,23 @@ const Api = {
   docxExportUrl: (nodePath, title) =>
     `${API_BASE}/backup/docx`, // POST — handled via fetch+blob in backupManager
 
+  openInWord: (nodePath, title, html) =>
+    apiFetchPlain('/backup/open-in-word', { method: 'POST', body: { nodePath, title, html } }),
+
+  wordSync: (nodePath, title) =>
+    apiFetchPlain(`/backup/word-sync?nodePath=${encodeURIComponent(nodePath)}&title=${encodeURIComponent(title || nodePath)}`, {}),
+
+  wordSyncManual: (nodePath, title) =>
+    apiFetchPlain('/backup/sync-word', { method: 'POST', body: { nodePath, title } }),
+
   // ── היסטוריית גרסאות ─────────────────────────────────────────────────
   getHistory:     (nodePath) => apiFetch(`/summaries/history?path=${encodeURIComponent(nodePath)}`),
   restoreVersion: (nodePath, versionIndex) =>
     apiFetch('/summaries/history/restore', { method: 'POST', body: { nodePath, versionIndex } }),
 
   // ── מסייע AI ─────────────────────────────────────────────────────────────
-  aiAsk: (context, userMessage, extra) =>
-    apiFetchPlain('/ai/ask', { method: 'POST', body: { context, userMessage, extra } }),
+  aiAsk: (context, userMessage, extra, selectedBooks) =>
+    apiFetchPlain('/ai/ask', { method: 'POST', body: { context, userMessage, extra, selectedBooks } }),
   aiSuggestQuestions: (summaryContent, summaryTitle, existingQuestions, type) =>
     apiFetchPlain('/ai/suggest-questions', { method: 'POST', body: { summaryContent, summaryTitle, existingQuestions, type } }),
   aiScheduleAdvice: (heavyDays, totalTasks) =>
@@ -158,4 +197,74 @@ const Api = {
   aiGetKeys: () => apiFetchPlain('/ai/keys', {}),
   aiSaveKeys: (keys) => apiFetchPlain('/ai/keys', { method: 'PUT', body: { keys } }),
   aiKeyStatus: () => apiFetchPlain('/ai/key-status', {}),
+  aiParseSrProgram: (hebrewText) =>
+    apiFetchPlain('/ai/parse-sr-program', { method: 'POST', body: { hebrewText } }),
+  aiSuggestSingleQuestion: (summaryPath, summaryTitle, type) =>
+    apiFetchPlain('/ai/suggest-single-question', { method: 'POST', body: { summaryPath, summaryTitle, type } }),
+  aiGradeAnswer: (question, sampleAnswer, userAnswer, strictness) =>
+    apiFetchPlain('/ai/grade-answer', { method: 'POST', body: { question, sampleAnswer, userAnswer, strictness } }),
+  aiAppealGrade: (params) =>
+    apiFetchPlain('/ai/appeal-grade', { method: 'POST', body: params }),
+  aiSystemHelp: (userMessage) =>
+    apiFetchPlain('/ai/system-help', { method: 'POST', body: { userMessage } }),
+  aiAppGuide: (userMessage, currentScreen, history) =>
+    apiFetchPlain('/ai/app-guide', { method: 'POST', body: { userMessage, currentScreen, history } }),
+  aiGetLbMode:  () => apiFetchPlain('/ai/lb-mode', {}),
+  aiSetLbMode:  (mode) => apiFetchPlain('/ai/lb-mode', { method: 'PUT', body: { mode } }),
+  aiResetCooldowns: () => apiFetchPlain('/ai/reset-cooldowns', { method: 'POST' }),
+  aiContextualEdit: (params) => apiFetchPlain('/ai/contextual-edit', { method: 'POST', body: params }),
+  calendarExtendParashot: () =>
+    apiFetch('/calendar/extend-parashot', { method: 'POST' }),
+  learningPlanGenerate: (params) =>
+    apiFetch('/learning-plans/generate', { method: 'POST', body: params }),
+  learningPlanOptimize: () =>
+    apiFetch('/learning-plans/optimize', { method: 'POST' }),
+  getStudyPaths: () =>
+    apiFetch('/learning-plans/paths'),
+  deleteStudyPath: (id) =>
+    apiFetch(`/learning-plans/paths/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  editStudyPath: (id, params) =>
+    apiFetch(`/learning-plans/paths/${encodeURIComponent(id)}/edit`, { method: 'POST', body: params }),
+
+  // ── קבצי הקשר לצ'אט ──────────────────────────────────────────────────────
+  chatFilesList:   () => apiFetch('/chat/files'),
+  chatFilesUpload: (file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiFormFetch('/chat/files', fd);
+  },
+  chatFilesDelete: (name) =>
+    fetch(`${API_BASE}/chat/files/${encodeURIComponent(name)}`, { method: 'DELETE' })
+      .then(r => r.json())
+      .then(d => { if (!d.success) throw new Error(d.message); return d; }),
+  chatFilesPreviewUrl: (name) => `${API_BASE}/chat/files/${encodeURIComponent(name)}`,
+
+  // ── פתקיות ───────────────────────────────────────────────────────────────
+  getNotes:     (date)   => apiFetch(date ? `/notes?date=${encodeURIComponent(date)}` : '/notes'),
+  saveNote:     (note)   => apiFetch('/notes', { method: 'POST', body: note }),
+  deleteNote:   (id)     => apiFetch(`/notes/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  // ── מאגר ספרים ───────────────────────────────────────────────────────────
+  getBooks:      () => apiFetch('/books'),
+  getBookStreamUrl: (name) => {
+    const parts = name.split('/');
+    return `/api/books/stream/${parts.map(encodeURIComponent).join('/')}`;
+  },
+  deleteBook:    (name) => {
+    const parts = name.split('/');
+    return apiFetch(`/books/${parts.map(encodeURIComponent).join('/')}`, { method: 'DELETE' });
+  },
+  createBooksFolder: (name, parent) => apiFetch('/books/folder', { method: 'POST', body: { name, parent: parent || '' } }),
+  uploadBook: (file, folder) => {
+    const fd = new FormData();
+    fd.append('pdf', file);
+    if (folder) fd.append('folder', folder);
+    return apiFormFetch('/books/upload', fd);
+  },
+
+  // ── איפוס נתונים ─────────────────────────────────────────────────────────
+  resetNotes:     () => apiFetch('/data/reset-notes',     { method: 'DELETE' }),
+  resetSchedule:  () => apiFetch('/data/reset-schedule',  { method: 'DELETE' }),
+  resetSummaries: () => apiFetch('/data/reset-summaries', { method: 'DELETE' }),
+  resetAll:       () => apiFetch('/data/reset-all',       { method: 'DELETE' }),
 };

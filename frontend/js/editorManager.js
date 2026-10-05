@@ -44,9 +44,30 @@ const EditorManager = (() => {
     el.textContent = { saving: 'שומר...', saved: 'נשמר ✓', error: 'שגיאה בשמירה!' }[state] || '';
   }
 
+  function _sanitizePastedHtml(html) {
+    const ALLOWED = /^(p|b|i|u|ul|ol|li|br|strong|em)$/i;
+    let s = html
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '');
+    s = s.replace(/<(\/?)([a-zA-Z][a-zA-Z0-9]*)([^>]*?)>/g, (_, slash, tag, attrs) => {
+      const t = tag.toLowerCase();
+      if (!ALLOWED.test(t)) return '';
+      if (slash) return `</${t}>`;
+      const href = attrs.match(/\bhref="([^"]*)"/i);
+      const src  = attrs.match(/\bsrc="([^"]*)"/i);
+      let kept = '';
+      if (href) kept += ` href="${href[1]}"`;
+      if (src)  kept += ` src="${src[1]}"`;
+      return `<${t}${kept}>`;
+    });
+    return s.trim();
+  }
+
   // ─── פתיחת עורך ──────────────────────────────────────────────────────────────
 
   async function open(node, list) {
+    _aiEdit.deactivate();
     currentNode = node;
     flatList    = list || [];
 
@@ -57,7 +78,11 @@ const EditorManager = (() => {
 
     document.body.classList.add('editor-open');
     WindowManager.showView('editor');
+    if (typeof AiManager !== 'undefined') AiManager.setContext('editor');
+    if (typeof AppGuideManager !== 'undefined') AppGuideManager.updateScreen('editor');
     _updateNav();
+    document.getElementById('editorToolbar')?.classList.remove('hidden');
+    _ensureToolbar();
 
     // טען תוכן
     const editor = document.getElementById('editorContent');
@@ -102,17 +127,102 @@ const EditorManager = (() => {
     }
   }
 
+  // ─── שחזור סרגל עיצוב אם נמחק ───────────────────────────────────────────────
+
+  const _TOOLBAR_HTML = `
+    <button class="fmt-btn" data-cmd="bold"               title="מודגש (Ctrl+B)"><b>ב</b></button>
+    <button class="fmt-btn" data-cmd="italic"             title="נטוי (Ctrl+I)"><i>נ</i></button>
+    <button class="fmt-btn" data-cmd="underline"          title="קו תחתון (Ctrl+U)"><u>ק</u></button>
+    <span class="toolbar-sep"></span>
+    <select id="editorFontFamily" class="select-field select-field--sm" title="גופן">
+      <option value="Arial, sans-serif">Arial</option>
+      <option value="'David', serif">David</option>
+      <option value="'Times New Roman', serif">Times</option>
+      <option value="'Courier New', monospace">Courier</option>
+    </select>
+    <select id="editorFontSize" class="select-field select-field--sm" title="גודל גופן">
+      <option value="12px">12</option>
+      <option value="14px">14</option>
+      <option value="16px" selected>16</option>
+      <option value="18px">18</option>
+      <option value="20px">20</option>
+      <option value="24px">24</option>
+      <option value="32px">32</option>
+    </select>
+    <span class="toolbar-sep"></span>
+    <button class="fmt-btn" data-cmd="insertUnorderedList" title="רשימה">•≡</button>
+    <button class="fmt-btn" data-cmd="insertOrderedList"   title="רשימה ממוספרת">1≡</button>
+    <span class="toolbar-sep"></span>
+    <button class="fmt-btn" data-cmd="justifyRight"  title="יישור לימין">⬛R</button>
+    <button class="fmt-btn" data-cmd="justifyCenter" title="מרכוז">⬛C</button>
+    <button class="fmt-btn" data-cmd="justifyLeft"   title="יישור לשמאל">⬛L</button>
+    <span class="toolbar-sep"></span>
+    <button class="fmt-btn fmt-btn--hl" data-cmd="hiliteColor" data-value="#FFFF66" title="הדגשה צהובה" style="background:#FFFF66;min-width:22px">A</button>
+    <button class="fmt-btn fmt-btn--hl" data-cmd="hiliteColor" data-value="#90EE90" title="הדגשה ירוקה" style="background:#90EE90;min-width:22px">A</button>
+    <button class="fmt-btn fmt-btn--hl" data-cmd="hiliteColor" data-value="#ADD8E6" title="הדגשה כחולה" style="background:#ADD8E6;min-width:22px">A</button>
+    <button class="fmt-btn fmt-btn--hl" data-cmd="hiliteColor" data-value="transparent" title="הסר הדגשה">✕HL</button>
+    <span class="toolbar-sep"></span>
+    <button class="fmt-btn" id="insertImageBtn" title="הוסף תמונה">🖼️</button>
+    <input type="file" id="imageUploadInput" accept="image/*" hidden />
+    <span class="toolbar-sep"></span>
+    <button class="fmt-btn" data-cmd="removeFormat" title="נקה עיצוב">✕</button>`;
+
+  function _ensureToolbar() {
+    let tb = document.getElementById('editorToolbar');
+
+    // Nuclear option: create and insert the toolbar if it was removed from DOM entirely
+    if (!tb) {
+      tb = document.createElement('div');
+      tb.id = 'editorToolbar';
+      tb.className = 'editor-toolbar';
+      // Toolbar now lives inside .editor-main, above #editorContent
+      const editorMain = document.querySelector('.editor-main');
+      if (editorMain) {
+        const content = document.getElementById('editorContent');
+        editorMain.insertBefore(tb, content || editorMain.firstChild);
+      } else {
+        // Last resort: insert right before the editor body
+        const body = document.getElementById('editorBody');
+        if (body) body.parentNode.insertBefore(tb, body);
+      }
+    }
+
+    // Rebuild buttons if toolbar was wiped empty
+    if (!tb.querySelector('.fmt-btn')) {
+      tb.innerHTML = _TOOLBAR_HTML;
+      // Re-bind font selectors for the freshly injected DOM
+      const ffSel = document.getElementById('editorFontFamily');
+      const fsSel = document.getElementById('editorFontSize');
+      if (ffSel) ffSel.addEventListener('change', (e) => {
+        try { document.execCommand('styleWithCSS', false, true); } catch {}
+        document.execCommand('fontName', false, e.target.value);
+        document.getElementById('editorContent')?.focus();
+      });
+      if (fsSel) fsSel.addEventListener('change', (e) => {
+        _applyFontSize(e.target.value);
+        document.getElementById('editorContent')?.focus();
+      });
+    }
+
+    // Force visibility with both inline style and CSS class regardless of cascade
+    tb.style.cssText = 'display:flex !important; flex-wrap:wrap; gap:8px; padding:8px; background-color:#eef1f6; border-bottom:1px solid #ccc; width:100%; min-height:45px; z-index:100; box-sizing:border-box; visibility:visible; opacity:1;';
+  }
+
   // ─── אתחול אירועים ───────────────────────────────────────────────────────────
 
   function init() {
+    document.getElementById('editorToolbar')?.classList.remove('hidden');
     _bindEditorEvents();
     _bindNavEvents();
     _bindAudioEvents();
     _bindBulkImportEvents();
+    _aiEdit.init();
   }
 
   function _bindEditorEvents() {
     const editor  = document.getElementById('editorContent');
+    if (!editor) return;
+    // toolbar lookup is deferred — _ensureToolbar() in open() guarantees it exists
     const toolbar = document.getElementById('editorToolbar');
 
     // הפעלת styleWithCSS לשימוש ב-span style במקום תגי font ישנים
@@ -140,15 +250,56 @@ const EditorManager = (() => {
       editor.classList.toggle('is-empty', !editor.textContent.trim() && !editor.innerHTML.trim());
     });
 
-    // סרגל עיצוב — כפתורי פורמט
-    toolbar.addEventListener('mousedown', (e) => {
+    // Paste interceptor — strip Word/Office HTML bloat before insertion
+    editor.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const html  = e.clipboardData.getData('text/html');
+      const plain = e.clipboardData.getData('text/plain');
+      let clean;
+      if (html) {
+        clean = _sanitizePastedHtml(html);
+      } else {
+        clean = plain
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/\n/g, '<br>');
+      }
+      if (clean) document.execCommand('insertHTML', false, clean);
+    });
+
+    // סרגל עיצוב — delegate on .editor-main (static ancestor of toolbar's new location).
+    // e.preventDefault() on mousedown is CRITICAL: prevents focus theft so selection survives.
+    const editorMain = document.querySelector('.editor-main');
+    (editorMain || toolbar || document).addEventListener('mousedown', (e) => {
       const btn = e.target.closest('.fmt-btn');
       if (!btn) return;
-      e.preventDefault(); // שמור selection
+      e.preventDefault(); // שמור selection — בלי זה execCommand נכשל
       try { document.execCommand('styleWithCSS', false, true); } catch {}
-      document.execCommand(btn.dataset.cmd, false, null);
+      // Support data-value for commands like hiliteColor that need a parameter
+      const cmdValue = btn.hasAttribute('data-value') ? btn.dataset.value : null;
+      document.execCommand(btn.dataset.cmd, false, cmdValue);
       editor.focus();
       _updateToolbarState();
+    });
+
+    // תמונה — קרא קובץ כ-DataURL והכנס ל-editor
+    document.getElementById('insertImageBtn')?.addEventListener('click', () => {
+      document.getElementById('imageUploadInput')?.click();
+    });
+    document.getElementById('imageUploadInput')?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) { alert('קובץ גדול מדי — מקסימום 5MB'); return; }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        editor.focus();
+        document.execCommand('insertHTML', false,
+          `<img src="${dataUrl}" style="max-width:100%;height:auto;display:block;margin:4px 0" alt="תמונה" />`);
+      };
+      reader.readAsDataURL(file);
+      e.target.value = ''; // allow re-upload of same file
     });
 
     // גופן
@@ -165,7 +316,62 @@ const EditorManager = (() => {
     });
 
     editor.addEventListener('keyup',    _updateToolbarState);
-    editor.addEventListener('mouseup',  _updateToolbarState);
+    editor.addEventListener('mouseup',  (e) => { _updateToolbarState(); _onEditorMouseUp(e); });
+
+    // ─── מיני-סרגל AI לטקסט מסומן ─────────────────────────────────────────────
+    let _miniBar = null;
+    function _ensureMiniBar() {
+      if (_miniBar) return _miniBar;
+      _miniBar = document.createElement('div');
+      _miniBar.className = 'ai-selection-bar';
+      _miniBar.setAttribute('dir', 'rtl');
+      _miniBar.innerHTML =
+        `<button type="button" class="ai-sel-btn" data-action="translate">🌐 תרגם</button>` +
+        `<button type="button" class="ai-sel-btn" data-action="questions">❓ שאלות</button>`;
+      document.body.appendChild(_miniBar);
+      _miniBar.querySelectorAll('.ai-sel-btn').forEach(btn => {
+        btn.addEventListener('mousedown', e => e.preventDefault()); // preserve selection
+        btn.addEventListener('click', () => {
+          const selText = window.getSelection().toString().trim();
+          _hideMiniBar();
+          if (btn.dataset.action === 'translate') {
+            _aiEdit.activateWithInstruction('תרגם לעברית');
+          } else if (btn.dataset.action === 'questions') {
+            // Pipeline: selection → bulk question bank directly
+            if (selText && typeof QuizManager !== 'undefined') {
+              QuizManager.openBulkGenWithSelection(currentNode?.path || null, selText);
+            } else {
+              _aiEdit.activateWithInstruction('צור שאלות בחינה מהקטע המסומן');
+            }
+          }
+        });
+      });
+      return _miniBar;
+    }
+    function _hideMiniBar() {
+      if (_miniBar) _miniBar.style.display = 'none';
+    }
+    function _onEditorMouseUp() {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
+        const rect = sel.getRangeAt(0).getBoundingClientRect();
+        if (rect.width === 0 && rect.height === 0) { _hideMiniBar(); return; }
+        const bar = _ensureMiniBar();
+        const barW = 170; // approximate width
+        let left = rect.left + rect.width / 2 - barW / 2;
+        left = Math.max(8, Math.min(left, window.innerWidth - barW - 8));
+        const top = Math.max(8, rect.top - 48);
+        bar.style.left = `${left}px`;
+        bar.style.top  = `${top}px`;
+        bar.style.display = 'flex';
+      } else {
+        _hideMiniBar();
+      }
+    }
+    // Hide mini-bar when clicking elsewhere
+    document.addEventListener('mousedown', (e) => {
+      if (_miniBar && !_miniBar.contains(e.target)) _hideMiniBar();
+    });
 
     // כפתור חזרה
     document.getElementById('editorBackBtn').addEventListener('click', async () => {
@@ -173,25 +379,76 @@ const EditorManager = (() => {
       document.body.classList.remove('editor-open');
       WindowManager.showView('summaries');
     });
+
+    // סנכרן עם Word — ידני (קרא document.doc → עדכן עורך)
+    document.getElementById('syncWithWordBtn')?.addEventListener('click', async () => {
+      if (!currentNode) return;
+      const btn = document.getElementById('syncWithWordBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ מסנכרן...';
+      try {
+        await Api.wordSyncManual(currentNode.path, currentNode.title);
+        const cacheBustUrl = `/api/summaries/content?path=${encodeURIComponent(currentNode.path)}&_t=${Date.now()}`;
+        const freshRes  = await fetch(cacheBustUrl);
+        const freshData = await freshRes.json();
+        const html = freshData.data || freshData.content || '';
+        document.getElementById('editorContent').innerHTML = html;
+        isDirty = false;
+        setSaveStatus('saved');
+        btn.textContent = '✓ סונכרן';
+        setTimeout(() => { btn.textContent = '🔄 סנכרן עם Word'; btn.disabled = false; }, 2500);
+      } catch (err) {
+        alert(`שגיאה בסנכרון עם Word: ${err.message}`);
+        btn.textContent = '🔄 סנכרן עם Word';
+        btn.disabled = false;
+      }
+    });
+
+    // פתח ב-Word
+    document.getElementById('openInWordBtn').addEventListener('click', async () => {
+      if (!currentNode) return;
+      const btn = document.getElementById('openInWordBtn');
+      btn.disabled = true;
+      btn.textContent = 'פותח...';
+      try {
+        if (isDirty) await _save();
+        const html = document.getElementById('editorContent').innerHTML;
+        await Api.openInWord(currentNode.path, currentNode.title || currentNode.path, html);
+      } catch (err) {
+        alert(`שגיאה בפתיחת Word: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '📂 פתח ב-Word';
+      }
+    });
   }
 
   function _applyFontSize(px) {
-    // execCommand fontSize uses 1-7 scale; we wrap the selection in a span with inline style
     const sel = window.getSelection();
-    if (!sel.rangeCount) return;
+    if (!sel || !sel.rangeCount) return;
     const range = sel.getRangeAt(0);
     if (range.collapsed) return;
-    try {
-      document.execCommand('styleWithCSS', false, true);
-      document.execCommand('fontSize', false, '7'); // placeholder
-      // Replace the giant font7 spans with our desired px size
-      document.getElementById('editorContent')
-        .querySelectorAll('[size="7"], font[size="7"]')
-        .forEach(el => {
-          el.removeAttribute('size');
-          el.style.fontSize = px;
-        });
-    } catch {}
+
+    const editor = document.getElementById('editorContent');
+    // Snapshot pre-existing size="7" elements so we only touch NEW ones
+    const existingFontSz7 = new Set(editor.querySelectorAll('font[size="7"]'));
+
+    try { document.execCommand('styleWithCSS', false, false); } catch {}
+    document.execCommand('fontSize', false, '7'); // placeholder — browser wraps selection
+
+    editor.querySelectorAll('font[size="7"]').forEach(font => {
+      if (existingFontSz7.has(font)) return; // pre-existing, skip
+      font.removeAttribute('size');
+      font.style.fontSize = px;
+      // Walk ancestors inside the editor and clear any cascading font-size that
+      // would override our newly applied size (happens when decreasing after a prior increase)
+      let anc = font.parentElement;
+      while (anc && anc !== editor) {
+        if (anc.style && anc.style.fontSize) anc.style.removeProperty('font-size');
+        if (anc.tagName === 'FONT' && anc.getAttribute('size')) anc.removeAttribute('size');
+        anc = anc.parentElement;
+      }
+    });
   }
 
   function _updateToolbarState() {
@@ -447,9 +704,281 @@ const EditorManager = (() => {
     }
   }
 
+  // ─── AI Contextual Edit ───────────────────────────────────────────────────────
+
+  const _aiEdit = (() => {
+    let _savedRange    = null;
+    let _highlightMark = null; // <mark> element wrapping the user's selection
+    let _editMode      = 'INSERT'; // 'INSERT' | 'REPLACE'
+    let _isActive      = false;
+
+    const _el = {
+      toggle:    () => document.getElementById('aiEditToggleBtn'),
+      bar:       () => document.getElementById('aiEditBar'),
+      results:   () => document.getElementById('aiEditResultsSection'),
+      list:      () => document.getElementById('aiEditResultsList'),
+      loading:   () => document.getElementById('aiEditLoadingMsg'),
+      modeLabel: () => document.getElementById('aiEditModeLabel'),
+      instr:     () => document.getElementById('aiEditInstruction'),
+      vars:      () => document.getElementById('aiEditVariations'),
+      submitBtn: () => document.getElementById('aiEditSubmitBtn'),
+      panel:     () => document.getElementById('aiPanel'),
+    };
+
+    function _showBar() {
+      const editor = document.getElementById('editorContent');
+
+      // Capture selection BEFORE focus is stolen by the instruction input
+      const sel = window.getSelection();
+      if (editor && sel && sel.rangeCount > 0 &&
+          editor.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        const range = sel.getRangeAt(0).cloneRange();
+        if (!range.collapsed) {
+          // Wrap the selected text in a persistent visual highlight
+          const mark = document.createElement('mark');
+          mark.className = 'ai-temp-highlight';
+          try {
+            range.surroundContents(mark);
+          } catch {
+            // Range spans multiple block elements — extract then rewrap
+            const frag = range.extractContents();
+            mark.appendChild(frag);
+            range.insertNode(mark);
+          }
+          _highlightMark = mark;
+          _savedRange = document.createRange();
+          _savedRange.selectNodeContents(mark);
+        } else {
+          _savedRange = range; // cursor-only INSERT position
+          _highlightMark = null;
+        }
+      } else {
+        _savedRange = null;
+        _highlightMark = null;
+      }
+
+      _isActive = true;
+      _el.toggle()?.classList.add('ai-edit--active');
+      _el.bar()?.classList.remove('hidden');
+      _el.instr()?.focus();
+    }
+
+    function deactivate() {
+      _isActive = false;
+
+      // Unwrap highlight mark, restoring the original text nodes
+      if (_highlightMark && _highlightMark.parentNode) {
+        const parent = _highlightMark.parentNode;
+        while (_highlightMark.firstChild) {
+          parent.insertBefore(_highlightMark.firstChild, _highlightMark);
+        }
+        parent.removeChild(_highlightMark);
+        parent.normalize();
+      }
+      _highlightMark = null;
+      _savedRange    = null;
+
+      const editor = document.getElementById('editorContent');
+      if (editor) {
+        editor.contentEditable = 'true';
+        editor.classList.remove('editor-content--locked');
+      }
+
+      _el.toggle()?.classList.remove('ai-edit--active');
+      _el.bar()?.classList.add('hidden');
+      _el.results()?.classList.add('hidden');
+      _el.panel()?.classList.remove('ai-edit--results');
+
+      const list = _el.list();
+      if (list) { list.innerHTML = ''; delete list.dataset.variations; }
+      const instr = _el.instr();
+      if (instr) instr.value = '';
+      _el.loading()?.classList.add('hidden');
+    }
+
+    async function _submit() {
+      const instruction = _el.instr()?.value.trim();
+      if (!instruction) { _el.instr()?.focus(); return; }
+
+      const editor = document.getElementById('editorContent');
+      if (!editor) return;
+
+      // ── 1. Use the range captured at toggle-time (mark or cursor) ──────
+      let range;
+      if (_highlightMark && _highlightMark.parentNode) {
+        range = document.createRange();
+        range.selectNodeContents(_highlightMark);
+        _savedRange = range;
+      } else if (_savedRange) {
+        range = _savedRange;
+      } else {
+        range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        _savedRange = range;
+      }
+
+      const selectedText = _highlightMark ? _highlightMark.textContent : range.toString();
+      _editMode = selectedText.length > 0 ? 'REPLACE' : 'INSERT';
+
+      // ── 2. Extract ±150-word context ────────────────────────────────────
+      let beforeContext = '', afterContext = '';
+      try {
+        const br = document.createRange();
+        br.setStart(editor, 0);
+        br.setEnd(range.startContainer, range.startOffset);
+        beforeContext = br.toString().trim().split(/\s+/).filter(Boolean).slice(-150).join(' ');
+      } catch { /* empty doc */ }
+      try {
+        const ar = document.createRange();
+        ar.setStart(range.endContainer, range.endOffset);
+        ar.setEnd(editor, editor.childNodes.length);
+        afterContext = ar.toString().trim().split(/\s+/).filter(Boolean).slice(0, 150).join(' ');
+      } catch { /* empty doc */ }
+
+      // ── 3. Lock editor ──────────────────────────────────────────────────
+      editor.contentEditable = 'false';
+      editor.classList.add('editor-content--locked');
+
+      // ── 4. Show loading overlay ─────────────────────────────────────────
+      _el.panel()?.classList.add('ai-edit--results');
+      _el.results()?.classList.remove('hidden');
+      const ml = _el.modeLabel();
+      if (ml) ml.textContent = _editMode === 'REPLACE' ? '🔁 החלפה' : '➕ הוספה';
+      _el.loading()?.classList.remove('hidden');
+      const list = _el.list();
+      if (list) list.innerHTML = '';
+
+      const submitBtn = _el.submitBtn();
+      if (submitBtn) submitBtn.disabled = true;
+
+      const numberOfVariations = Number(_el.vars()?.value) || 3;
+
+      // ── 5. Call API ─────────────────────────────────────────────────────
+      try {
+        const data = await Api.aiContextualEdit({
+          beforeContext, selectedText, afterContext, instruction, numberOfVariations,
+        });
+        _el.loading()?.classList.add('hidden');
+        _renderCards(data.variations || []);
+      } catch (err) {
+        _el.loading()?.classList.add('hidden');
+        if (list) {
+          list.innerHTML =
+            `<p class="hint" style="color:var(--color-danger);padding:0.4rem 0">שגיאה: ${esc(err.message)}</p>`;
+        }
+        // Unlock so user can retry or cancel
+        editor.contentEditable = 'true';
+        editor.classList.remove('editor-content--locked');
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    }
+
+    function _renderCards(variations) {
+      const list = _el.list();
+      if (!list) return;
+      list.innerHTML = '';
+      list.dataset.variations = JSON.stringify(variations);
+
+      const actionLabel = _editMode === 'REPLACE' ? 'החלף ✓' : 'הוסף ✓';
+
+      variations.forEach((text, i) => {
+        const card = document.createElement('div');
+        card.className = 'ai-edit-card';
+        card.innerHTML =
+          `<div class="ai-edit-card__num">הצעה ${i + 1}</div>` +
+          `<div class="ai-edit-card__text">${esc(text)}</div>` +
+          `<div class="ai-edit-card__actions">` +
+          `<button class="btn btn--primary btn--sm ai-edit-apply-btn" data-idx="${i}">${actionLabel}</button>` +
+          `</div>`;
+        list.appendChild(card);
+      });
+
+      list.querySelectorAll('.ai-edit-apply-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const vars = JSON.parse(list.dataset.variations || '[]');
+          _inject(vars[Number(btn.dataset.idx)] || '');
+        });
+      });
+    }
+
+    function _inject(text) {
+      const editor = document.getElementById('editorContent');
+      if (!editor) return;
+
+      // Unlock first
+      editor.contentEditable = 'true';
+      editor.classList.remove('editor-content--locked');
+
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+
+      try {
+        let workRange;
+        if (_highlightMark && _highlightMark.parentNode) {
+          // Select and delete the highlight mark (replaces its entire content)
+          workRange = document.createRange();
+          workRange.selectNode(_highlightMark);
+          workRange.deleteContents();
+          _highlightMark = null; // prevent deactivate() from double-unwrapping
+        } else if (_savedRange) {
+          workRange = _savedRange.cloneRange();
+          if (_editMode === 'REPLACE') workRange.deleteContents();
+        } else {
+          workRange = document.createRange();
+          workRange.selectNodeContents(editor);
+          workRange.collapse(false);
+        }
+
+        // Build fragment preserving newlines
+        const frag = document.createDocumentFragment();
+        text.split('\n').forEach((line, i) => {
+          if (i > 0) frag.appendChild(document.createElement('br'));
+          if (line)  frag.appendChild(document.createTextNode(line));
+        });
+        workRange.insertNode(frag);
+
+        sel.addRange(workRange);
+        sel.collapseToEnd();
+      } catch (err) {
+        console.error('[aiEdit] injection error:', err);
+      }
+
+      editor.focus();
+      isDirty = true;
+      setSaveStatus('saving');
+      debouncedSave();
+
+      deactivate();
+    }
+
+    function init() {
+      document.getElementById('aiEditToggleBtn')
+        ?.addEventListener('click', () => (_isActive ? deactivate() : _showBar()));
+      document.getElementById('aiEditSubmitBtn')
+        ?.addEventListener('click', _submit);
+      document.getElementById('aiEditCancelBtn')
+        ?.addEventListener('click', deactivate);
+      document.getElementById('aiEditInstruction')
+        ?.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _submit(); }
+        });
+    }
+
+    function activateWithInstruction(instruction) {
+      _showBar();
+      const instrEl = document.getElementById('aiEditInstruction');
+      if (instrEl) instrEl.value = instruction;
+    }
+
+    return { init, deactivate, activateWithInstruction };
+  })();
+
   // ─── ממשק ציבורי ─────────────────────────────────────────────────────────────
 
   function clear() {
+    _aiEdit.deactivate();
     if (isDirty) _save();
     currentNode = null;
     prevNode = null;

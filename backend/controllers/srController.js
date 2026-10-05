@@ -1,9 +1,7 @@
 'use strict';
 const fs   = require('fs');
 const path = require('path');
-const { SCHEDULE_FILE } = require('../config/limits');
-
-const scheduleFile = path.resolve(__dirname, SCHEDULE_FILE);
+const { SCHEDULE_FILE, ensureJsonFile } = require('../config/limits');
 
 // ── Defaults ────────────────────────────────────────────────────────────────
 
@@ -11,24 +9,29 @@ const DEFAULT_SETTINGS = {
   algorithm: 'powers2',
   customSequence: [1, 7, 30, 90],
   heavyLoadThreshold: 9,
+  strictKodeshMode: true,
+  aiScopePreference: 'repository_kodesh',
 };
 
 // ── File I/O ─────────────────────────────────────────────────────────────────
 
 function readSchedule() {
-  if (!fs.existsSync(scheduleFile)) {
-    return { settings: { ...DEFAULT_SETTINGS }, tasks: [] };
-  }
-  const raw = JSON.parse(fs.readFileSync(scheduleFile, 'utf-8'));
+  ensureJsonFile(SCHEDULE_FILE, { settings: { ...DEFAULT_SETTINGS }, tasks: [] });
+  const raw = JSON.parse(fs.readFileSync(SCHEDULE_FILE, 'utf-8'));
   if (!raw.settings) raw.settings = { ...DEFAULT_SETTINGS };
   if (!raw.tasks) raw.tasks = [];
   return raw;
 }
 
 function writeSchedule(data) {
-  const dir = path.dirname(scheduleFile);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(scheduleFile, JSON.stringify(data, null, 2));
+  ensureJsonFile(SCHEDULE_FILE, { settings: { ...DEFAULT_SETTINGS }, tasks: [] });
+  // Inline mop-up: re-check immediately before write in case the path was
+  // recreated as a directory between the ensureJsonFile call and here
+  if (fs.existsSync(SCHEDULE_FILE) && fs.statSync(SCHEDULE_FILE).isDirectory()) {
+    fs.rmSync(SCHEDULE_FILE, { recursive: true, force: true });
+    fs.mkdirSync(path.dirname(SCHEDULE_FILE), { recursive: true });
+  }
+  fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(data, null, 2));
 }
 
 // ── Hebrew Calendar ──────────────────────────────────────────────────────────
@@ -41,6 +44,12 @@ const HEBREW_MONTH_NAMES = {
   7: 'תשרי', 8: 'חשוון', 9: 'כסלו', 10: 'טבת', 11: 'שבט',
   12: 'אדר', 13: 'אדר ב׳',
 };
+
+// In a leap year month 12 = Adar I (אדר א׳), not plain Adar
+function _getHebrewMonthName(month, year) {
+  if (month === 12 && isHebrewLeap(year)) return 'אדר א׳';
+  return HEBREW_MONTH_NAMES[month] || '';
+}
 
 function isHebrewLeap(y) {
   return ((7 * y + 1) % 19) < 7;
@@ -203,6 +212,62 @@ function getIntervals(settings) {
     : [1, 2, 4, 8, 16, 32, 64];
 }
 
+// ── Programs ───────────────────────────────────────────────────────────────────
+
+function _ensureDefaultPrograms(schedule) {
+  if (!schedule.programs) schedule.programs = [];
+  if (!schedule.programs.find(p => p.id === 'default')) {
+    schedule.programs.unshift({
+      id: 'default',
+      name: 'ברירת מחדל — חזקות של 2',
+      sequence: [1, 2, 4, 8, 16, 32, 64],
+      usageCount: 0,
+      createdAt: new Date().toISOString(),
+    });
+  }
+}
+
+function getPrograms() {
+  const schedule = readSchedule();
+  _ensureDefaultPrograms(schedule);
+  return schedule.programs.slice().sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0));
+}
+
+function createProgram(name, sequence, periodic, intervalDays) {
+  if (!name || typeof name !== 'string' || !name.trim()) throw new Error('שם תוכנית נדרש');
+  if (periodic) {
+    const n = parseInt(intervalDays, 10);
+    if (!Number.isInteger(n) || n < 1) throw new Error('מרווח בימים חייב להיות מספר שלם חיובי');
+  } else {
+    if (!Array.isArray(sequence) || !sequence.length || sequence.some(n => !Number.isInteger(n) || n < 1)) {
+      throw new Error('רצף חייב להיות מערך של מספרים שלמים חיוביים');
+    }
+  }
+  const schedule = readSchedule();
+  _ensureDefaultPrograms(schedule);
+  const program = {
+    id: `prog-${Date.now()}`,
+    name: name.trim(),
+    sequence: periodic ? [] : sequence,
+    periodic: !!periodic,
+    intervalDays: periodic ? parseInt(intervalDays, 10) : undefined,
+    usageCount: 0,
+    createdAt: new Date().toISOString(),
+  };
+  schedule.programs.push(program);
+  writeSchedule(schedule);
+  return program;
+}
+
+function deleteProgram(id) {
+  if (id === 'default') throw new Error('לא ניתן למחוק את התוכנית הבסיסית');
+  const schedule = readSchedule();
+  const before = (schedule.programs || []).length;
+  schedule.programs = (schedule.programs || []).filter(p => p.id !== id);
+  if (schedule.programs.length === before) throw new Error('תוכנית לא נמצאה');
+  writeSchedule(schedule);
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 function getTodayTasks() {
@@ -221,29 +286,118 @@ function completeTask(taskId) {
   return task;
 }
 
-function planSummary(summaryPath, title) {
-  const schedule  = readSchedule();
-  const intervals = getIntervals(schedule.settings);
-  const today     = todayStr();
-  const newTasks  = [];
+function uncompleteTask(taskId) {
+  const schedule = readSchedule();
+  const task = schedule.tasks.find(t => t.id === taskId);
+  if (!task) throw new Error('משימה לא נמצאה');
+  task.completed   = false;
+  task.completedAt = null;
+  writeSchedule(schedule);
+  return task;
+}
 
-  // Initial study task — due today
+// Shift all remaining tasks in the same learning sequence forward/backward by `days`
+function _shiftSequence(schedule, anchorTask, fromDate, days) {
+  const seqKey = anchorTask.bookName || anchorTask.summaryPath;
+  schedule.tasks
+    .filter(t => (t.bookName || t.summaryPath) === seqKey && t.dueDate >= fromDate)
+    .forEach(t => { t.dueDate = addDaysToStr(t.dueDate, days); });
+}
+
+function postponeTask(taskId) {
+  const schedule = readSchedule();
+  const task = schedule.tasks.find(t => t.id === taskId);
+  if (!task) throw new Error('משימה לא נמצאה');
+  _shiftSequence(schedule, task, task.dueDate, 1);
+  writeSchedule(schedule);
+  return task;
+}
+
+function learnYesterday(taskId) {
+  const schedule = readSchedule();
+  const task = schedule.tasks.find(t => t.id === taskId);
+  if (!task) throw new Error('משימה לא נמצאה');
+  const originalDate = task.dueDate;
+  const yesterday    = addDaysToStr(todayStr(), -1);
+  task.completed   = true;
+  task.completedAt = new Date().toISOString();
+  task.dueDate     = yesterday;
+  // Pull subsequent tasks back by 1
+  const seqKey = task.bookName || task.summaryPath;
+  schedule.tasks
+    .filter(t => t.id !== taskId && (t.bookName || t.summaryPath) === seqKey && t.dueDate > originalDate)
+    .forEach(t => { t.dueDate = addDaysToStr(t.dueDate, -1); });
+  writeSchedule(schedule);
+  return task;
+}
+
+function addCustomEvent(dateStr, title) {
+  if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) throw new Error('תאריך לא תקין');
+  if (!title || !String(title).trim()) throw new Error('כותרת נדרשת');
+  const schedule = readSchedule();
+  const event = {
+    id:            genId(),
+    summaryPath:   'אירועים',
+    title:         String(title).trim(),
+    type:          'event',
+    dueDate:       dateStr,
+    completed:     false,
+    completedAt:   null,
+    reviewNumber:  0,
+    scheduledFrom: todayStr(),
+    programId:     'event',
+  };
+  schedule.tasks.push(event);
+  writeSchedule(schedule);
+  return event;
+}
+
+function planSummary(summaryPath, title, programId) {
+  const schedule = readSchedule();
+  _ensureDefaultPrograms(schedule);
+
+  // Find requested program or fall back to default
+  let program = (schedule.programs || []).find(p => p.id === programId);
+  if (!program) program = schedule.programs.find(p => p.id === 'default') || schedule.programs[0];
+
+  // Increment usage count
+  program.usageCount = (program.usageCount || 0) + 1;
+
+  const today    = todayStr();
+  const newTasks = [];
+
   newTasks.push({
     id: genId(), summaryPath, title,
     type: 'completion', dueDate: today,
     completed: false, completedAt: null,
     reviewNumber: 0, scheduledFrom: today,
+    programId: program.id,
   });
 
-  // Spaced review tasks
-  intervals.forEach((interval, i) => {
-    newTasks.push({
-      id: genId(), summaryPath, title,
-      type: 'review', dueDate: nextWorkDay(today, interval),
-      completed: false, completedAt: null,
-      reviewNumber: i + 1, scheduledFrom: today,
+  if (program.periodic) {
+    // Infinite periodic: generate 1 year of repeating reviews
+    const interval = program.intervalDays || 7;
+    for (let i = 1; i * interval <= 365; i++) {
+      newTasks.push({
+        id: genId(), summaryPath, title,
+        type: 'review', dueDate: nextWorkDay(today, i * interval),
+        completed: false, completedAt: null,
+        reviewNumber: i, scheduledFrom: today,
+        programId: program.id, periodic: true,
+      });
+    }
+  } else {
+    const intervals = program.sequence || getIntervals(schedule.settings);
+    intervals.forEach((interval, i) => {
+      newTasks.push({
+        id: genId(), summaryPath, title,
+        type: 'review', dueDate: nextWorkDay(today, interval),
+        completed: false, completedAt: null,
+        reviewNumber: i + 1, scheduledFrom: today,
+        programId: program.id,
+      });
     });
-  });
+  }
 
   schedule.tasks.push(...newTasks);
   writeSchedule(schedule);
@@ -279,7 +433,7 @@ function getCalendarData(yearMonth) {
       hebrewDay: heb.day,
       hebrewMonth: heb.month,
       hebrewYear: heb.year,
-      hebrewMonthName: HEBREW_MONTH_NAMES[heb.month] || '',
+      hebrewMonthName: _getHebrewMonthName(heb.month, heb.year),
     });
   }
 
@@ -305,10 +459,13 @@ function saveSettings(newSettings) {
 }
 
 module.exports = {
-  getTodayTasks, completeTask,
+  getTodayTasks, completeTask, uncompleteTask,
+  postponeTask, learnYesterday,
+  addCustomEvent,
   planSummary,
   getCalendarData,
   getSettings, saveSettings,
+  getPrograms, createProgram, deleteProgram,
   readSchedule, writeSchedule,
   gregorianToHebrew, HEBREW_MONTH_NAMES,
 };

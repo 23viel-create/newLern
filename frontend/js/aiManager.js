@@ -152,6 +152,15 @@ const AiManager = (() => {
     }
   }
 
+  // ─── Markdown renderer (safe — escapes HTML before converting) ───────────────
+  function _mdToHtml(text) {
+    return String(text)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/\n/g, '<br>');
+  }
+
   // ─── Chat ────────────────────────────────────────────────────────────────────
   async function _sendToChat(context, message, extra) {
     _appendMessage('user', message);
@@ -163,7 +172,8 @@ const AiManager = (() => {
         title: extra?.title || node?.title || node?.path,
         content: extra?.content || document.getElementById('editorContent')?.innerText?.slice(0, 3000) || '',
       };
-      const res = await Api.aiAsk(context, message, fullExtra);
+      const selectedBooks = typeof BooksManager !== 'undefined' ? BooksManager.getSelectedBooks() : [];
+      const res = await Api.aiAsk(context, message, fullExtra, selectedBooks);
       _removeLastSystemMessage();
       _appendMessage('ai', res.answer || 'אין תגובה');
     } catch (err) {
@@ -177,7 +187,11 @@ const AiManager = (() => {
     if (!box) return;
     const div = document.createElement('div');
     div.className = `ai-msg ai-msg--${role}`;
-    div.textContent = text;
+    if (role === 'ai') {
+      div.innerHTML = _mdToHtml(text);
+    } else {
+      div.textContent = text;
+    }
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
   }
@@ -204,6 +218,7 @@ const AiManager = (() => {
     const slotCount = Math.max(savedCount, 1);
     for (let i = 0; i < slotCount; i++) _addKeyRow(container, i);
     _appendAddKeyButton(container);
+    _updateLbVisibility();
   }
 
   function _addKeyRow(container, index) {
@@ -260,16 +275,45 @@ const AiManager = (() => {
       const msg = el.keysSavedMsg();
       if (msg) { msg.classList.remove('hidden'); setTimeout(() => msg.classList.add('hidden'), 2500); }
       await _refreshBattery();
+      _updateLbVisibility();
     } catch (err) {
       alert(`שגיאה בשמירת מפתחות: ${err.message}`);
+    }
+  }
+
+  async function _resetCooldowns() {
+    const btn = document.getElementById('resetCooldownsBtn');
+    if (btn) btn.disabled = true;
+    try {
+      await Api.aiResetCooldowns();
+      await _refreshBattery();
+      const msg = el.keysSavedMsg();
+      if (msg) { msg.textContent = 'סטטוס מפתחות אופס ✓'; msg.classList.remove('hidden'); setTimeout(() => { msg.classList.add('hidden'); msg.textContent = 'נשמר ✓'; }, 3000); }
+    } catch (err) {
+      alert(`שגיאה: ${err.message}`);
+    } finally {
+      if (btn) btn.disabled = false;
     }
   }
 
   async function _refreshBattery() {
     try {
       const status = await Api.aiKeyStatus();
+      const healthyCount = Array.isArray(status) ? status.filter(k => k.healthy).length : 0;
       const cnt = el.keyCount();
-      if (cnt) cnt.textContent = Array.isArray(status) ? status.length : 0;
+      if (cnt) cnt.textContent = healthyCount;
+
+      // Block chat when no healthy keys remain
+      const sendBtn = el.sendBtn();
+      const input   = el.chatInput();
+      if (!_offline && Array.isArray(status) && status.length > 0 && healthyCount === 0) {
+        if (sendBtn) sendBtn.disabled = true;
+        if (input)   input.disabled   = true;
+        _appendMessage('error', 'שגיאה: לא נשארו מפתחות API תקינים או פעילים במערכת. אנא הזן מפתח תקין במסך ההגדרות.');
+      } else if (!_offline) {
+        if (sendBtn) sendBtn.disabled = false;
+        if (input)   input.disabled   = false;
+      }
 
       const battery = el.keyBattery();
       if (!battery || !Array.isArray(status)) return;
@@ -308,7 +352,11 @@ const AiManager = (() => {
     if (!box) return;
     const div = document.createElement('div');
     div.className = `ai-msg ai-msg--${role}`;
-    div.textContent = text;
+    if (role === 'ai') {
+      div.innerHTML = _mdToHtml(text);
+    } else {
+      div.textContent = text;
+    }
     box.appendChild(div);
     box.scrollTop = box.scrollHeight;
   }
@@ -364,17 +412,183 @@ const AiManager = (() => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') el.sendBtn()?.click();
     });
 
+    // API key generation link — open in OS browser (Electron-aware)
+    document.getElementById('generateApiKeyLink')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      const url = 'https://aistudio.google.com/app/apikey';
+      if (typeof require !== 'undefined' && typeof process !== 'undefined' &&
+          process.versions && process.versions.electron) {
+        const { shell } = require('electron');
+        shell.openExternal(url);
+      } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+    });
+
     // Settings keys
     el.saveKeysBtn()?.addEventListener('click', _saveKeys);
+    document.getElementById('resetCooldownsBtn')?.addEventListener('click', _resetCooldowns);
     el.articlesSend()?.addEventListener('click', _sendArticlesChat);
     el.articlesInput()?.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') _sendArticlesChat();
     });
     el.programBtn()?.addEventListener('click', _generateLearningProgram);
 
+    // Chat context file manager
+    document.getElementById('chatContextUploadBtn')?.addEventListener('click', _uploadChatContextFile);
+    await _loadChatContextList();
+
+    // Load-balancing mode selector
+    await _initLbMode();
+
     await _renderKeyFields();
     await _refreshBattery();
     _renderContextActions();
+  }
+
+  // ─── Load-balancing mode ──────────────────────────────────────────────────
+
+  async function _initLbMode() {
+    const select  = document.getElementById('lbModeSelect');
+    const section = document.getElementById('lbModeSection');
+    const hint    = document.getElementById('lbModeHint');
+    const msgEl   = document.getElementById('lbModeSavedMsg');
+    if (!select || !section || !hint) return;
+
+    // Fetch current mode from server
+    try {
+      const { mode } = await Api.aiGetLbMode();
+      select.value = mode || 'balanced';
+    } catch { /* ignore — default stays 'balanced' */ }
+
+    // Show section only when key count > 4
+    _updateLbVisibility();
+
+    select.addEventListener('change', async () => {
+      try {
+        await Api.aiSetLbMode(select.value);
+        if (msgEl) {
+          msgEl.classList.remove('hidden');
+          setTimeout(() => msgEl.classList.add('hidden'), 3000);
+        }
+      } catch (err) {
+        alert(`שגיאה בשמירת מצב: ${err.message}`);
+      }
+    });
+  }
+
+  function _updateLbVisibility() {
+    const select  = document.getElementById('lbModeSelect');
+    const section = document.getElementById('lbModeSection');
+    const hint    = document.getElementById('lbModeHint');
+    if (!select || !section || !hint) return;
+    const keys = el.apiKeysList()?.querySelectorAll('.api-key-row').length || 0;
+    if (keys > 4) {
+      section.classList.remove('hidden');
+      hint.classList.add('hidden');
+    } else {
+      section.classList.add('hidden');
+      hint.classList.remove('hidden');
+    }
+  }
+
+  // ─── Chat Context File Manager ────────────────────────────────────────────
+
+  async function _loadChatContextList() {
+    const listEl = document.getElementById('chatContextList');
+    if (!listEl) return;
+    try {
+      const files = await Api.chatFilesList();
+      if (!files.length) {
+        listEl.innerHTML = '<p class="placeholder-text">אין קבצים מועלים עדיין</p>';
+        return;
+      }
+      listEl.innerHTML = files.map(f => `
+        <div class="chat-ctx-item" data-name="${_escAttr(f.name)}">
+          <span class="chat-ctx-item__name">${_escHtml(f.name)}</span>
+          <span class="chat-ctx-item__size">${(f.size / 1024).toFixed(1)} KB</span>
+          <button class="btn btn--ghost btn--xs ctx-preview-btn">הצג</button>
+          <button class="btn btn--ghost btn--xs ctx-delete-btn">מחק</button>
+          <div class="chat-ctx-preview hidden"></div>
+        </div>
+      `).join('');
+
+      listEl.querySelectorAll('.ctx-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const item = btn.closest('.chat-ctx-item');
+          const name = item?.dataset.name;
+          if (!name) return;
+          try {
+            await Api.chatFilesDelete(name);
+            await _loadChatContextList();
+          } catch (err) {
+            alert(`שגיאה במחיקה: ${err.message}`);
+          }
+        });
+      });
+
+      listEl.querySelectorAll('.ctx-preview-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const item    = btn.closest('.chat-ctx-item');
+          const name    = item?.dataset.name;
+          const previewEl = item?.querySelector('.chat-ctx-preview');
+          if (!previewEl) return;
+          if (!previewEl.classList.contains('hidden')) {
+            previewEl.classList.add('hidden');
+            previewEl.innerHTML = '';
+            btn.textContent = 'הצג';
+            return;
+          }
+          const url = Api.chatFilesPreviewUrl(name);
+          const ext = name.split('.').pop().toLowerCase();
+          if (ext === 'pdf') {
+            previewEl.innerHTML = `<iframe src="${url}" title="${_escAttr(name)}"></iframe>`;
+          } else {
+            previewEl.innerHTML = `<div class="chat-ctx-preview__text">טוען...</div>`;
+            fetch(url).then(r => r.text()).then(text => {
+              previewEl.querySelector('.chat-ctx-preview__text').textContent = text;
+            }).catch(() => {
+              previewEl.querySelector('.chat-ctx-preview__text').textContent = 'לא ניתן לטעון תצוגה מקדימה';
+            });
+          }
+          previewEl.classList.remove('hidden');
+          btn.textContent = 'סגור';
+        });
+      });
+    } catch {
+      listEl.innerHTML = '<p class="placeholder-text">שגיאה בטעינת הקבצים</p>';
+    }
+  }
+
+  async function _uploadChatContextFile() {
+    const input  = document.getElementById('chatContextFileInput');
+    const msgEl  = document.getElementById('chatContextUploadMsg');
+    const file   = input?.files?.[0];
+    if (!file) { _showCtxMsg(msgEl, 'יש לבחור קובץ תחילה', 'err'); return; }
+    _showCtxMsg(msgEl, 'מעלה...', 'info');
+    try {
+      await Api.chatFilesUpload(file);
+      _showCtxMsg(msgEl, 'הקובץ הועלה בהצלחה ✓', 'ok');
+      if (input) input.value = '';
+      await _loadChatContextList();
+    } catch (err) {
+      _showCtxMsg(msgEl, `שגיאה: ${err.message}`, 'err');
+    }
+  }
+
+  function _showCtxMsg(el, text, type) {
+    if (!el) return;
+    el.textContent = text;
+    el.className = `save-status ${type === 'ok' ? 'save-status--saved' : type === 'err' ? 'save-status--error' : ''}`;
+    el.classList.remove('hidden');
+    if (type === 'ok') setTimeout(() => el.classList.add('hidden'), 4000);
+  }
+
+  function _escHtml(s) {
+    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function _escAttr(s) {
+    return String(s || '').replace(/"/g,'&quot;');
   }
 
   return { init, setContext, setOffline, refreshBattery: _refreshBattery };

@@ -18,6 +18,7 @@ const {
   getAudioFilePath,
   bulkImport,
   getNeighbors,
+  importFileToFolder,
 } = require('../controllers/filesController');
 
 // multer with memory storage — buffer written to disk in controller
@@ -190,6 +191,20 @@ router.post('/bulk-import', upload.single('file'), (req, res) => {
     if (!delimiter) return res.status(400).json({ success: false, message: 'נדרש מפריד' });
     const created = bulkImport(parentPath, content, delimiter, baseName);
     res.status(201).json({ success: true, data: created });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/summaries/import-file  (multipart: field "file" + field "folderPath")
+router.post('/import-file', upload.single('file'), (req, res) => {
+  try {
+    const { folderPath = '' } = req.body;
+    if (!req.file) return res.status(400).json({ success: false, message: 'נדרש קובץ' });
+    const result = importFileToFolder(
+      folderPath, req.file.originalname, req.file.buffer, req.file.mimetype,
+    );
+    res.status(201).json({ success: true, data: result });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }

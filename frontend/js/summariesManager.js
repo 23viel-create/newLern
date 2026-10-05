@@ -1,10 +1,11 @@
 // מנהל מסך בחירת תכנים — עץ תיקיות וסיכומים
 const SummariesManager = (() => {
 
-  let treeData     = [];   // עץ מלא מהשרת
-  let sortBy       = 'name';
-  let searchQuery  = '';
-  const expanded   = new Set(); // paths של תיקיות פתוחות
+  let treeData        = [];   // עץ מלא מהשרת
+  let sortBy          = 'name';
+  let searchQuery     = '';
+  let _eventsAttached = false;
+  const expanded      = new Set(); // paths של תיקיות פתוחות
 
   // ─── עזרים ──────────────────────────────────────────────────────────────────
 
@@ -24,7 +25,11 @@ const SummariesManager = (() => {
   // ─── אתחול ──────────────────────────────────────────────────────────────────
 
   async function init() {
-    bindToolbar();
+    if (!_eventsAttached) {
+      bindToolbar();
+      attachEvents();
+      _eventsAttached = true;
+    }
     await loadTree();
   }
 
@@ -40,11 +45,23 @@ const SummariesManager = (() => {
       render();
     });
 
-    // חיפוש (מדורג)
+    // חיפוש (מדורג) — live filter
     document.getElementById('treeSearch').addEventListener(
       'input',
       debounce((e) => { searchQuery = e.target.value.trim(); render(); }, 250),
     );
+
+    // כפתור חיפוש מתקדם — מציג תוצאות עם נתיב מלא
+    document.getElementById('treeSearchBtn')?.addEventListener('click', () => {
+      const q = document.getElementById('treeSearch').value.trim();
+      if (q) _showSearchResults(q);
+    });
+    document.getElementById('treeSearch')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const q = document.getElementById('treeSearch').value.trim();
+        if (q) _showSearchResults(q);
+      }
+    });
   }
 
   // ─── טעינה מהשרת ────────────────────────────────────────────────────────────
@@ -120,7 +137,6 @@ const SummariesManager = (() => {
         if (toggle) toggle.textContent = '▼';
       }
     });
-    attachEvents(container);
   }
 
   function renderNodes(nodes, depth) {
@@ -145,10 +161,12 @@ const SummariesManager = (() => {
             <span class="tree-node__icon" aria-hidden="true">📁</span>
             <span class="tree-node__name">${title}</span>
             <div class="tree-node__actions">
-              <button class="btn btn--xs btn--ghost" data-action="quiz-folder" data-path="${p}" data-name="${rawName}" title="בחן על כל הסיכומים בתיקייה">🎯</button>
-              <button class="btn btn--xs btn--ghost" data-action="new-folder"  data-path="${p}" title="תיקייה חדשה בתוך ${rawName}">📁+</button>
-              <button class="btn btn--xs btn--ghost" data-action="new-summary" data-path="${p}" title="סיכום חדש בתוך ${rawName}">📄+</button>
-              <button class="btn btn--xs btn--ghost" data-action="rename"      data-path="${p}" data-name="${rawName}">✏️</button>
+              <button class="btn btn--xs btn--ghost" data-action="quiz-folder"   data-path="${p}" data-name="${rawName}" title="בחן על כל הסיכומים בתיקייה">🎯</button>
+              <button class="btn btn--xs btn--ghost" data-action="import-file"   data-path="${p}" data-name="${rawName}" title="ייבא קובץ Word או שמע לתיקייה">📥</button>
+              <button class="btn btn--xs btn--ghost" data-action="export-zip"    data-path="${p}" data-name="${rawName}" title="ייצא חומר לימוד (ZIP)">📦</button>
+              <button class="btn btn--xs btn--ghost" data-action="new-folder"    data-path="${p}" title="תיקייה חדשה בתוך ${rawName}">📁+</button>
+              <button class="btn btn--xs btn--ghost" data-action="new-summary"   data-path="${p}" title="סיכום חדש בתוך ${rawName}">📄+</button>
+              <button class="btn btn--xs btn--ghost" data-action="rename"        data-path="${p}" data-name="${rawName}">✏️</button>
               <button class="btn btn--xs btn--danger-ghost" data-action="delete" data-path="${p}" data-name="${rawName}" data-type="folder">🗑️</button>
             </div>
           </div>
@@ -167,8 +185,9 @@ const SummariesManager = (() => {
           <div class="tree-node__actions">
             <button class="btn btn--xs btn--ghost" data-action="quiz-node"  data-path="${p}" data-name="${rawName}" title="התחל בחינה על סיכום זה">🎯</button>
             <button class="btn btn--xs btn--ghost" data-action="edit-questions" data-path="${p}" data-name="${rawName}" title="ערוך שאלות">📝</button>
-            <button class="btn btn--xs btn--ghost" data-action="plan"   data-path="${p}" data-name="${rawName}" title="תזמן חזרות מרווחות">📅</button>
-            <button class="btn btn--xs btn--ghost" data-action="rename" data-path="${p}" data-name="${rawName}">✏️</button>
+            <button class="btn btn--xs btn--ghost" data-action="plan"       data-path="${p}" data-name="${rawName}" title="תזמן חזרות מרווחות">📅</button>
+            <button class="btn btn--xs btn--ghost" data-action="export-zip" data-path="${p}" data-name="${rawName}" title="ייצא חומר לימוד (ZIP)">📦</button>
+            <button class="btn btn--xs btn--ghost" data-action="rename"     data-path="${p}" data-name="${rawName}">✏️</button>
             <button class="btn btn--xs btn--danger-ghost" data-action="delete" data-path="${p}" data-name="${rawName}" data-type="summary">🗑️</button>
           </div>
         </div>
@@ -188,9 +207,13 @@ const SummariesManager = (() => {
 
   // ─── אירועים ────────────────────────────────────────────────────────────────
 
-  function attachEvents(container) {
-    container.addEventListener('click', async (e) => {
-      const btn = e.target.closest('[data-action]');
+  function attachEvents() {
+    // Delegate on the stable view section so the listener survives tree re-renders
+    // and works regardless of which nav tab the user came from.
+    // Scope to #summariesTree children to avoid intercepting toolbar buttons.
+    const viewSection = document.getElementById('view-summaries');
+    viewSection.addEventListener('click', async (e) => {
+      const btn = e.target.closest('#summariesTree [data-action]');
       if (!btn) return;
       e.stopPropagation();
       await handleAction(btn.dataset.action, btn.dataset.path, btn.dataset.name, btn.dataset.type, btn);
@@ -260,7 +283,15 @@ const SummariesManager = (() => {
       }
 
       case 'open': {
-        // flatten the sorted tree (not filtered) so nav works across all summaries
+        // If a search is active: clear it, re-render full tree, then reveal path
+        if (searchQuery) {
+          searchQuery = '';
+          const searchInput = document.getElementById('treeSearch');
+          if (searchInput) searchInput.value = '';
+          render(); // render full tree
+          // Expand all ancestor folders so the item is visible
+          _revealPath(nodePath);
+        }
         const flatList = flattenSummaries(sortTree(treeData));
         const node     = flatList.find(n => n.path === nodePath);
         if (node) EditorManager.open(node, flatList);
@@ -283,16 +314,25 @@ const SummariesManager = (() => {
       }
 
       case 'plan': {
-        const confirmed = await WindowManager.confirm(
-          `לתזמן חזרות מרווחות לסיכום "${nodeName}"?\n\nיווצרו משימות חזרה לפי ההגדרות הנוכחיות.`
-        );
-        if (!confirmed) return;
-        try {
-          const tasks = await Api.planSummary(nodePath, nodeName);
-          alert(`✓ תוזמנו ${tasks.length} משימות חזרה לסיכום "${nodeName}"`);
-        } catch (err) {
-          alert(`שגיאה: ${err.message}`);
-        }
+        // Show program selector modal then plan
+        PlanProgramModal.open(nodePath, nodeName);
+        break;
+      }
+
+      case 'export-zip': {
+        const fname = `${(nodeName || nodePath.split('/').pop())}_${new Date().toISOString().slice(0, 10)}.zip`;
+        const url   = Api.exportNodeZipUrl(nodePath);
+        const a     = document.createElement('a');
+        a.href      = url;
+        a.download  = fname;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        break;
+      }
+
+      case 'import-file': {
+        _importFileToFolder(nodePath);
         break;
       }
 
@@ -319,6 +359,126 @@ const SummariesManager = (() => {
         break;
       }
     }
+  }
+
+  // ─── ייבוא קובץ לתיקייה ─────────────────────────────────────────────────────
+
+  function _importFileToFolder(folderPath) {
+    const input = document.getElementById('folderImportInput');
+    input.value = '';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const result = await Api.importFileToFolder(folderPath, file);
+        await loadTree();
+        alert(`✓ הקובץ "${result.title}" יובא בהצלחה לתיקייה`);
+      } catch (err) {
+        alert(`שגיאה בייבוא: ${err.message}`);
+      }
+    };
+    input.click();
+  }
+
+  // ─── חיפוש מתקדם עם נתיב מלא ──────────────────────────────────────────────
+
+  function _flattenWithPath(nodes, folderLabel) {
+    const out = [];
+    for (const n of nodes) {
+      if (n.type === 'summary') {
+        out.push({ ...n, folderLabel: folderLabel || '' });
+      } else if (n.type === 'folder' && n.children) {
+        const childLabel = folderLabel
+          ? `${folderLabel} / ${n.title || n.name}`
+          : (n.title || n.name);
+        out.push(..._flattenWithPath(n.children, childLabel));
+      }
+    }
+    return out;
+  }
+
+  function _showSearchResults(q) {
+    const panel = document.getElementById('treeSearchResults');
+    if (!panel) return;
+    const lower = q.toLowerCase();
+    const results = _flattenWithPath(treeData, '').filter(n =>
+      (n.title || n.name).toLowerCase().includes(lower),
+    );
+
+    panel.classList.remove('hidden');
+
+    if (!results.length) {
+      panel.innerHTML = `<p class="placeholder-text" style="padding:0.5rem 0.8rem">לא נמצאו תוצאות עבור "${esc(q)}"</p>`;
+      return;
+    }
+
+    panel.innerHTML = `
+      <div class="tree-search-results__header">
+        <span>נמצאו ${results.length} תוצאות</span>
+        <button class="btn btn--xs btn--ghost" id="treeSearchClose">✕ סגור</button>
+      </div>
+      ${results.map(r => `
+        <div class="tree-search-result" data-path="${esc(r.path)}" role="button" tabindex="0">
+          <span class="tree-search-result__name">📄 ${esc(r.title || r.name)}</span>
+          ${r.folderLabel ? `<span class="tree-search-result__path">${esc(r.folderLabel)}</span>` : ''}
+        </div>
+      `).join('')}`;
+
+    panel.querySelector('#treeSearchClose')?.addEventListener('click', () => {
+      panel.classList.add('hidden');
+    });
+
+    panel.querySelectorAll('.tree-search-result').forEach(el => {
+      el.addEventListener('click', () => {
+        const nodePath = el.dataset.path;
+        panel.classList.add('hidden');
+        searchQuery = '';
+        const searchInput = document.getElementById('treeSearch');
+        if (searchInput) searchInput.value = '';
+        render();
+        _revealPath(nodePath);
+        const flatList = flattenSummaries(sortTree(treeData));
+        const node = flatList.find(n => n.path === nodePath);
+        if (node) EditorManager.open(node, flatList);
+      });
+    });
+  }
+
+  // ─── גילוי מסלול עץ (expand כל תיקיות ההורה + גלילה + הדגשה) ───────────────
+
+  function _revealPath(targetPath) {
+    // Build ancestor paths from root down to parent
+    const parts = targetPath.split('/');
+    const ancestors = [];
+    for (let i = 1; i < parts.length; i++) {
+      ancestors.push(parts.slice(0, i).join('/'));
+    }
+
+    const container = document.getElementById('summariesTree');
+
+    // Expand each ancestor folder
+    for (const ancestorPath of ancestors) {
+      expanded.add(ancestorPath);
+      const folderEl = container.querySelector(`.tree-node--folder[data-path="${CSS.escape(ancestorPath)}"]`);
+      if (folderEl) {
+        const children = folderEl.querySelector('.tree-node__children');
+        const toggle   = folderEl.querySelector('.tree-node__toggle');
+        if (children) children.hidden = false;
+        if (toggle)   toggle.textContent = '▼';
+      }
+    }
+
+    // After expansion, find and highlight the target node
+    requestAnimationFrame(() => {
+      const targetEl = container.querySelector(`[data-path="${CSS.escape(targetPath)}"]`);
+      if (!targetEl) return;
+      // Scroll into view
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Flash highlight
+      const row = targetEl.querySelector('.tree-node__row') || targetEl;
+      row.classList.add('tree-node--highlight');
+      setTimeout(() => row.classList.remove('tree-node--highlight'), 1800);
+    });
   }
 
   // ─── ממשק ציבורי ────────────────────────────────────────────────────────────

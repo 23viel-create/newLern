@@ -1,10 +1,10 @@
 const fs   = require('fs');
 const path = require('path');
+const { exec } = require('child_process');
 const AdmZip = require('adm-zip');
-const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = require('docx');
-const { summariesRoot, getSummaryContent, createFolder } = require('./filesController');
+const { summariesRoot, getSummaryContent, setSummaryContent } = require('./filesController');
 
-const DATA_ROOT = path.resolve(__dirname, '../../data');
+const { DATA_DIR: DATA_ROOT, SCHEDULE_FILE: DATA_SCHEDULE_FILE, BACKUPS_DIR, WORD_CACHE_DIR: _WORD_CACHE_DIR } = require('../config/limits');
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -12,60 +12,79 @@ function _ts() {
   return new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
 }
 
-// Strip HTML tags, preserving newlines at block boundaries
-function _htmlToText(html) {
-  return (html || '')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<\/div>/gi, '\n')
-    .replace(/<\/li>/gi, '\n')
-    .replace(/<li[^>]*>/gi, '• ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
+// ─── Word HTML export (.doc — MS-Word-compatible HTML) ───────────────────────
 
-// ─── DOCX export ─────────────────────────────────────────────────────────────
+function _preprocessHtmlForWord(raw) {
+  if (!raw) return '<p></p>';
 
-async function buildDocx(title, htmlContent) {
-  const plainText = _htmlToText(htmlContent);
-  const paragraphs = [];
+  // 1. Flatten <div> wrappers → <p> so Word doesn't create floating text boxes
+  let html = raw
+    .replace(/<div([^>]*)>/gi, '<p$1>')
+    .replace(/<\/div>/gi, '</p>');
 
-  // Title
-  paragraphs.push(
-    new Paragraph({
-      text: title || 'סיכום',
-      heading: HeadingLevel.HEADING_1,
-      alignment: AlignmentType.RIGHT,
-      bidirectional: true,
-    })
-  );
-  paragraphs.push(new Paragraph({ text: '' }));
-
-  // Body — split by newlines
-  for (const line of plainText.split('\n')) {
-    paragraphs.push(
-      new Paragraph({
-        children: [new TextRun({ text: line, size: 24 })],
-        alignment: AlignmentType.RIGHT,
-        bidirectional: true,
+  // 2. Strip inline CSS properties that cause Word to render shapes/frames
+  const BLOCKED_PROPS = /^(width|height|position|margin|padding|float|clear|display|overflow|z-index|top|left|right|bottom)$/i;
+  html = html.replace(/style="([^"]*)"/gi, (_m, styleStr) => {
+    const clean = styleStr
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => {
+        const prop = s.split(':')[0].trim();
+        return prop && !BLOCKED_PROPS.test(prop);
       })
-    );
-  }
-
-  const doc = new Document({
-    sections: [{
-      properties: { page: { textDirection: 'rl' } },
-      children: paragraphs,
-    }],
+      .join('; ');
+    return clean ? `style="${clean}"` : '';
   });
 
-  return Packer.toBuffer(doc);
+  // 3. Convert all list items to literal dash paragraphs — bypasses Word's
+  //    list engine entirely, guaranteeing no auto-numbering and clean two-way sync.
+  html = html.replace(
+    /<li[^>]*>([\s\S]*?)<\/li>/gis,
+    '<p style="margin-top:0;margin-bottom:0;margin-right:20px;direction:rtl;text-align:right">- $1</p>',
+  );
+
+  // 4. Strip <ul>, </ul>, <ol>, </ol> wrappers — now empty after li conversion
+  html = html
+    .replace(/<\/?ul[^>]*>/gi, '')
+    .replace(/<\/?ol[^>]*>/gi, '');
+
+  return html;
+}
+
+function buildDocx(_title, htmlContent) {
+  const body = _preprocessHtmlForWord(htmlContent);
+  const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+     xmlns:w="urn:schemas-microsoft-com:office:word"
+     xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="UTF-8">
+  <meta name="ProgId" content="Word.Document">
+  <meta name="Generator" content="Microsoft Word 11">
+  <style>
+    @page { margin: 2cm; mso-page-orientation: portrait; }
+    body  { direction: rtl; font-family: Arial, sans-serif; font-size: 12pt; }
+    p     { margin: 0 0 6pt 0; direction: rtl; }
+    h1, h2, h3 { margin: 8pt 0 4pt 0; direction: rtl; }
+    ul, ol { margin: 4pt 0 4pt 1.5em; direction: rtl; padding-right: 1.2em; }
+    li     { margin-bottom: 2pt; list-style-type: disc; direction: rtl; text-align: right; }
+    strong { font-weight: bold; }
+    em     { font-style: italic; }
+    u      { text-decoration: underline; }
+  </style>
+  <!--[if gte mso 9]><xml>
+    <w:WordDocument>
+      <w:View>Normal</w:View>
+      <w:Zoom>100</w:Zoom>
+      <w:BiDi/>
+      <w:DoNotOptimizeForBrowser/>
+    </w:WordDocument>
+  </xml><![endif]-->
+</head>
+<body dir="rtl">
+${body}
+</body>
+</html>`;
+  return Buffer.from(html, 'utf-8');
 }
 
 // ─── ZIP export ───────────────────────────────────────────────────────────────
@@ -87,7 +106,7 @@ function exportZip(subPath) {
   _addDirToZip(zip, exportRoot, 'summaries_tree');
 
   // Add schedule.json
-  const scheduleFile = path.join(DATA_ROOT, 'schedule.json');
+  const scheduleFile = DATA_SCHEDULE_FILE;
   if (fs.existsSync(scheduleFile)) {
     zip.addFile('schedule.json', fs.readFileSync(scheduleFile));
   }
@@ -162,7 +181,7 @@ function importZip(buffer, targetRelPath) {
 // ─── List backups ─────────────────────────────────────────────────────────────
 
 function listBackups() {
-  const backupsDir = path.join(DATA_ROOT, 'backups');
+  const backupsDir = BACKUPS_DIR;
   if (!fs.existsSync(backupsDir)) return [];
   return fs.readdirSync(backupsDir)
     .filter(f => f.endsWith('.zip'))
@@ -175,11 +194,563 @@ function listBackups() {
 
 // Save a backup copy to data/backups/
 function saveBackup(buffer) {
-  const backupsDir = path.join(DATA_ROOT, 'backups');
+  const backupsDir = BACKUPS_DIR;
   fs.mkdirSync(backupsDir, { recursive: true });
   const name = `backup_${_ts()}.zip`;
   fs.writeFileSync(path.join(backupsDir, name), buffer);
   return name;
 }
 
-module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup };
+// ─── Open in local Word ───────────────────────────────────────────────────────
+
+const WORD_CACHE_DIR = _WORD_CACHE_DIR;
+
+async function openInWord(nodePath, title, html) {
+  fs.mkdirSync(WORD_CACHE_DIR, { recursive: true });
+
+  let content = html !== undefined ? html : getSummaryContent(nodePath);
+  const buffer = await buildDocx(title || nodePath, content);
+
+  // Before writing the fresh export, remove any conflicting Word files from the
+  // summary folder so the user always finds exactly one document to open.
+  const summaryFolderPath = path.join(summariesRoot, nodePath);
+  const exportPath        = path.join(summaryFolderPath, 'document.doc');
+  if (fs.existsSync(summaryFolderPath)) {
+    for (const conflict of ['document.doc', 'document.docx']) {
+      const cp = path.join(summaryFolderPath, conflict);
+      if (fs.existsSync(cp)) {
+        try { fs.unlinkSync(cp); }
+        catch (e) {
+          if (e.code === 'EBUSY' || e.code === 'EPERM')
+            throw new Error('קובץ הוורד פתוח כעת בתוכנת Word. אנא שמור וסגור אותו כדי לאפשר סנכרון מחדש.');
+        }
+      }
+    }
+    try {
+      fs.writeFileSync(exportPath, buffer);
+      console.log('Word Engine [EXPORT]: Writing master web content to:', exportPath);
+    } catch (e) {
+      if (e.code !== 'EBUSY' && e.code !== 'EPERM') throw e;
+      // File immediately re-locked — word_cache copy below still lets the user open it
+    }
+  }
+
+  // Also save a named copy in word_cache for the OS open command
+  const safeBase = (title || nodePath).replace(/[^\w֐-׿‏‎ -]/g, '_').slice(0, 60);
+  let filePath   = path.join(WORD_CACHE_DIR, safeBase + '.doc');
+
+  // EBUSY retry: if main path is locked, try incrementing filename suffix
+  let written = false;
+  for (let attempt = 0; attempt <= 5; attempt++) {
+    const tryPath = attempt === 0
+      ? filePath
+      : path.join(WORD_CACHE_DIR, `${safeBase}_${attempt}.doc`);
+    try {
+      fs.writeFileSync(tryPath, buffer);
+      filePath = tryPath;
+      written  = true;
+      break;
+    } catch (e) {
+      if ((e.code === 'EBUSY' || e.code === 'EPERM') && attempt < 5) continue;
+      throw new Error('קובץ הוורד פתוח כעת בתוכנת Word. אנא שמור וסגור אותו כדי לאפשר סנכרון מחדש.');
+    }
+  }
+  if (!written) throw new Error('לא ניתן לשמור קובץ Word — נסה שנית לאחר סגירת Word.');
+
+  // Platform open command
+  let cmd;
+  if (process.platform === 'win32') {
+    cmd = `start "" "${filePath}"`;
+  } else if (process.platform === 'darwin') {
+    cmd = `open "${filePath}"`;
+  } else {
+    cmd = `xdg-open "${filePath}"`;
+  }
+
+  return new Promise((resolve, reject) => {
+    exec(cmd, (err) => {
+      if (err) reject(new Error(`לא ניתן לפתוח את הקובץ: ${err.message}`));
+      else     resolve({ filePath });
+    });
+  });
+}
+
+// Read back .docx metadata for Word sync — checks summary folder first (dual-file)
+function readWordCache(title, nodePath) {
+  // Primary: document.doc inside the summary folder
+  if (nodePath) {
+    const summaryDocx   = path.join(summariesRoot, nodePath, 'document.doc');
+    const contentFile   = path.join(summariesRoot, nodePath, 'content.txt');
+    if (fs.existsSync(summaryDocx)) {
+      const docxStat     = fs.statSync(summaryDocx);
+      const contentMtime = fs.existsSync(contentFile) ? fs.statSync(contentFile).mtimeMs : 0;
+      return {
+        filePath:         summaryDocx,
+        size:             docxStat.size,
+        mtime:            docxStat.mtimeMs,
+        newerThanContent: docxStat.mtimeMs > contentMtime + 2000, // 2 s grace period
+      };
+    }
+  }
+  // Fallback: named file in word_cache
+  const safeBase = (title || nodePath).replace(/[^\w֐-׿‏‎ -]/g, '_').slice(0, 60);
+  const filePath = path.join(WORD_CACHE_DIR, safeBase + '.doc');
+  if (!fs.existsSync(filePath)) throw new Error('קובץ Word לא נמצא — פתח אותו תחילה');
+  const stat = fs.statSync(filePath);
+  return { filePath, size: stat.size, mtime: stat.mtimeMs, newerThanContent: false };
+}
+
+// ─── Binary DOCX XML → simple HTML converter ─────────────────────────────────
+// Used when Word saves in native ZIP/DOCX format instead of HTML.
+
+function _convertDocxXmlToHtml(xml) {
+  const paras = [];
+  const pRegex = /<w:p[\s>][\s\S]*?<\/w:p>/gi;
+  let pm;
+  while ((pm = pRegex.exec(xml)) !== null) {
+    const texts = [];
+    const tRegex = /<w:t[^>]*>([\s\S]*?)<\/w:t>/gi;
+    let tm;
+    while ((tm = tRegex.exec(pm[0])) !== null) texts.push(tm[1]);
+    const text = texts.join('');
+    if (text.trim()) {
+      const safe = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      paras.push(`<p dir="rtl">${safe}</p>`);
+    }
+  }
+  return paras.join('\n');
+}
+
+// ─── Aggressive Word HTML bloat shredder (text .doc path only) ───────────────
+// The binary .docx path (_convertDocxXmlToHtml) produces clean output and
+// does NOT go through this function.
+
+function _sanitizeWordBody(body) {
+  let b = body;
+
+  // 1. Strip any residual <html> / </html> wrapper that leaked through extraction
+  b = b.replace(/<html[^>]*>|<\/html>/gi, '');
+
+  // 2. Remove all remaining <style> blocks (head-strip may have missed nested ones)
+  b = b.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+
+  // 3. Remove named Office namespace tags first (more readable), then catch-all
+  b = b.replace(/<\/?(o:p|o:smarttagtype)[^>]*>/gi, '');
+  b = b.replace(/<\/?[a-z][a-z0-9]*:[a-z][a-z0-9]*[^>]*\/?>/gi, '');
+
+  // 4. Unwrap WordSection wrapper div — keep inner content
+  b = b.replace(/<div[^>]*\bWordSection\d*\b[^>]*>([\s\S]*?)<\/div>/gi, '$1');
+
+  // 5. Strip xmlns declarations on surviving tags
+  b = b.replace(/\s+xmlns(?::[a-z0-9]+)?="[^"]*"/gi, '');
+
+  // 6. Strip ALL class / style / lang / dir / id attributes (quoted, double or single)
+  b = b.replace(/\s+(class|style|lang|dir|id)="[^"]*"/gi, '');
+  b = b.replace(/\s+(class|style|lang|dir|id)='[^']*'/gi, '');
+
+  // 7. Strip unquoted attribute values Word sometimes emits (e.g. class=WordSection1)
+  b = b.replace(/\s+(class|style|lang|dir|id)=[^\s>]+/gi, '');
+
+  // 8. Remove empty paragraphs and spans left behind after stripping
+  b = b.replace(/<p>\s*<\/p>/gi, '');
+  b = b.replace(/<span>\s*<\/span>/gi, '');
+
+  return b.trim();
+}
+
+// ─── Word HTML sanitizer (import: .doc HTML → app) ───────────────────────────
+// Permissive three-step fallback — no longer rejects on missing schema markers.
+
+function _extractWordHtmlBody(raw) {
+  // Strip metadata blocks
+  let html = raw
+    .replace(/<head[\s\S]*?<\/head>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '');
+
+  // Step 1: permissive <body> regex
+  let body;
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  if (bodyMatch) {
+    body = bodyMatch[1];
+  } else {
+    // Step 2: split on <body (catches body tags with complex attributes)
+    const bodyIdx = html.toLowerCase().indexOf('<body');
+    if (bodyIdx !== -1) {
+      const closeTag = html.indexOf('>', bodyIdx);
+      body = closeTag !== -1
+        ? html.slice(closeTag + 1).replace(/<\/body[\s\S]*$/i, '')
+        : html;
+    } else {
+      // Step 3: ultimate fallback — no <body> at all, use entire content
+      console.log('Word Sync: No <body> tag detected — using full content as body');
+      body = html;
+    }
+  }
+
+  return _sanitizeWordBody(body);
+}
+
+// ─── Two-way sync: pure mtime-polling (resilient against Word atomic saves) ──
+// Word's atomic save (delete old file + write new) instantly kills fs.watch
+// file descriptors. An mtime-cache poll every 3 s is the only reliable approach.
+
+const _docMtimeCache = new Map(); // absPath → last-known mtimeMs
+
+function _syncWordFile(absPath) {
+  if (!fs.existsSync(absPath)) return;
+  try {
+    const raw = fs.readFileSync(absPath, { encoding: 'utf-8', flag: 'r' });
+    if (!raw.includes('urn:schemas-microsoft-com:office:word')) return;
+    const body = _extractWordHtmlBody(raw);
+    if (!body) return;
+    const nodeRelPath = path.relative(summariesRoot, path.dirname(absPath));
+    const contentPath = path.join(summariesRoot, nodeRelPath, 'content.txt');
+    const docMtime    = fs.statSync(absPath).mtimeMs;
+    const cntMtime    = fs.existsSync(contentPath) ? fs.statSync(contentPath).mtimeMs : 0;
+    if (docMtime <= cntMtime + 2000) return;
+    setSummaryContent(nodeRelPath, body);
+  } catch { /* ignore errors from locked/partial reads */ }
+}
+
+function _walkDocFiles(dir, results) {
+  try {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name.startsWith('~$')) continue; // skip Word lock/temp files
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        _walkDocFiles(abs, results);
+      } else if (entry.name === 'document.doc') {
+        results.push(abs);
+      }
+    }
+  } catch {}
+}
+
+function _pollForWordChanges() {
+  const docs = [];
+  _walkDocFiles(summariesRoot, docs);
+  for (const absPath of docs) {
+    try {
+      const newMtime = fs.statSync(absPath).mtimeMs;
+      const cached   = _docMtimeCache.get(absPath);
+      if (cached === undefined) {
+        _docMtimeCache.set(absPath, newMtime); // seed on first discovery
+        continue;
+      }
+      if (newMtime > cached + 1000) {
+        _docMtimeCache.set(absPath, newMtime);
+        _syncWordFile(absPath);
+      }
+    } catch {}
+  }
+}
+
+// ─── Manual on-demand Word sync ───────────────────────────────────────────────
+// Called by POST /api/backup/sync-word { nodePath, title }.
+// Priority order: word_cache (where OS-opened file lives) → summary folder.
+// Within each location, the most recently modified file wins.
+
+function syncWordFile(nodePath, title) {
+  // Compute the same safeBase the export uses so we hit the exact word_cache file
+  const safeBase = (title || nodePath).replace(/[^\w֐-׿‏‎ -]/g, '_').slice(0, 60);
+  const treeDir  = path.join(summariesRoot, nodePath);
+
+  // Build the full candidate list: word_cache variants first, then summary folder
+  const allCandidates = [
+    path.join(WORD_CACHE_DIR, safeBase + '.docx'),
+    path.join(WORD_CACHE_DIR, safeBase + '.doc'),
+    path.join(treeDir, 'document.docx'),
+    path.join(treeDir, 'document.doc'),
+  ].filter(p => {
+    if (!fs.existsSync(p)) return false;
+    if (path.basename(p).startsWith('~$')) return false; // skip Word lock files
+    return true;
+  });
+
+  if (allCandidates.length === 0) {
+    console.log(`Word Engine [SYNC]: No Word file found in word_cache or ${treeDir}`);
+    const err = new Error('לא נמצא קובץ Word שמור עבור סיכום זה.');
+    err.status = 404;
+    throw err;
+  }
+
+  // Always pick the most recently modified file across all locations
+  let chosenPath   = allCandidates[0];
+  let chosenMtime  = fs.statSync(chosenPath).mtimeMs;
+  for (let i = 1; i < allCandidates.length; i++) {
+    const mt = fs.statSync(allCandidates[i]).mtimeMs;
+    if (mt > chosenMtime) { chosenMtime = mt; chosenPath = allCandidates[i]; }
+  }
+
+  if (allCandidates.length > 1) {
+    console.log('Word Sync: Detected multiple files. Selected latest modified ->', chosenPath);
+  }
+
+  const isFromCache = chosenPath.startsWith(WORD_CACHE_DIR);
+  if (isFromCache) {
+    console.log(`Word Sync: Reading user edits from cache -> ${chosenPath}`);
+  }
+  console.log('Word Engine [SYNC]: Extracting user changes directly from:', chosenPath);
+
+  // Read as Buffer — detect binary ZIP vs HTML text via magic bytes ("PK")
+  const buf      = fs.readFileSync(chosenPath);
+  const isBinary = buf[0] === 0x50 && buf[1] === 0x4B;
+  console.log(`Word Engine [SYNC]: Format — ${isBinary ? 'binary ZIP/DOCX' : 'HTML text'} (${buf.length} bytes)`);
+
+  let body;
+  if (isBinary) {
+    try {
+      const zip      = new AdmZip(buf);
+      const xmlEntry = zip.getEntry('word/document.xml');
+      if (!xmlEntry) throw new Error('word/document.xml חסר בתוך ה-ZIP');
+      body = _convertDocxXmlToHtml(xmlEntry.getData().toString('utf-8'));
+      console.log(`Word Engine [SYNC]: Binary extraction yielded ${body.length} chars`);
+    } catch (zipErr) {
+      throw new Error(`שגיאה בקריאת קובץ Word בינארי: ${zipErr.message}`);
+    }
+  } else {
+    // Heuristic UTF-16LE check: BOM (FF FE) OR null bytes at positions 1 and 3
+    // (e.g. '<' in UTF-16LE is 3C 00, 'h' is 68 00 → bytes 1 and 3 are 0x00)
+    const isUtf16 = (buf[0] === 0xFF && buf[1] === 0xFE) ||
+                    (buf.length > 3 && buf[1] === 0x00 && buf[3] === 0x00);
+    let html;
+    if (isUtf16) {
+      console.log('Word Sync: Heuristic detected UTF-16LE encoding');
+      html = buf.toString('utf16le');
+    } else {
+      console.log('Word Sync: Falling back to UTF-8 encoding');
+      html = buf.toString('utf8');
+    }
+    html = html.replace(/^﻿/, ''); // Strip invisible BOM marker if present
+    body = _extractWordHtmlBody(html);
+    console.log(`Word Engine [SYNC]: HTML extraction yielded ${body.length} chars`);
+  }
+
+  if (!body.trim()) throw new Error('לא ניתן לחלץ תוכן מהקובץ');
+
+  const targetTreePath = path.join(treeDir, 'content.txt');
+  console.log('Word Sync: Force updating master tree file ->', targetTreePath);
+  setSummaryContent(nodePath, body);
+
+  // Remove every stale candidate so the next sync reads only the freshest source
+  for (const stalePath of allCandidates) {
+    if (stalePath === chosenPath) continue;
+    try { fs.unlinkSync(stalePath); } catch { /* locked or already gone — not fatal */ }
+  }
+
+  return { ok: true };
+}
+
+// ─── Bulk Word folder import ───────────────────────────────────────────────
+// Accepts an array of multer file objects plus a parallel array of relPaths
+// (webkitRelativePath values) and a targetRoot prefix.
+
+async function bulkImportWord(files, relPaths, targetRoot) {
+  const results = { imported: 0, skipped: 0, errors: [] };
+  const now = new Date().toISOString();
+
+  for (let i = 0; i < files.length; i++) {
+    const file    = files[i];
+    const relPath = (relPaths[i] || file.originalname).replace(/\\/g, '/');
+    const ext     = path.extname(file.originalname).toLowerCase();
+
+    if (!['.doc', '.docx'].includes(ext)) { results.skipped++; continue; }
+
+    const base    = targetRoot ? `${targetRoot.replace(/\/+$/, '')}/${relPath}` : relPath;
+    const parts   = base.split('/').filter(Boolean);
+    const rawFile = parts[parts.length - 1];
+    const sumName = rawFile.replace(/\.(doc|docx)$/i, '');
+    const folders = parts.slice(0, -1);
+
+    try {
+      // Ensure all ancestor folders have meta.json
+      let curRel = '';
+      for (const part of folders) {
+        curRel = curRel ? `${curRel}/${part}` : part;
+        const absDir = path.join(summariesRoot, curRel);
+        if (!fs.existsSync(absDir)) {
+          fs.mkdirSync(absDir, { recursive: true });
+          fs.writeFileSync(path.join(absDir, 'meta.json'),
+            JSON.stringify({ title: part, type: 'folder', createdAt: now, updatedAt: now }, null, 2));
+        }
+      }
+
+      // Create summary folder
+      const sumRel = curRel ? `${curRel}/${sumName}` : sumName;
+      const sumAbs = path.join(summariesRoot, sumRel);
+      fs.mkdirSync(sumAbs, { recursive: true });
+
+      // Extract content — reuse Phase 32 heuristic pipeline
+      const buf    = file.buffer;
+      const isBin  = buf[0] === 0x50 && buf[1] === 0x4B;
+      let body = '';
+      if (isBin) {
+        const zip      = new AdmZip(buf);
+        const xmlEntry = zip.getEntry('word/document.xml');
+        if (xmlEntry) body = _convertDocxXmlToHtml(xmlEntry.getData().toString('utf-8'));
+      } else {
+        const isUtf16 = (buf[0] === 0xFF && buf[1] === 0xFE) ||
+                        (buf.length > 3 && buf[1] === 0x00 && buf[3] === 0x00);
+        let html = isUtf16 ? buf.toString('utf16le') : buf.toString('utf8');
+        html     = html.replace(/^﻿/, '');
+        body     = _extractWordHtmlBody(html);
+      }
+
+      fs.writeFileSync(path.join(sumAbs, 'meta.json'),
+        JSON.stringify({ title: sumName, type: 'summary', createdAt: now, updatedAt: now }, null, 2));
+      fs.writeFileSync(path.join(sumAbs, 'content.txt'),          body || '');
+      fs.writeFileSync(path.join(sumAbs, 'questions_open.json'), '[]');
+      fs.writeFileSync(path.join(sumAbs, 'questions_mc.json'),   '[]');
+      results.imported++;
+    } catch (err) {
+      results.errors.push({ file: relPath, error: err.message });
+    }
+  }
+  return results;
+}
+
+// ─── Export full tree as Word ZIP ──────────────────────────────────────────
+// Walk summaries_tree, convert every summary to Word HTML via buildDocx,
+// add as {relPath}.doc inside a ZIP, return the ZIP buffer.
+
+function exportWordZip() {
+  const zip = new AdmZip();
+
+  function walk(dir, relBase) {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); }
+    catch { return; }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const absDir   = path.join(dir, entry.name);
+      const rel      = relBase ? `${relBase}/${entry.name}` : entry.name;
+      const metaFile = path.join(absDir, 'meta.json');
+      if (!fs.existsSync(metaFile)) continue;
+      let meta;
+      try { meta = JSON.parse(fs.readFileSync(metaFile, 'utf-8')); } catch { continue; }
+      if (meta.type === 'summary') {
+        try {
+          const content   = getSummaryContent(rel);
+          const docBuffer = buildDocx(meta.title || entry.name, content);
+          zip.addFile(`${rel}.doc`, docBuffer);
+        } catch { /* skip summaries that fail */ }
+      } else {
+        walk(absDir, rel);
+      }
+    }
+  }
+
+  walk(summariesRoot, '');
+  return zip.toBuffer();
+}
+
+// ─── Bulk Word import from a ZIP container ────────────────────────────────────
+// Accepts a ZIP buffer whose entries are .doc / .docx files (preserving folder
+// structure). Each entry is processed through the same heuristic pipeline used
+// by bulkImportWord so the caller can treat both paths identically.
+
+async function bulkImportWordFromZip(zipBuffer, targetRoot) {
+  const container = new AdmZip(zipBuffer);
+  const entries   = container.getEntries().filter(e => !e.isDirectory);
+  const results   = { imported: 0, skipped: 0, errors: [] };
+  const now       = new Date().toISOString();
+
+  for (const entry of entries) {
+    const ext = path.extname(entry.entryName).toLowerCase();
+    if (!['.doc', '.docx'].includes(ext)) { results.skipped++; continue; }
+
+    const relPath = entry.entryName.replace(/\\/g, '/');
+    const base    = targetRoot ? `${targetRoot.replace(/\/+$/, '')}/${relPath}` : relPath;
+    const parts   = base.split('/').filter(Boolean);
+    const rawFile = parts[parts.length - 1];
+    const sumName = rawFile.replace(/\.(doc|docx)$/i, '');
+    const folders = parts.slice(0, -1);
+
+    try {
+      let curRel = '';
+      for (const part of folders) {
+        curRel = curRel ? `${curRel}/${part}` : part;
+        const absDir = path.join(summariesRoot, curRel);
+        if (!fs.existsSync(absDir)) {
+          fs.mkdirSync(absDir, { recursive: true });
+          fs.writeFileSync(path.join(absDir, 'meta.json'),
+            JSON.stringify({ title: part, type: 'folder', createdAt: now, updatedAt: now }, null, 2));
+        }
+      }
+
+      const sumRel = curRel ? `${curRel}/${sumName}` : sumName;
+      const sumAbs = path.join(summariesRoot, sumRel);
+      fs.mkdirSync(sumAbs, { recursive: true });
+
+      const buf    = entry.getData();
+      const isBin  = buf[0] === 0x50 && buf[1] === 0x4B;
+      let body = '';
+      if (isBin) {
+        const innerZip = new AdmZip(buf);
+        const xmlEntry = innerZip.getEntry('word/document.xml');
+        if (xmlEntry) body = _convertDocxXmlToHtml(xmlEntry.getData().toString('utf-8'));
+      } else {
+        const isUtf16 = (buf[0] === 0xFF && buf[1] === 0xFE) ||
+                        (buf.length > 3 && buf[1] === 0x00 && buf[3] === 0x00);
+        let html = isUtf16 ? buf.toString('utf16le') : buf.toString('utf8');
+        html = html.replace(/^﻿/, '');
+        body = _extractWordHtmlBody(html);
+      }
+
+      fs.writeFileSync(path.join(sumAbs, 'meta.json'),
+        JSON.stringify({ title: sumName, type: 'summary', createdAt: now, updatedAt: now }, null, 2));
+      fs.writeFileSync(path.join(sumAbs, 'content.txt'),          body || '');
+      fs.writeFileSync(path.join(sumAbs, 'questions_open.json'), '[]');
+      fs.writeFileSync(path.join(sumAbs, 'questions_mc.json'),   '[]');
+      results.imported++;
+    } catch (err) {
+      results.errors.push({ file: relPath, error: err.message });
+    }
+  }
+  return results;
+}
+
+// ─── Granular node ZIP export ─────────────────────────────────────────────────
+// Zips a single summary folder or a parent folder inside summaries_tree.
+// Excludes any global app state — only the node's own files are included.
+
+function exportNodeZip(targetPath) {
+  const safeRel = path.normalize(targetPath).replace(/^(\.\.(\/|\\|$))+/, '');
+  const nodeAbs = path.resolve(summariesRoot, safeRel);
+
+  // Path traversal guard
+  if (!nodeAbs.startsWith(path.resolve(summariesRoot))) {
+    const err = new Error('נתיב לא חוקי'); err.status = 400; throw err;
+  }
+  if (!fs.existsSync(nodeAbs)) {
+    const err = new Error('הנתיב לא נמצא'); err.status = 404; throw err;
+  }
+
+  const zip = new AdmZip();
+
+  function _addDir(dir, zipBase) {
+    for (const entry of fs.readdirSync(dir)) {
+      const abs = path.join(dir, entry);
+      const rel = zipBase ? `${zipBase}/${entry}` : entry;
+      if (fs.statSync(abs).isDirectory()) {
+        _addDir(abs, rel);
+      } else {
+        zip.addFile(rel, fs.readFileSync(abs));
+      }
+    }
+  }
+
+  const stat = fs.statSync(nodeAbs);
+  if (stat.isDirectory()) {
+    _addDir(nodeAbs, '');
+  } else {
+    zip.addFile(path.basename(nodeAbs), fs.readFileSync(nodeAbs));
+  }
+
+  return zip.toBuffer();
+}
+
+module.exports = { buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, syncWordFile, bulkImportWord, bulkImportWordFromZip, exportWordZip, exportNodeZip };

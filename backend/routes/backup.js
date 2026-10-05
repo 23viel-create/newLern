@@ -3,7 +3,8 @@ const multer  = require('multer');
 const router  = express.Router();
 
 const {
-  buildDocx, exportZip, importZip, listBackups, saveBackup,
+  buildDocx, exportZip, importZip, listBackups, saveBackup, openInWord, readWordCache, syncWordFile,
+  bulkImportWord, bulkImportWordFromZip, exportWordZip, exportNodeZip,
 } = require('../controllers/backupController');
 const {
   getSummaryContent, getSummaryHistory, restoreHistoryVersion,
@@ -24,11 +25,11 @@ router.post('/docx', async (req, res) => {
     const buffer  = await buildDocx(title || nodePath, content);
 
     const rawTitle   = (title || nodePath).trim().slice(0, 60) || 'summary';
-    const asciiName  = rawTitle.replace(/[^\x20-\x7E]/g, '_').replace(/["/\\?*:|<>]/g, '_') + '.docx';
-    const encodedName = encodeURIComponent(rawTitle + '.docx');
+    const asciiName  = rawTitle.replace(/[^\x20-\x7E]/g, '_').replace(/["/\\?*:|<>]/g, '_') + '.doc';
+    const encodedName = encodeURIComponent(rawTitle + '.doc');
     res.setHeader('Content-Disposition',
       `attachment; filename="${asciiName}"; filename*=UTF-8''${encodedName}`);
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Type', 'application/msword');
     res.send(buffer);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -94,6 +95,101 @@ router.post('/restore', (req, res) => {
     const content = restoreHistoryVersion(nodePath, versionIndex ?? 0);
     res.json({ ok: true, content });
   } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// ─── Open in local Word ───────────────────────────────────────────────────────
+
+// POST /api/backup/open-in-word  { nodePath, title, html? }
+router.post('/open-in-word', async (req, res) => {
+  try {
+    const { nodePath, title, html } = req.body;
+    if (!nodePath) return res.status(400).json({ error: 'נדרש nodePath' });
+    const result = await openInWord(nodePath, title, html);
+    res.json({ ok: true, filePath: result.filePath });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/backup/word-sync?nodePath=...&title=...
+router.get('/word-sync', (req, res) => {
+  try {
+    const { nodePath, title } = req.query;
+    if (!nodePath) return res.status(400).json({ error: 'נדרש nodePath' });
+    const info = readWordCache(title, nodePath);
+    res.json({ ok: true, ...info });
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+// POST /api/backup/sync-word  { nodePath, title }
+// Manual on-demand sync: read newest Word file from word_cache or summary folder,
+// sanitize, and overwrite content.txt in the summary tree.
+router.post('/sync-word', (req, res) => {
+  try {
+    const { nodePath, title } = req.body;
+    if (!nodePath) return res.status(400).json({ error: 'נדרש nodePath' });
+    const result = syncWordFile(nodePath, title);
+    res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// POST /api/backup/import-word-bulk — import a folder OR a ZIP of Word files
+// Detects a single .zip upload and extracts it via bulkImportWordFromZip;
+// otherwise processes the array of .doc/.docx files as a folder import.
+const path = require('path');
+router.post('/import-word-bulk', upload.array('files', 500), async (req, res) => {
+  try {
+    const files      = req.files || [];
+    const targetRoot = (req.body.targetRoot || '').trim().replace(/^\/+|\/+$/g, '');
+    if (!files.length) return res.status(400).json({ success: false, message: 'לא נבחרו קבצים' });
+
+    // ZIP container upload: single file whose extension is .zip
+    if (files.length === 1 && path.extname(files[0].originalname).toLowerCase() === '.zip') {
+      const result = await bulkImportWordFromZip(files[0].buffer, targetRoot);
+      return res.json({ success: true, data: result });
+    }
+
+    // Folder upload: array of .doc/.docx with webkitRelativePath metadata
+    const rawPaths = req.body.paths;
+    const relPaths = Array.isArray(rawPaths) ? rawPaths : (rawPaths ? [rawPaths] : []);
+    const result   = await bulkImportWord(files, relPaths, targetRoot);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/backup/export-node-zip?targetPath=... — zip a specific node/folder
+router.get('/export-node-zip', (req, res) => {
+  try {
+    const { targetPath } = req.query;
+    if (!targetPath) return res.status(400).json({ error: 'נדרש targetPath' });
+    const buffer   = exportNodeZip(targetPath);
+    const nodeName = targetPath.split('/').filter(Boolean).pop() || 'node';
+    const fname    = `${nodeName}_${new Date().toISOString().slice(0, 10)}.zip`;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    res.send(buffer);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+// GET /api/backup/export-word-zip — export full tree as Word files in a ZIP
+router.get('/export-word-zip', (req, res) => {
+  try {
+    const buffer = exportWordZip();
+    const fname  = `word_export_${new Date().toISOString().slice(0, 10)}.zip`;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    res.send(buffer);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

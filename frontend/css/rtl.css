@@ -1,7 +1,7 @@
 /* RTL corrections — all pages have dir="rtl" in HTML */
 
-.navbar            { flex-direction: row-reverse; }
-.navbar__links     { flex-direction: row-reverse; }
+/* Navbar: in RTL context flex-direction:row already flows right→left correctly.
+   No row-reverse needed here — that would undo the natural RTL order. */
 .navbar__status    { flex-direction: row-reverse; }
 
 .modal__actions    { flex-direction: row-reverse; }
@@ -77,3 +77,4 @@
 /* Help RTL */
 .help-list li::before { content: '→ '; }
 .api-key-input-wrap   { flex-direction: row-reverse; }
+
